@@ -1,0 +1,17 @@
+		
+		void 						read(const char* sFile);
+		std::string					popOperator();
+		ENUM_OP_PRECEDENCE 			opFromString(std::string sOperator);
+		void						checkOpPrecedenceAndPush(std::string sCurrentOperator);		
+		
+		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
+		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);
+		Tree*						createPostFixExpr();
+	protected:
+		
+	private:
+		std::stack<std::string>		m_vOperatorStack;
+		std::vector<std::string>	m_vPostFix;
+		
+		Tree*						m_pASTRootNode;
+		Tree*						m_pASTCurrentNode;

@@ -1,0 +1,299 @@
+
+<def>							::=		<stmt_list>;
+<stmt_list> 					::=		{ <stmt> };
+<stmt>      					::=   	( <assignment> | <ifelse> | <_while> | <print> | <putc> | <bracesstmtlist> ) ;
+
+<ifelse>						::= 	<_if>;
+<_if>							::=		"if" 			"<code>"
+															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, GrammerUtils::m_pPrevToken.getText());
+															Tree* pTemp = nullptr;
+															{
+																pIfNode->m_pParentNode = m_pASTCurrentNode;
+		
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pIfNode;
+															}
+														"</code>"
+										'('
+										<expr>			"<code>"
+															Tree* pExpressionLeftLeaf = createPostFixExpr();
+															{
+																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
+															}
+														"</code>"
+										')'
+										['{'] 
+										<stmt_list> 
+										['}'] 
+										[ <_else> ]		"<code>"
+															pTemp->addChild(pIfNode);
+															{
+																m_pASTCurrentNode = pTemp;
+															}
+														"</code>"
+										;
+										
+<_else>							::=		"else" 			"<code>"
+															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
+															Tree* pIfNode = nullptr;
+															{
+																pIfNode = m_pASTCurrentNode;
+																m_pASTCurrentNode = pElseNode;
+															}
+														"</code>"
+										['{'] 
+										<stmt_list> 
+										['}'] 			"<code>"
+															pIfNode->m_pRightNode = pElseNode;
+															{
+																m_pASTCurrentNode = pIfNode;
+															}
+														"</code>"
+										;
+
+<_while>						::= 	"while" 		"<code>"
+															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, GrammerUtils::m_pPrevToken.getText());
+															Tree* pTemp = nullptr;
+															{
+																pWhileNode->m_pParentNode = m_pASTCurrentNode;
+
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pWhileNode;
+															}
+														"</code>"
+										'('
+										<expr>			"<code>"
+															Tree* pExpressionLeftLeaf = createPostFixExpr();
+															{
+																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
+															}
+														"</code>"
+										')'
+										['{'] 
+										<stmt_list> 
+										['}'] 			"<code>"
+															pTemp->addChild(pWhileNode);
+															{
+																m_pASTCurrentNode = pTemp;
+															}
+														"</code>"
+										
+										;
+
+<print>							::= 	"print" 
+										'(' 			"<code>"
+															Tree* pPrintNode = makeLeaf(ASTNodeType::ASTNode_PRINT, GrammerUtils::m_pPrevToken.getText());
+															Tree* pTemp = nullptr;
+															{
+																pPrintNode->m_pParentNode = m_pASTCurrentNode;
+														
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pPrintNode;
+															}
+														"</code>"
+										<print_list> 
+										')' ';' 		"<code>"
+															pTemp->addChild(pPrintNode);
+															{
+																m_pASTCurrentNode = pTemp;
+															}
+														"</code>"
+										;
+										
+<print_list>					::= 	{ <print_list_0> } ;
+<print_list_0>					::= 	( 	TK_STRING  	"<code>"
+															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, GrammerUtils::m_pPrevToken.getText());
+															{
+																m_pASTCurrentNode->addChild(pStringNode);
+															}
+														"</code>"
+											[',']
+											|
+											<expr> 		"<code>"
+															Tree* pExpressionLeftLeaf = createPostFixExpr();
+															{
+																m_pASTCurrentNode->addChild(pExpressionLeftLeaf);
+															}
+														"</code>"
+											[',']
+											|
+											TK_CHARACTER	"<code>"
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																{
+																	m_pASTCurrentNode->addChild(pCharacterNode);
+																}
+															"</code>"
+										) ;
+
+<putc>							::=		"putc" 				"<code>"
+																Tree* pPutCNode = makeLeaf(ASTNodeType::ASTNode_PUTC, GrammerUtils::m_pPrevToken.getText());
+																Tree* pTemp = nullptr;
+																{
+																	pPutCNode->m_pParentNode = m_pASTCurrentNode;
+															
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pPutCNode;
+																}
+															"</code>"
+										'(' 
+										<putcList>
+										')' ';'				"<code>"
+																pTemp->addChild(pPutCNode);
+																{
+																	m_pASTCurrentNode = pTemp;
+																}
+															"</code>"
+										;
+										
+<putcList>						::=		( 	TK_IDENTIFIER 	"<code>"
+																Tree* pIdentifierNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, GrammerUtils::m_pPrevToken.getText());
+																m_pASTCurrentNode->addChild(pIdentifierNode);
+															"</code>"
+											|
+											TK_INTEGER		"<code>"
+																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																m_pASTCurrentNode->addChild(pIntegerNode);
+															"</code>"
+											|
+											TK_CHARACTER 	"<code>"
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																m_pASTCurrentNode->addChild(pCharacterNode);
+															"</code>"
+										);
+
+<bracesstmtlist>				::= 	'{' <stmt_list> '}';
+
+<assignment>					::=  	TK_IDENTIFIER 	"<code>" 
+															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, "");
+															Tree* pTemp = nullptr;
+															{
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pAssignmentNode;
+															}
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, GrammerUtils::m_pPrevToken.getText());
+															{
+																pAssignmentNode->m_pRightNode = pIdentifierLeaf;
+															}
+														"</code>"
+										'=' 
+										<expr>			"<code>"
+															Tree* pExpressionLeftLeaf = createPostFixExpr();
+															{
+																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
+															}
+														"</code>"
+										';'				"<code>"
+															pTemp->addChild(pAssignmentNode);
+															{
+																m_pASTCurrentNode = pTemp;
+															}
+														"</code>"
+										;
+										
+<paren_expr>					::=   	[<unary_oper>] '(' <expr> ')' ;
+										
+<expr>                			::=		<and_expr> { <logicalor_expr> } ;
+										
+<logicalor_expr>				::=		"||" 		"<code>" 
+														checkOpPrecedenceAndPush("||");
+													"</code>"
+										<and_expr> ;
+		
+<and_expr>            			::=   	<equality_expr> { <logicaland_expr> } ;
+<logicaland_expr>				::= 	"&&" 		"<code>" 
+														checkOpPrecedenceAndPush("&&");
+													"</code>"
+										<equality_expr> ;
+		
+<equality_expr>       			::=   	<relational_expr> [ <equality_expr_optional> ] ;
+<equality_expr_optional>		::=		<equality> <relational_expr> ;
+<equality>						::= 	(	"==" 	"<code>" 
+														checkOpPrecedenceAndPush("==");
+													"</code>"
+											| 
+											"!="	"<code>" 
+														checkOpPrecedenceAndPush("!=");
+													"</code>"
+										) ;
+		
+<relational_expr>     			::=   	<addition_expr> [ <relational_expr_optional> ] ;
+<relational_expr_optional>		::= 	<relational> <addition_expr> ;
+<relational>					::= 	(	'<' 	"<code>" 
+														checkOpPrecedenceAndPush("<");
+													"</code>"
+											| 
+											"<=" 	"<code>" 
+														checkOpPrecedenceAndPush("<=");
+													"</code>"
+											| 
+											'>' 	"<code>" 
+														checkOpPrecedenceAndPush(">");
+													"</code>"
+											| 
+											">="	"<code>" 
+														checkOpPrecedenceAndPush(">=");
+													"</code>"
+										) ;
+	
+<addition_expr>       			::=   	<multiplication_expr> { <addition_expr_optional> } ;
+<addition_expr_optional>		::=		<add_sub> <multiplication_expr> ;
+<add_sub>						::=		(	'+' 	"<code>" 
+														checkOpPrecedenceAndPush("+");
+													"</code>"
+											| 
+											'-'		"<code>" 
+														checkOpPrecedenceAndPush("-");
+													"</code>"
+										) ;
+	
+<multiplication_expr> 			::=   	<primary> { <multiplication_expr_optional> } ;
+<multiplication_expr_optional> 	::=   	<mul_div_mod> <primary> ;
+<mul_div_mod>					::=		(	'*' 	"<code>" 
+														checkOpPrecedenceAndPush("*");
+													"</code>"
+											| 
+											'/' 	"<code>" 
+														checkOpPrecedenceAndPush("/");
+													"</code>"
+											| 
+											'%'		"<code>" 
+														checkOpPrecedenceAndPush("%");
+													"</code>"
+										) ;
+
+<primary>             			::=   	<defaults> ;
+//<defaults>						::= 	( <operands> | <paren_expr> | <unary_oper> ) ;
+<defaults>						::= 	( <operands> | <paren_expr> ) ;
+<operands>						::=		"<code>"
+											std::string sOperand;
+										"</code>"
+										
+										( 	TK_IDENTIFIER 	"<code>"
+																sOperand = GrammerUtils::m_pPrevToken.getText();
+																m_vPostFix.push_back(sOperand);
+															"</code>"
+											| 
+											TK_INTEGER		"<code>"
+																sOperand = GrammerUtils::m_pPrevToken.getText();
+																m_vPostFix.push_back(sOperand);
+															"</code>"
+											|
+											TK_CHARACTER	"<code>"
+																sOperand = GrammerUtils::m_pPrevToken.getText();
+																char pStr[255] = {0};
+																sprintf_s(pStr, "%d", sOperand.c_str()[0]);
+
+																m_vPostFix.push_back(pStr);
+															"</code>"
+										) ;
+<unary_oper>					::=		(	'+' 
+											| 
+											'-' 
+											| 
+											'!'				"<code>" 
+																checkOpPrecedenceAndPush("!");
+															"</code>"
+										);
+

@@ -1,0 +1,172 @@
+#include "TinyCReader.h"
+#include "GrammerUtils.h"
+
+TinyCReader::TinyCReader()
+{
+	GrammerUtils::init();
+}
+
+void TinyCReader::read(const char* sFile)
+{
+	//////////////// THIS PIECE OF CODE WILL REMAIN COMMON FOR ALL //////////////////
+	if (GrammerUtils::read(sFile))
+	{
+		addKeywords();
+		GrammerUtils::getNextToken();
+
+		m_pASTRootNode = new Tree();
+		{
+			m_pASTRootNode->m_eASTNodeType = ASTNodeType::ASTNode_ROOT;
+			m_pASTCurrentNode = m_pASTRootNode;
+		}
+
+		def();
+
+		GrammerUtils::generateCode(m_pASTRootNode);
+	}
+	/////////////////////////////////////////////////////////////////////////////////
+}
+
+std::string TinyCReader::popOperator()
+{
+	if(!m_vOperatorStack.empty())
+	{
+		std::string sTop = m_vOperatorStack.top();
+		m_vOperatorStack.pop();
+		
+		return sTop;
+	}
+	
+	return "";
+}
+
+ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
+{
+	ENUM_OP_PRECEDENCE eOperator = ENUM_OP_PRECEDENCE::OP_INVALID;
+
+	if (sOperator == "||")
+		eOperator = ENUM_OP_PRECEDENCE::OP_LOGICALOR;
+	else
+	if (sOperator == "&&")
+		eOperator = ENUM_OP_PRECEDENCE::OP_LOGICALAND;
+	else
+	if (sOperator == "==")
+		eOperator = ENUM_OP_PRECEDENCE::OP_EQ;
+	else
+	if (sOperator == "!=")
+		eOperator = ENUM_OP_PRECEDENCE::OP_NEQ;
+	else
+	if (sOperator == "<")
+		eOperator = ENUM_OP_PRECEDENCE::OP_LT;
+	else
+	if (sOperator == "<=")
+		eOperator = ENUM_OP_PRECEDENCE::OP_LTEQ;
+	else
+	if (sOperator == ">")
+		eOperator = ENUM_OP_PRECEDENCE::OP_GT;
+	else
+	if (sOperator == ">=")
+		eOperator = ENUM_OP_PRECEDENCE::OP_GTEQ;
+	else
+	if (sOperator == "+")
+		eOperator = ENUM_OP_PRECEDENCE::OP_ADD;
+	else
+	if (sOperator == "-")
+		eOperator = ENUM_OP_PRECEDENCE::OP_SUB;
+	else
+	if (sOperator == "*")
+		eOperator = ENUM_OP_PRECEDENCE::OP_MUL;
+	else
+	if (sOperator == "/")
+		eOperator = ENUM_OP_PRECEDENCE::OP_DIV;
+	else
+	if (sOperator == "")
+		eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
+	else
+	if (sOperator == "(")
+		eOperator = ENUM_OP_PRECEDENCE::OP_LPAREN;
+	else
+	if (sOperator == ")")
+		eOperator = ENUM_OP_PRECEDENCE::OP_RPAREN;
+	else
+	if (sOperator == "!")
+		eOperator = ENUM_OP_PRECEDENCE::OP_NOT;
+	else
+	if (sOperator == "%%")
+		eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
+
+	return eOperator;
+}
+
+void TinyCReader::checkOpPrecedenceAndPush(std::string sCurrentOperator)
+{
+	if(m_vOperatorStack.empty()) m_vOperatorStack.push(sCurrentOperator);
+	else
+	{
+		int eCurrOp = (int)opFromString(sCurrentOperator);
+		
+		std::string sTopOfStack = m_vOperatorStack.top();
+		int eTopOfStack = (int)opFromString(sTopOfStack);
+		
+		if(eCurrOp > eTopOfStack)
+			m_vOperatorStack.push(sCurrentOperator);
+		else
+		{
+			popOperator();
+			m_vPostFix.push_back(sTopOfStack);
+			m_vOperatorStack.push(sCurrentOperator);
+		}
+	}
+}
+
+Tree* TinyCReader::createPostFixExpr()
+{
+	if (!m_vOperatorStack.empty())
+	{
+		while (!m_vOperatorStack.empty())
+		{
+			std::string sTop = m_vOperatorStack.top();
+			m_vPostFix.push_back(sTop);
+
+			m_vOperatorStack.pop();
+		}
+	}
+
+	std::string sPostFixExpr = "";
+	
+	int iSize = m_vPostFix.size();
+	for(int i = 1; i <= iSize; i++)
+	{
+		sPostFixExpr += m_vPostFix[i-1];
+		if(i != iSize)
+			sPostFixExpr += ", ";
+	}
+
+	m_vPostFix.clear();
+
+	Tree* pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
+	return pLeaf;
+}
+
+Tree* TinyCReader::makeLeaf(ASTNodeType eASTNodeType, const char* sText)
+{
+	Tree* pLeaf = new Tree();
+	{
+		pLeaf->m_eASTNodeType = eASTNodeType;
+		pLeaf->m_sText = sText;
+	}
+
+	return pLeaf;
+}
+
+Tree* TinyCReader::makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight)
+{
+	Tree* pNode = new Tree();
+	{
+		pNode->m_eASTNodeType = eASTNodeType;
+		pNode->m_pLeftNode = pLeft;
+		pNode->m_pRightNode = pRight;
+	}
+
+	return pNode;
+}

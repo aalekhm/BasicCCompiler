@@ -1,0 +1,179 @@
+#pragma once
+
+#include <stack>
+#include <vector>
+#include "GrammerUtils.h"
+
+enum class ENUM_OP_PRECEDENCE {
+	OP_INVALID = 0,
+
+	OP_LOGICALOR,
+
+	OP_LOGICALAND,
+
+	OP_EQ,
+	OP_NEQ = OP_EQ,
+
+	OP_LT,
+	OP_LTEQ = OP_LT,
+	OP_GT = OP_LT,
+	OP_GTEQ = OP_LT,
+
+	OP_ADD,
+	OP_SUB = OP_ADD,
+
+	OP_MUL,
+	OP_DIV = OP_MUL,
+	OP_MOD = OP_MUL,
+
+	OP_LPAREN,
+	OP_RPAREN = OP_LPAREN,
+};
+
+enum class ASTNodeType {
+	ASTNode_INVALID = -1,
+	ASTNode_ROOT,
+
+	ASTNode_MUL,
+	ASTNode_MULEQ,
+	ASTNode_DIV,
+	ASTNode_DIVEQ,
+	ASTNode_MOD,
+
+	ASTNode_ADD,
+	ASTNode_ADDEQ,
+	ASTNode_SUB,
+	ASTNode_SUBEQ,
+
+	ASTNode_NEGATE,
+	ASTNode_NOT,
+
+	ASTNode_LT,
+	ASTNode_LTEQ,
+	ASTNode_GT,
+	ASTNode_GTEQ,
+	ASTNode_EQ,
+	ASTNode_NEQ,
+
+	ASTNode_ASSIGN,
+
+	ASTNode_LOGICALAND,
+	ASTNode_LOGICALOR,
+	ASTNode_BITWISEAND,
+	ASTNode_BITWISEOR,
+
+	ASTNode_IF,
+	ASTNode_ELSE,
+	ASTNode_FOR,
+	ASTNode_WHILE,
+
+	ASTNode_PRINT,
+	ASTNode_PUTC,
+
+	ASTNode_IDENTIFIER,
+	ASTNode_INTEGER,
+	ASTNode_FLOAT,
+	ASTNode_STRING,
+	ASTNode_CHARACTER,
+	ASTNode_STATEMENT,
+	ASTNode_EXPRESSION,
+};
+
+typedef struct Tree {
+	Tree()
+		: m_pParentNode(nullptr)
+		, m_pLeftNode(nullptr)
+		, m_pRightNode(nullptr)
+		, m_eASTNodeType(ASTNodeType::ASTNode_INVALID)
+		, m_sText("")
+	{
+	}
+
+	void addChild(Tree* pNode)
+	{
+		if (pNode != nullptr)
+			m_vStatements.push_back(pNode);
+	}
+
+	ASTNodeType m_eASTNodeType;
+
+	std::vector<Tree*> m_vStatements;
+	std::string m_sText;
+
+	Tree* m_pParentNode;
+	Tree* m_pLeftNode;
+	Tree* m_pRightNode;
+
+} Tree;
+
+class TinyCReader {
+public:
+	TinyCReader();
+
+	void addKeywords()
+	{
+		GrammerUtils::m_vKeywords.push_back("if");
+		GrammerUtils::m_vKeywords.push_back("else");
+		GrammerUtils::m_vKeywords.push_back("while");
+		GrammerUtils::m_vKeywords.push_back("print");
+		GrammerUtils::m_vKeywords.push_back("putc");
+		GrammerUtils::m_vKeywords.push_back("||");
+		GrammerUtils::m_vKeywords.push_back("&&");
+		GrammerUtils::m_vKeywords.push_back("==");
+		GrammerUtils::m_vKeywords.push_back("!=");
+		GrammerUtils::m_vKeywords.push_back("<=");
+		GrammerUtils::m_vKeywords.push_back(">=");
+	}
+
+	bool def();
+	bool stmt_list();
+	bool stmt();
+	bool ifelse();
+	bool _if();
+	bool _else();
+	bool _while();
+	bool print();
+	bool print_list();
+	bool print_list_0();
+	bool putc();
+	bool bracesstmtlist();
+	bool assignment();
+	bool paren_expr();
+	bool expr();
+	bool logicalor_expr();
+	bool and_expr();
+	bool logicaland_expr();
+	bool equality_expr();
+	bool equality_expr_optional();
+	bool equality();
+	bool relational_expr();
+	bool relational_expr_optional();
+	bool relational();
+	bool addition_expr();
+	bool addition_expr_optional();
+	bool add_sub();
+	bool multiplication_expr();
+	bool multiplication_expr_optional();
+	bool mul_div_mod();
+	bool primary();
+	bool defaults();
+	bool operands();
+	bool unary_oper();
+
+	void read(const char* sFile);
+	std::string popOperator();
+	ENUM_OP_PRECEDENCE opFromString(std::string sOperator);
+	void checkOpPrecedenceAndPush(std::string sCurrentOperator);
+
+	Tree* makeLeaf(ASTNodeType eASTNodeType, const char* sText);
+	Tree* makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);
+	Tree* createPostFixExpr();
+
+protected:
+private:
+	std::stack<std::string> m_vOperatorStack;
+	std::vector<std::string> m_vPostFix;
+
+	Tree* m_pASTRootNode;
+	Tree* m_pASTCurrentNode;
+};
