@@ -3,17 +3,25 @@
 #include <stack>
 #include <vector>
 #include "GrammerUtils.h"
+#include <assert.h>
 
 class TinyCReader {
 	public:
 		TinyCReader();
 
 		void addKeywords() {
+			GrammerUtils::m_vKeywords.push_back("int");
+			GrammerUtils::m_vKeywords.push_back("void");
+			GrammerUtils::m_vKeywords.push_back("string");
+			GrammerUtils::m_vKeywords.push_back("int");
+			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("if");
 			GrammerUtils::m_vKeywords.push_back("else");
 			GrammerUtils::m_vKeywords.push_back("while");
 			GrammerUtils::m_vKeywords.push_back("print");
 			GrammerUtils::m_vKeywords.push_back("putc");
+			GrammerUtils::m_vKeywords.push_back("int");
+			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("||");
 			GrammerUtils::m_vKeywords.push_back("&&");
 			GrammerUtils::m_vKeywords.push_back("==");
@@ -23,8 +31,19 @@ class TinyCReader {
 		}
 
 		bool def();
+		bool functionList();
+		bool functionDef();
+		bool returnType();
+		bool functionArgumentDefList();
+		bool functionArgumentDefListMore();
+		bool primitiveTypeInt();
+		bool primitiveTypeString();
 		bool stmt_list();
 		bool stmt();
+		bool assignOrFuncCall();
+		bool functionCall();
+		bool functionArgumentList();
+		bool functionArgumentItem();
 		bool ifelse();
 		bool _if();
 		bool _else();
@@ -35,7 +54,10 @@ class TinyCReader {
 		bool putc();
 		bool putcList();
 		bool bracesstmtlist();
-		bool assignment();
+		bool assignmentNewVariable();
+		bool newInt();
+		bool newString();
+		bool assignmentRHS();
 		bool paren_expr();
 		bool expr();
 		bool logicalor_expr();
@@ -67,6 +89,11 @@ class TinyCReader {
 		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
 		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);
 		Tree*						createPostFixExpr();
+		
+		void						updateBlockString(std::string sIdent);
+		void						removeLastFromBlockString();
+		std::string					getBlockString();
+		std::string					getFullyQualifiedNameForVariable(Tree* pNode, std::string sVariable);
 	protected:
 		
 	private:
@@ -75,5 +102,7 @@ class TinyCReader {
 		
 		Tree*						m_pASTRootNode;
 		Tree*						m_pASTCurrentNode;
+		
+		std::vector<std::string>	m_sBlockStringList;
 
 };

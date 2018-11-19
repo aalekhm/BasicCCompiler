@@ -170,3 +170,64 @@ Tree* TinyCReader::makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight)
 
 	return pNode;
 }
+
+void TinyCReader::updateBlockString(std::string sIdent)
+{
+	if (NOT sIdent.empty())
+	{
+		m_sBlockStringList.push_back(sIdent);
+	}
+}
+
+std::string TinyCReader::getBlockString()
+{
+	std::string sReturn;
+	for (std::string sStr : m_sBlockStringList)
+	{
+		sReturn.append(sStr);
+		sReturn.append("_");
+	}
+
+	return sReturn;
+}
+
+void TinyCReader::removeLastFromBlockString()
+{
+	if (m_sBlockStringList.size() > 0)
+	{
+		m_sBlockStringList.erase(m_sBlockStringList.end()-1);
+	}
+}
+
+std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::string sVariable)
+{
+	std::string sFullyQualifiedName;
+
+	for (Tree* pChild : pNode->m_vStatements)
+	{
+		if (	pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT
+				||
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING
+		) {
+			if (pChild->m_sAdditionalInfo == sVariable)
+			{
+				sFullyQualifiedName = pChild->m_sText;
+				break;
+			}
+		}
+	}
+
+	if (sFullyQualifiedName.empty())
+	{
+		if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONDEF)
+		{
+			sFullyQualifiedName = getFullyQualifiedNameForVariable(pNode->m_pRightNode, sVariable); // Search in the 'Arg list'.
+		}
+		else
+		{
+			sFullyQualifiedName = getFullyQualifiedNameForVariable(pNode->m_pParentNode, sVariable);
+		}
+	}
+
+	return sFullyQualifiedName;
+}

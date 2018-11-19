@@ -59,8 +59,8 @@ void StringTokenizer::tokenize()
 	{
 		Token tok = getNextToken();
 
-		if( NOT (tok.getType() == TokenType::Type::TK_EOL || tok.getType() == TokenType::Type::TK_WHITESPACE))
-			printf("tok = %s ==> %s\n", tok.getText(), TokenType::toString(tok.getType()).c_str());
+		//if( NOT (tok.getType() == TokenType::Type::TK_EOL || tok.getType() == TokenType::Type::TK_WHITESPACE))
+		//	printf("tok = %s ==> %s\n", tok.getText(), TokenType::toString(tok.getType()).c_str());
 
 		m_vTokens.push_back(tok);
 

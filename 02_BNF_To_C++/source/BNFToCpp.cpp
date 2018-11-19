@@ -42,8 +42,8 @@ bool BNFToCpp::tokenize(const char* sGrammerFile)
 				{
 					Token tok = st->nextToken();
 
-					if (!(tok.getType() == TokenType::Type::TK_EOL || tok.getType() == TokenType::Type::TK_WHITESPACE))
-						std::cout << "BNFToCpp::tokenize() << Token :: " << TokenType::toString(tok.getType()) << "\t" << tok.getText() << std::endl;
+					//if (!(tok.getType() == TokenType::Type::TK_EOL || tok.getType() == TokenType::Type::TK_WHITESPACE))
+					//	std::cout << "BNFToCpp::tokenize() << Token :: " << TokenType::toString(tok.getType()) << "\t" << tok.getText() << std::endl;
 
 					m_vTokens.push_back(tok);
 				}

@@ -1,42 +1,13 @@
 #pragma once
 
 #include <string>
+#include <map>
 #include "RandomAccessFile.h"
 #include "StringTokenizer.h"
 #include "Token.h"
 
 #define OPTIONAL	0
 #define MANDATORY	1
-
-enum class OPCODE
-{
-	NOP = 0,
-	FETCH,
-	STORE,
-	PUSH,
-	POP,
-	MUL,
-	DIV,
-	MOD,
-	ADD,
-	SUB,
-	JMP_LT,
-	JMP_LTEQ,
-	JMP_GT,
-	JMP_GTEQ,
-	JMP_EQ,
-	JMP_NEQ,
-	LOGICALOR,
-	LOGICALAND,
-	_NOT,
-	JMP,
-	JZ,
-	JNZ,
-	PRTS,
-	PRTC,
-	PRTI,
-	HLT,
-};
 
 #define MAX_BYTECODE_SIZE	1024
 
@@ -64,7 +35,7 @@ class GrammerUtils
 		static void						printTabs();
 
 		static void						generateCode(Tree* pRootNode);
-		static void						populateVariables(Tree* pParentNode, std::vector<std::string>& sVector);
+		//static void						populateVariables(Tree* pParentNode, std::vector<std::string>& sVector);
 		static void						populateStrings(Tree* pParentNode, std::vector<std::string>& sVector);
 		static void						addString(std::string& sText, std::vector<std::string>& vVector);
 		static void						populateCode(Tree* pNode, int* pByteCode, int& iOffset);
@@ -79,7 +50,13 @@ class GrammerUtils
 		static std::vector<std::string>	m_vVariables;
 		static std::vector<std::string>	m_vStrings;
 
-		static int						m_iByteCode[MAX_BYTECODE_SIZE];
-		static int						m_iJumpHole;
-;	private:
+		static std::map<std::string, FunctionInfo*>	m_MapFunctionInfos;
+		//static std::map<std::string, Tree*>			m_MapFunctionNodes;
+		//static std::map<std::string, int>			m_MapFunctionOffsets;
+
+		static FunctionInfo*						m_pCurrentFunction;
+		
+		static int									m_iByteCode[MAX_BYTECODE_SIZE];
+		static int									m_iJumpHole;
+	private:
 };
