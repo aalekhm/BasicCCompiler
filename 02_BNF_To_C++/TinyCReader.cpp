@@ -254,8 +254,10 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	for (Tree* pChild : pNode->m_vStatements)
 	{
-		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE)
-		{
+		if (	pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+				|
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+		){
 			if (pChild->m_sAdditionalInfo == sVariable)
 			{
 				sFullyQualifiedName = pChild->m_sText;
@@ -547,7 +549,7 @@ if(assignmentDerefArray()) {
 return true;
 }
 else
-if(newPtrOrInt()) {
+if(newPtrOrArrayOrInt()) {
 return true;
 }
 else
@@ -1322,7 +1324,7 @@ return true;
 }
 
 bool TinyCReader::initExpr() {
-if(newPtrOrInt()) {
+if(newPtrOrArrayOrInt()) {
 return true;
 }
 else
@@ -1538,21 +1540,21 @@ return true;
 
 }
 
-bool TinyCReader::newPtrOrInt() {
+bool TinyCReader::newPtrOrArrayOrInt() {
 if(!primitiveType())
 return false;
-if(!primPtrOrInt())
+if(!primPtrOrArrayOrInt())
 return false;
 return true;
 
 }
 
-bool TinyCReader::primPtrOrInt() {
+bool TinyCReader::primPtrOrArrayOrInt() {
 if(primPtr()) {
 return true;
 }
 else
-if(primInt()) {
+if(primArrayOrInt()) {
 return true;
 }
 else
@@ -1564,11 +1566,63 @@ return true;
 
 bool TinyCReader::primPtr() {
 
-																std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
-															
+														std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+													
 if(!GrammerUtils::match('*', MANDATORY))
 return false;
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+return false;
+
+														std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+														std::string sFullyQualifiedVariableName;
+														sFullyQualifiedVariableName.append(getBlockString());
+														sFullyQualifiedVariableName.append(sVariableName);
+													
+if(!GrammerUtils::match('=', MANDATORY))
+return false;
+ 
+														ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
+														Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+														Tree* pTemp = nullptr;
+														{
+															pTemp = m_pASTCurrentNode;
+															pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
+															pPrimPtrNode->m_bIsPointerType = true;
+															pPrimPtrNode->setAdditionalInfo("type", sPointerType);
+															pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
+															m_pASTCurrentNode = pPrimPtrNode;
+														}																
+													
+if(!ptrAssign())
+return false;
+
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pPrimPtrNode);
+													
+return true;
+
+}
+
+bool TinyCReader::primArrayOrInt() {
+if(primArray()) {
+return true;
+}
+else
+if(primType()) {
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::primArray() {
+
+																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+															
+if(!GrammerUtils::match(TokenType::Type::TK_DEREFARRAY, MANDATORY))
 return false;
 
 																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
@@ -1576,32 +1630,100 @@ return false;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
 															
-if(!GrammerUtils::match('=', MANDATORY))
+if(!GrammerUtils::match('[', MANDATORY))
 return false;
- 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-																Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPEARRAY;
+																Tree* pPrimTypeArrayNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
-																	pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
-																	pPrimPtrNode->m_bIsPointerType = true;
-																	pPrimPtrNode->setAdditionalInfo("type", sPointerType);
-																	pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
-																	m_pASTCurrentNode = pPrimPtrNode;
+																	
+																	pPrimTypeArrayNode->m_sAdditionalInfo.append(sVariableName);
+																	pPrimTypeArrayNode->m_bIsPointerType = true;
+																	pPrimTypeArrayNode->setAdditionalInfo("type", sPrimitiveType);
+																	pPrimTypeArrayNode->m_pParentNode = m_pASTCurrentNode;
+																}
+															
+if(!GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
+
+}
+
+else {
+
+
+																Tree* pArraySizeLeaf = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																{
+																	pPrimTypeArrayNode->m_pLeftNode = pArraySizeLeaf;
+																	pArraySizeLeaf->m_pParentNode = pPrimTypeArrayNode;
 																}																
 															
-if(!ptrAssign())
-return false;
+}
+
+
+																	m_pASTCurrentNode = pPrimTypeArrayNode;
+															
+if(!primArrayOptionalRHS()) {
+}
+else {
+}
+
 
 																m_pASTCurrentNode = pTemp;
-																m_pASTCurrentNode->addChild(pPrimPtrNode);
+																m_pASTCurrentNode->addChild(pPrimTypeArrayNode);
 															
 return true;
 
 }
 
-bool TinyCReader::primInt() {
+bool TinyCReader::primArrayOptionalRHS() {
+if(!GrammerUtils::match(']', MANDATORY))
+return false;
+if(!GrammerUtils::match('=', MANDATORY))
+return false;
+if(!GrammerUtils::match('{', MANDATORY))
+return false;
+
+																Tree* pPrimTypeArrayNode = m_pASTCurrentNode;
+																Tree* pArrayElementsLeaf = makeLeaf(ASTNodeType::ASTNode_TYPEARRAYELEMENTS, "");
+																{
+																	pPrimTypeArrayNode->m_pRightNode = pArrayElementsLeaf;
+																	pArrayElementsLeaf->m_pParentNode = pPrimTypeArrayNode;
+																}
+															
+while(true) {
+
+																Tree* pExpressionArrayElementLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																{
+																	pExpressionArrayElementLeaf->m_pParentNode = pArrayElementsLeaf;
+																	m_pASTCurrentNode = pExpressionArrayElementLeaf;
+																}
+															
+if(expr()) {
+
+																m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+																pArrayElementsLeaf->addChild(pExpressionArrayElementLeaf);
+															
+if(!GrammerUtils::match(',', OPTIONAL)) {
+
+}
+
+else {
+
+}
+
+}
+else
+break;
+}
+
+if(!GrammerUtils::match('}', MANDATORY))
+return false;
+return true;
+
+}
+
+bool TinyCReader::primType() {
 
 																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
 															
@@ -1753,6 +1875,69 @@ return false;
 														m_pASTCurrentNode = pTemp;
 														m_pASTCurrentNode->addChild(pAssignmentNode);
 													
+return true;
+
+}
+
+bool TinyCReader::arrayDeclaration() {
+if(!primitiveType())
+return false;
+if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+return false;
+if(!GrammerUtils::match('[', MANDATORY))
+return false;
+if(!expr()) {
+}
+else {
+}
+
+if(!GrammerUtils::match(']', MANDATORY))
+return false;
+if(arrayDeclaration_Option0()) {
+return true;
+}
+else
+if(arrayDeclaration_Option1()) {
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::arrayDeclaration_Option0() {
+
+											std::string sSemiColon = GrammerUtils::m_pToken.getText();
+											return (sSemiColon == ";");
+										
+return true;
+
+}
+
+bool TinyCReader::arrayDeclaration_Option1() {
+if(!GrammerUtils::match('=', MANDATORY))
+return false;
+if(!GrammerUtils::match('{', MANDATORY))
+return false;
+while(true) {
+if(expr()) {
+if(!GrammerUtils::match(',', OPTIONAL)) {
+
+}
+
+else {
+
+}
+
+}
+else
+break;
+}
+
+if(!GrammerUtils::match('}', MANDATORY))
+return false;
 return true;
 
 }

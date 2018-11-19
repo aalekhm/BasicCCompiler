@@ -444,6 +444,8 @@ enum class ASTNodeType
 	ASTNode_FREE,
 	ASTNode_TYPE,
 	ASTNode_TYPESTATIC,
+	ASTNode_TYPEARRAY,
+	ASTNode_TYPEARRAYELEMENTS,
 };
 
 typedef struct Tree
@@ -572,6 +574,7 @@ typedef struct FunctionInfo
 			switch(pChild->m_eASTNodeType)
 			{
 				case ASTNodeType::ASTNode_TYPE:
+				case ASTNodeType::ASTNode_TYPEARRAY:
 				{
 					m_vLocalVariables.push_back(pChild);
 				}

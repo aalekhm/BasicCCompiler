@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	6144
+#define MAX_BYTECODE_SIZE	6656
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -61,6 +61,7 @@ class GrammerUtils
 		static void									handleIdentifier(Tree* pNode);
 		static void									handleString(Tree* pNode);
 		static void									handlePrimitiveInt(Tree* pNode);
+		static void									handleTypeArray(Tree* pNode);
 		static void									handlePrimitivePtrEpilogue(Tree* pNode);
 		static void									handleAssign(Tree* pNode);
 		static void									handleReturnStatement(Tree* pNode);
@@ -84,6 +85,7 @@ class GrammerUtils
 		static int32_t								sizeOf(std::string sType);
 		static int32_t								castValueFor(std::string sType);
 		static void									cast(int32_t iCastValue);
+		static void									storeValueAtPosForVariable(int32_t iPos, const char* sType, const char* sVariableName);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);
 		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2);

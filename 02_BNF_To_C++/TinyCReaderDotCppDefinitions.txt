@@ -254,8 +254,10 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	for (Tree* pChild : pNode->m_vStatements)
 	{
-		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE)
-		{
+		if (	pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+				|
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+		){
 			if (pChild->m_sAdditionalInfo == sVariable)
 			{
 				sFullyQualifiedName = pChild->m_sText;

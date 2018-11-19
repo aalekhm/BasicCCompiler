@@ -22,6 +22,17 @@ static int32_t* pStaticPtr_3;
 static int8_t* pStaticPtr_0_Start;
 int32_t retNewFunc()
 {
+	//int32_t arr1[10];
+	//int32_t arr[] = {10, 20, 30, 40};
+	//int32_t arr[6] = {10, 20, 30, 40};
+	int8_t arr1[10] = {111, 222, 333, 444, 555};
+	
+	for(int32_t ii = 0; ii < 10; ii++)
+	{
+		print("arr1[", ii, "] = ", arr1[ii]);
+		putc(10);		
+	}
+	
 	print("In retNewFunc................");
 	putc(10);
 

@@ -285,6 +285,35 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			std::cout << ";";
 		}
 		break;
+		case ASTNodeType::ASTNode_TYPEARRAY:
+		{
+			Tree* pArraySizeLeaf = pNode->m_pLeftNode;
+			Tree* pArrayElementsLeaf = pNode->m_pRightNode;
+
+			std::cout << pNode->getAdditionalInfoFor("type") << " " << pNode->m_sAdditionalInfo << "[";
+			if (pArraySizeLeaf != nullptr)
+			{
+				std::cout << pArraySizeLeaf->m_sText;
+			}
+
+			std::cout << "]";
+
+			if (pArrayElementsLeaf != nullptr)
+			{
+				std::cout << " " << "=" << " ";
+				std::cout << "{";
+
+				for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
+				{
+					std::cout << " " << pArrayElement->m_sText << ",";
+				}
+
+				std::cout << "}";
+			}
+
+			std::cout << ";";
+		}
+		break;
 		case ASTNodeType::ASTNode_MALLOC:
 		{
 			std::cout << "malloc(";
@@ -763,6 +792,11 @@ void GrammerUtils::populateCode(Tree* pNode)
 			{
 				if(NOT pNode->m_bIsPointerType)
 					handlePrimitiveInt(pNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_TYPEARRAY:
+			{
+				handleTypeArray(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_ASSIGN:
@@ -1339,6 +1373,58 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 	}
 }
 
+void GrammerUtils::handleTypeArray(Tree* pNode)
+{
+	Tree* pArraySizeLeaf = pNode->m_pLeftNode;
+	Tree* pArrayElementsLeaf = pNode->m_pRightNode;
+
+	std::string sType = pNode->getAdditionalInfoFor("type");
+	int32_t iSize = 0;
+
+	// Allocate the sizeOfArray * sizeof(arrayType)
+	{
+		if (pArraySizeLeaf != nullptr)
+		{
+			iSize = atoi(pArraySizeLeaf->m_sText.c_str());
+		}
+		else
+		{
+			iSize = pArrayElementsLeaf->m_vStatements.size();
+		}
+
+		EMIT_1(OPCODE::PUSHI, iSize);						// The sizeOfArray to allocate is equal to the number of array elements.
+		EMIT_1(OPCODE::PUSHI, sizeOf(sType));				// Push variable TYPE onto the STACK as it will be
+		EMIT_1(OPCODE::MUL, 0);								// Multiplied with the sizeOfArray.
+
+		EMIT_1(OPCODE::MALLOC, 0);							// MALLOC will pull the amount of bytes to allocate from the STACK & reserve memory on heap.
+															// The address of allocated memory location will be pushed onto the STACK.
+
+		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));	// Store the memory address in the array variable.
+	}
+
+	// Initialize array elements
+	if (pArrayElementsLeaf != nullptr)
+	{
+		int32_t iCount = 0;
+		for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
+		{
+			if (iCount < iSize)
+			{
+				populateCode(pArrayElement);
+
+				storeValueAtPosForVariable(iCount, sType.c_str(), pNode->m_sText.c_str());
+				iCount++;
+			}
+		}
+
+		for(; iCount < iSize; iCount++)
+		{
+			EMIT_1(OPCODE::PUSHI, 0);						// Init the array element value to '0'.
+			storeValueAtPosForVariable(iCount, sType.c_str(), pNode->m_sText.c_str());
+		}
+	}
+}
+
 void GrammerUtils::handlePrimitivePtrEpilogue(Tree* pNode)
 {
 	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
@@ -1377,15 +1463,9 @@ void GrammerUtils::handleAssign(Tree* pNode)
 			break;
 			case ASTNodeType::ASTNode_DEREF:
 			{
-				cast(castValueFor(sType));					// Perform relevant 'CAST'
-
-				EMIT_1(OPCODE::PUSHI, 0);					// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
-															// @pVar = iRValue; ==> @pVar[0] = iRValue;
-
-				EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push variable TYPE onto the STACK as it will be
-															// required to access the array pointer.
-
-				EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+				// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
+				// @pVar = iRValue; ==> @pVar[0] = iRValue;
+				storeValueAtPosForVariable(0, sType.c_str(), pNode->m_sText.c_str());
 			}
 			break;
 			case ASTNodeType::ASTNode_DEREFARRAY:
@@ -1729,6 +1809,19 @@ int32_t GrammerUtils::castValueFor(std::string sType)
 		return 0xFFFFFFFF;
 
 	return 0;
+}
+
+void GrammerUtils::storeValueAtPosForVariable(int32_t iPos, const char* sType, const char* sVariableName)
+{
+	cast(castValueFor(sType));					// Perform relevant 'CAST'
+
+	EMIT_1(OPCODE::PUSHI, iPos);				// Push a ArrayIndex of iPos onto the STACK i.e
+												// @pVar = iRValue; ==> @pVar[iPos] = iRValue;
+
+	EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push variable TYPE onto the STACK as it will be
+												// required to access the array pointer.
+
+	EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(sVariableName));
 }
 
 void GrammerUtils::cast(int32_t iCastValue)
