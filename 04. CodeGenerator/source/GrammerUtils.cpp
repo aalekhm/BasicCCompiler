@@ -528,7 +528,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONSTART:
 			{
-				std::cout << "Start of Function : " << m_pCurrentFunction->m_sFunctionName << "()" << std::endl;
+				std::cout << m_pCurrentFunction->m_sFunctionName << ":" << std::endl;
 
 				///////////////////////////////////////////
 				// Stack Frame: Subtract local variable count from ESP.
@@ -550,9 +550,8 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			{
 				emit((int)OPCODE::RET, pByteCode, iOffset++);
 #if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "RET" << std::endl;
+				std::cout << (iOffset - 1) << ". " << "RET" << std::endl << std::endl;
 #endif
-				std::cout << "End of Function : " << m_pCurrentFunction->m_sFunctionName << "()" << std::endl;
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONCALLEND:
@@ -631,89 +630,6 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 				}
 			}
 			break;
-			/*
-			case ASTNodeType::ASTNode_FUNCTIONCALL:
-			{
-				std::string sFuncCallee = pNode->m_sText;
-				int iActualArgListSize = 0, iArgListSize = 0;
-				Tree* pFuncNode = nullptr;
-				Tree* pArgListNode = nullptr;
-				{
-					std::map<std::string, Tree*>::const_iterator itr = m_MapFunctionNodes.find(sFuncCallee);
-					if (itr != m_MapFunctionNodes.end())
-					{
-						pFuncNode = itr->second;
-						pArgListNode = pFuncNode->m_pRightNode;
-						iActualArgListSize = pArgListNode->m_vStatements.size();
-						std::string sActualFuncSignature = pArgListNode->m_sAdditionalInfo;
-						std::string sFuncSignature = pNode->m_sAdditionalInfo;
-						iArgListSize = pNode->m_vStatements.size();
-
-						assert(	(iActualArgListSize == iArgListSize)
-								&&
-								(sActualFuncSignature == sFuncSignature));
-
-						if (	(iActualArgListSize == iArgListSize)
-								&&
-								(sActualFuncSignature == sFuncSignature)
-						) {
-							for (Tree* pArg : pNode->m_vStatements)
-							{
-								switch (pArg->m_eASTNodeType)
-								{
-									case ASTNodeType::ASTNode_EXPRESSION:
-									{
-										populateCode(pArg, pByteCode, iOffset);
-									}
-									break;
-									case ASTNodeType::ASTNode_INTEGER:
-									{
-										emit((int)OPCODE::PUSH, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-										std::cout << (iOffset - 1) << ". " << "PUSH ";
-#endif
-										emit(atoi(pArg->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-										std::cout << atoi(pArg->m_sText.c_str()) << std::endl;
-#endif
-									}
-									break;
-									case ASTNodeType::ASTNode_IDENTIFIER:
-									{
-										emit((int)OPCODE::FETCH, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-										std::cout << (iOffset - 1) << ". " << "FETCH ";
-#endif
-										emit(getVariablePosition(pArg->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-										std::cout << getVariablePosition(pArg->m_sText.c_str()) << std::endl;
-#endif
-									}
-									break;
-									case ASTNodeType::ASTNode_STRING:
-									{
-										emit((int)OPCODE::PUSH, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-										std::cout << (iOffset - 1) << ". " << "PUSH ";
-#endif
-										emit(getStringPosition(pArg->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-										std::cout << getStringPosition(pArg->m_sText.c_str()) << std::endl;
-#endif
-									}
-									break;
-								}
-							}
-						}
-						else
-						{
-							std::cout << "Compilation error!" << std::endl;
-						}
-					}	
-				}
-			}
-			break;
-			//*/
 			case ASTNodeType::ASTNode_CHARACTER:
 			{
 				emit((int)OPCODE::PUSH, pByteCode, iOffset++);
@@ -1131,41 +1047,43 @@ void GrammerUtils::printAssembly(int* iByteCode, int iOffset, std::vector<std::s
 {
 	RandomAccessFile* pRaf = new RandomAccessFile();
 	bool bCanWrite = pRaf->openForWrite("main.o");
+
 	if (bCanWrite)
 	{
 		printHeaders(pRaf, vVariables, vStrings);
+	}
 
-		OPCODE eOpcode = OPCODE::NOP;
-		while (true)
+	OPCODE eOpcode = OPCODE::NOP;
+	while (true)
+	{
+		eOpcode = (OPCODE)iByteCode[iOffset];
+		CodeMap pMachineInstruction = opCodeMap[(int)eOpcode];
+
+		// Print to stdout
 		{
-			eOpcode = (OPCODE)iByteCode[iOffset];
-			CodeMap pMachineInstruction = opCodeMap[(int)eOpcode];
+			std::cout << iOffset << ". " << pMachineInstruction.sOpCode;
 
-			// Print to stdout
+			for(int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
 			{
-				std::cout << iOffset << ". " << pMachineInstruction.sOpCode;
-
-				for(int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
-				{
-					std::cout << " " << iByteCode[iOffset + i];
-				}
-				std::cout << std::endl;
+				std::cout << " " << iByteCode[iOffset + i];
 			}
-
-			// Print to file
-			{
-				pRaf->writeInt((int)pMachineInstruction.eOpCode);
-				for (int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
-				{
-					pRaf->writeInt(iByteCode[iOffset + i]);
-				}
-			}
-
-			iOffset += pMachineInstruction.iOpcodeOperandCount;
-
-			if (eOpcode == OPCODE::HLT)
-				break;
+			std::cout << std::endl;
 		}
+
+		// Print to file
+		if(bCanWrite)
+		{
+			pRaf->writeInt((int)pMachineInstruction.eOpCode);
+			for (int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
+			{
+				pRaf->writeInt(iByteCode[iOffset + i]);
+			}
+		}
+
+		iOffset += pMachineInstruction.iOpcodeOperandCount;
+
+		if (eOpcode == OPCODE::HLT)
+			break;
 	}
 
 	pRaf->close();

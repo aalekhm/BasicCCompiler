@@ -279,10 +279,28 @@ void AsciiMandlebrot()
     }
 }
 
+void callMe()
+{
+	int ii = 0;
+	while(ii < 3)
+	{
+		print("printing AsciiMandlebrot Before", ii);
+		putc(10);
+		
+		// TODO:: Problem with the stack when we call a function inside a nested block.
+		AsciiMandlebrot();
+		
+		ii = ii + 1;
+		print("printing AsciiMandlebrot After", ii);
+		putc(10);
+	}
+}
+
 int main()
 {
 	print("In main()");
 	putc(10);
+	
 	//int i = 10;
 	tempFunc(55, 101);
 	testPrinting();
@@ -294,5 +312,7 @@ int main()
 	fizzBuzz();
 	_99BottlesOfBeer();
 	primes();
-	AsciiMandlebrot();
+	//AsciiMandlebrot();
+	
+	callMe();
 }
