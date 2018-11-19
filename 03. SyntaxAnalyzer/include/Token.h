@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <assert.h>
 
 namespace TokenType
 {
@@ -56,6 +57,7 @@ namespace TokenType
 		TK_BNFNONTERMINAL,
 		TK_BNFASSIGNMENT,
 		TK_BNFCODE,
+		TK_FUNCTIONCALL,
 		TK_UNKNOWN
 	};
 
@@ -114,6 +116,7 @@ namespace TokenType
 			case Type::TK_BNFNONTERMINAL:		return "TK_BNFNONTERMINAL";
 			case Type::TK_BNFASSIGNMENT:		return "TK_BNFASSIGNMENT";
 			case Type::TK_BNFCODE:				return "TK_BNFCODE";
+			case Type::TK_FUNCTIONCALL:			return "TK_FUNCTIONCALL";
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
 
@@ -172,6 +175,7 @@ namespace TokenType
 		else if(sTokenType == "TK_BNFNONTERMINAL")		return Type::TK_BNFNONTERMINAL;
 		else if(sTokenType == "TK_BNFASSIGNMENT")		return Type::TK_BNFASSIGNMENT;
 		else if(sTokenType == "TK_BNFCODE")				return Type::TK_BNFCODE;
+		else if(sTokenType == "TK_FUNCTIONCALL")		return Type::TK_FUNCTIONCALL;
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;
 	}
@@ -194,6 +198,80 @@ struct Token
 	TokenType::Type		getType() { return m_eTokenType; }
 	const char*			getText() { return m_sText.c_str(); }
 };
+
+enum class OPCODE
+{
+	NOP = 0,
+	FETCH,
+	STORE,
+	PUSH,
+	POP,
+	MUL,
+	DIV,
+	MOD,
+	ADD,
+	SUB,
+	JMP_LT,
+	JMP_LTEQ,
+	JMP_GT,
+	JMP_GTEQ,
+	JMP_EQ,
+	JMP_NEQ,
+	LOGICALOR,
+	LOGICALAND,
+	_NOT,
+	JMP,
+	JZ,
+	JNZ,
+	PRTS,
+	PRTC,
+	PRTI,
+	CALL,
+	RET,
+	SUB_REG,
+	PUSHI,
+	PUSHR,
+	POPI,
+	POPR,
+	HLT,
+};
+
+struct CodeMap
+{
+	const char*		sOpCode;
+	OPCODE			eOpCode;
+	int				iOpcodeOperandCount;
+};
+
+enum class EREGISTERS
+{
+	RAX,	// Accumulator
+	RCX,	// Counter
+	RDX,	// Data
+	RBX,	// Base
+	RSP,	// Stack Pointer
+	RBP,	// Stack Base Pointer
+	RSI,	// Source
+	RDI,	// Destination
+
+	RMAX
+};
+
+typedef struct REGISTERS
+{
+	__int64		RAX;	// Accumulator
+	__int64		RCX;	// Counter
+	__int64		RDX;	// Data
+	__int64		RBX;	// Base
+	__int64		RSP;	// Stack Pointer
+	__int64		RBP;	// Stack Base Pointer
+	__int64		RSI;	// Source
+	__int64		RDI;	// Destination
+
+	__int32		EFLAGS;
+	__int32		EIP;
+};
+
 
 enum class ENUM_OP_PRECEDENCE
 {
@@ -272,6 +350,17 @@ enum class ASTNodeType
 	ASTNode_CHARACTER,
 	ASTNode_STATEMENT,
 	ASTNode_EXPRESSION,
+
+	ASTNode_FUNCTIONDEF,
+	ASTNode_FUNCTIONRETURNTYPE,
+	ASTNode_FUNCTIONARGLIST,
+	ASTNode_FUNCTIONSTART,
+	ASTNode_FUNCTIONEND,
+	ASTNode_PRIMITIVETYPEINT,
+	ASTNode_PRIMITIVETYPESTRING,
+	ASTNode_FUNCTIONCALL,
+	ASTNode_RETURNSTMT,
+	ASTNode_FUNCTIONCALLEND
 };
 
 typedef struct Tree
@@ -282,21 +371,158 @@ typedef struct Tree
 		, m_pRightNode(nullptr)
 		, m_eASTNodeType(ASTNodeType::ASTNode_INVALID)
 		, m_sText("")
+		, m_sAdditionalInfo("")
 	{}
 
 	void addChild(Tree* pNode)
 	{
 		if (pNode != nullptr)
+		{
 			m_vStatements.push_back(pNode);
+			pNode->m_pParentNode = this;
+		}
+	}
+
+	Tree* getLastStatement()
+	{
+		return m_vStatements.back();
+	}
+
+	void removeFromParent()
+	{
+		int iCount = 0;
+		for (Tree* pChild : m_pParentNode->m_vStatements)
+		{
+			if (pChild == this)
+			{
+				m_pParentNode->m_vStatements.erase(m_pParentNode->m_vStatements.begin() + iCount);
+				m_pParentNode = nullptr;
+				break;
+			}
+
+			iCount++;
+		}
 	}
 
 	ASTNodeType			m_eASTNodeType;
 
 	std::vector<Tree*>	m_vStatements;
 	std::string			m_sText;
+	std::string			m_sAdditionalInfo;
 
 	Tree*				m_pParentNode;
 	Tree*				m_pLeftNode;
 	Tree*				m_pRightNode;
-
 } Tree;
+
+typedef struct FunctionInfo
+{
+	FunctionInfo(Tree* pNode, int iOffset)
+	: m_pNode(pNode)
+	, m_iStartOffsetInCode(iOffset)
+	, m_sFunctionName(pNode->m_sText)
+	, m_pFunctionReturnType(pNode->m_pLeftNode)
+	, m_pFunctionArguments(pNode->m_pRightNode)
+	{
+		scanFunctionForLocals(pNode);
+		scanFunctionForArguments(pNode);
+	}
+
+	void scanFunctionForLocals(Tree* pNode)
+	{
+		for (Tree* pChild : pNode->m_vStatements)
+		{
+			switch(pChild->m_eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
+				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
+				{
+					m_vLocalVariables.push_back(pChild);
+				}
+				break;
+				case ASTNodeType::ASTNode_IF:
+				{
+					scanFunctionForLocals(pChild);
+					Tree* pElseNode = pChild->m_pRightNode;
+					if (pElseNode != nullptr)
+						scanFunctionForLocals(pElseNode);
+				}
+				break;
+				case ASTNodeType::ASTNode_WHILE:
+				{
+					scanFunctionForLocals(pChild);
+				}
+				break;
+			}
+		}
+	}
+
+	void scanFunctionForArguments(Tree* pNode)
+	{
+		for (Tree* pChild : m_pFunctionArguments->m_vStatements)
+		{
+			switch (pChild->m_eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
+				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
+				{
+					m_vArguments.push_back(pChild);
+				}
+				break;
+			}
+		}
+	}
+
+	int getLocalVariablePosition(const char* sLocalVariableName)
+	{
+		bool bFound = false;
+		int iPosition = 0;
+		for (Tree* pLocalVar : m_vLocalVariables)
+		{
+			iPosition++;
+			bFound = pLocalVar->m_sText == sLocalVariableName;
+			if(bFound)
+			{
+				break;
+			}
+		}
+
+		if (!bFound)
+		{
+			iPosition = 0;
+			for (Tree* pLocalVar : m_vArguments)
+			{
+				bFound = pLocalVar->m_sText == sLocalVariableName;
+				if (bFound)
+				{
+					break;
+				}
+				iPosition--;
+			}
+		}
+
+		assert(bFound);
+
+		return iPosition;
+	}
+
+	int getLocalVariableCount()
+	{
+		return m_vLocalVariables.size();
+	}
+
+	int getArgumentsCount()
+	{
+		return m_vArguments.size();
+	}
+
+	Tree*					m_pNode;
+	int						m_iStartOffsetInCode;
+	std::string				m_sFunctionName;
+
+	Tree*					m_pFunctionReturnType;
+	Tree*					m_pFunctionArguments;
+
+	std::vector<Tree*>		m_vLocalVariables;
+	std::vector<Tree*>		m_vArguments;
+} FunctionInfo;

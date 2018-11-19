@@ -119,7 +119,7 @@ void TinyCReader::checkOpPrecedenceAndPush(std::string sCurrentOperator)
 	}
 }
 
-Tree* TinyCReader::createPostFixExpr()
+Tree* TinyCReader::createPostFixExpr(Tree* pLeaf /* = nullptr*/)
 {
 	if (!m_vOperatorStack.empty())
 	{
@@ -144,7 +144,11 @@ Tree* TinyCReader::createPostFixExpr()
 
 	m_vPostFix.clear();
 
-	Tree* pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
+	if (pLeaf == nullptr)
+		pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
+	else
+		pLeaf->m_sText = sPostFixExpr;
+
 	return pLeaf;
 }
 

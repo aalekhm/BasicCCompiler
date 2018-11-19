@@ -220,7 +220,7 @@ void BNFToCpp::writeFromFile(RandomAccessFile* rafOutDest, const char* sSrcFileN
 
 void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName, Token tok)
 {
-	char sLine[1024] = { 0 };
+	char sLine[4096] = { 0 };
 	TokenType::Type eTokenType = tok.getType();
 	std::string sValue = tok.getText();
 

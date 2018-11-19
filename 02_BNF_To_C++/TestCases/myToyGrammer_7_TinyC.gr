@@ -4,7 +4,7 @@
 <functionDef>					::=		<returnType>		"<code>"
 																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
-										TK_IDENTIFIER		"<code>"
+										TK_FUNCTIONCALL		"<code>"
 																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
 																updateBlockString(sFunctionName);
 																
@@ -54,8 +54,6 @@
 <returnType>					::=		(	"int"
 											|
 											"void"
-											|
-											"string"
 										);
 <functionArgumentDefList>		::=		{ <functionArgumentDefListMore> };
 <functionArgumentDefListMore>	::=		(	<primitiveTypeInt>
@@ -98,13 +96,58 @@
 										;
 										
 										
-<stmt_list> 					::=		{ <stmt> };
-<stmt>      					::=   	( <assignOrFuncCall> | <assignmentNewVariable> | <ifelse> | <_while> | <print> | <putc> | <bracesstmtlist> ) ;
+<stmt_list> 					::=		{ <stmt> [';'] };
 
-<assignOrFuncCall>				::= 	TK_IDENTIFIER
-										( <assignmentRHS> | <functionCall> );
+<stmt>      					::=   	( 	<functionCall> 
+											| 
+											<assignmentRHS> 
+											| 
+											<assignmentNewVariable> 
+											| 
+											<ifelse> 
+											| 
+											<_while> 
+											| 
+											<print> 
+											| 
+											<putc> 
+											| 
+											<bracesstmtlist> 
+											| 
+											<returnStatement> 
+										);
 
-<functionCall>					::=		"<code>"
+<returnStatement>				::=		"return"
+													"<code>"
+														updateBlockString("return");
+														
+														Tree* pReturnStmtNode = makeLeaf(ASTNodeType::ASTNode_RETURNSTMT, "return");
+														{
+															pReturnStmtNode->m_pParentNode = m_pASTCurrentNode;
+														}
+														
+														Tree* pTemp = nullptr;
+														Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														{
+															pExpressionLeftLeaf->m_pParentNode = pReturnStmtNode;
+															
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pExpressionLeftLeaf;
+														}
+													"</code>"
+										<expr>		"<code>"
+														removeLastFromBlockString();
+														
+														m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+														pReturnStmtNode->addChild(pExpressionLeftLeaf);
+														
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pReturnStmtNode);
+													"</code>"
+										;
+
+<functionCall>					::=		TK_FUNCTIONCALL
+										"<code>"
 											std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
 										"</code>"
 										'('				"<code>"
@@ -119,7 +162,7 @@
 														"</code>"
 										[ <functionArgumentList> ]
 										')'
-										';' 			"<code>"
+														"<code>"
 															Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sIdentifier.c_str());
 															m_pASTCurrentNode->addChild(pFuncCallEndNode);
 															
@@ -166,38 +209,44 @@
 										) ;
 
 <ifelse>						::= 	<_if>;
-<_if>							::=		"if" 			"<code>"
-															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, GrammerUtils::m_pPrevToken.getText());
-															Tree* pTemp = nullptr;
-															{
-																m_pASTCurrentNode->addChild(pIfNode);
+<_if>							::=		"if"
+										'('				"<code>"
+															updateBlockString("if");
 
+															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, "if");
+															{
+																pIfNode->m_pParentNode = m_pASTCurrentNode;
+															}
+
+															Tree* pTemp = nullptr;
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pIfNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pIfNode;
+																
 																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pIfNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
 															}
 														"</code>"
-										'('
 										<expr>			"<code>"
-															Tree* pExpressionLeftLeaf = createPostFixExpr();
-															{
-																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
-															}
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															m_pASTCurrentNode = pIfNode;
 														"</code>"
 										')'
-										['{'] 			"<code>"
-															updateBlockString("if");
-														"</code>"
+										['{']
 										<stmt_list> 
 										['}'] 			"<code>"
 															removeLastFromBlockString();
 														"</code>"
 										[ <_else> ]		"<code>"
 															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pIfNode);
 														"</code>"
 										;
 										
 <_else>							::=		"else" 			"<code>"
+															updateBlockString("else");
+															
 															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
 															Tree* pIfNode = nullptr;
 															{	
@@ -207,9 +256,7 @@
 																m_pASTCurrentNode = pElseNode;
 															}
 														"</code>"
-										['{'] 			"<code>"
-															updateBlockString("else");
-														"</code>"
+										['{']
 										<stmt_list> 
 										['}'] 			"<code>"
 															removeLastFromBlockString();
@@ -221,34 +268,38 @@
 														"</code>"
 										;
 
-<_while>						::= 	"while" 		"<code>"
-															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, GrammerUtils::m_pPrevToken.getText());
-															Tree* pTemp = nullptr;
+<_while>						::= 	"while"
+										'('				"<code>"
+															updateBlockString("while");
+															
+															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
 															{
-																m_pASTCurrentNode->addChild(pWhileNode);
-																
-																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pWhileNode;
+																pWhileNode->m_pParentNode = m_pASTCurrentNode;
 															}
-														"</code>"
-										'('
-										<expr>			"<code>"
-															Tree* pExpressionLeftLeaf = createPostFixExpr();
+															
+															Tree* pTemp = nullptr;
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 															{
 																pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
+																pExpressionLeftLeaf->m_pParentNode = pWhileNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
 															}
 														"</code>"
-										')'
-										['{'] 			"<code>"
-															updateBlockString("while");
+										<expr>			"<code>"
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															m_pASTCurrentNode = pWhileNode;
 														"</code>"
+										')'
+										['{']
 										<stmt_list> 
 										['}'] 			"<code>"
 															removeLastFromBlockString();
+															
 															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pWhileNode);
 														"</code>"
-										
 										;
 
 <print>							::= 	"print" 
@@ -263,7 +314,8 @@
 															}
 														"</code>"
 										<print_list> 
-										')' ';' 		"<code>"
+										')' 
+														"<code>"
 															m_pASTCurrentNode = pTemp;
 														"</code>"
 										;
@@ -306,7 +358,8 @@
 															"</code>"
 										'(' 
 										<putcList>
-										')' ';'				"<code>"
+										')' 
+															"<code>"
 																m_pASTCurrentNode = pTemp;
 															"</code>"
 										;
@@ -349,20 +402,28 @@
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
 															"</code>"
-										'='					"<code>" 
+										'='					"<code>"
 																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedVariableName.c_str());
+																Tree* pTemp = nullptr;
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
+																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																}
-															"</code>"
-										<expr>				"<code>"
-																Tree* pExpressionLeftLeaf = createPostFixExpr();
+																
+																Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 																{
 																	pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
-																	pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
+																	pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																	
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pExpressionLeftLeaf;
 																}
+
 															"</code>"
-										';'					"<code>"
+										<expr>				"<code>"
+																m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															
+																m_pASTCurrentNode = pTemp;
 																m_pASTCurrentNode->addChild(pPrimIntNode);
 															"</code>"
 										;
@@ -386,25 +447,23 @@
 																	pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 																}
 															"</code>"
-										';'					"<code>"
+															"<code>"
 																m_pASTCurrentNode->addChild(pPrimStringNode);
 															"</code>"
 										;
 
-<assignmentRHS>					::=  	"<code>"
+<assignmentRHS>					::=  	TK_IDENTIFIER
+										"<code>"
 											std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
 										"</code>"
-										'='				"<code>" 
+										'='				"<code>"
 															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 															assert(!sFullyQualifiedVariableName.empty());
 
-															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, "");
+															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
 															Tree* pTemp = nullptr;
 															{
-																m_pASTCurrentNode->addChild(pAssignmentNode);
-																
-																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pAssignmentNode;
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
 															}
 															
 															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
@@ -412,19 +471,25 @@
 																pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
 																pAssignmentNode->m_pRightNode = pIdentifierLeaf;
 															}
-														"</code>"
-										<expr>			"<code>"
-															Tree* pExpressionLeftLeaf = createPostFixExpr();
+															
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 															{
-																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
+																pAssignmentNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
 															}
 														"</code>"
-										';'				"<code>"
+										<expr>
+														"<code>"
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															
 															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pAssignmentNode);
 														"</code>"
 										;
-										
+																				
 <paren_expr>					::=   	[<unary_oper>] '(' <expr> ')' ;
 										
 <expr>                			::=		<and_expr> { <logicalor_expr> } ;
@@ -497,13 +562,56 @@
 										) ;
 
 <primary>             			::=   	<defaults> ;
-//<defaults>						::= 	( <operands> | <paren_expr> | <unary_oper> ) ;
-<defaults>						::= 	( <operands> | <paren_expr> ) ;
+<defaults>						::= 	( <operands> | <paren_expr> ) ; // <unary_oper>
 <operands>						::=		"<code>"
 											std::string sOperand;
 										"</code>"
 										
-										( 	TK_IDENTIFIER 	"<code>"
+										( 	<functionCall>	"<code>"
+																// The idea here is to create a temporary variable of the type returned by the function
+																// & add it before the expression statement.
+																// The temporary variable is then inserted in the expression.
+																// Eg:
+																// 		int iRet = 10;
+																//		iRet = 10 + retFunc(); // where retFunc return type is "int".
+																//		This will create a dummy code as follows:
+																//			int iRet = 10;
+																//			int iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
+																//			iRet = 10 + iRet_retFunc;
+																
+																Tree* pExpressionNode = m_pASTCurrentNode;
+																Tree* pAssignNode = pExpressionNode->m_pParentNode;
+																Tree* pBlockNode = pAssignNode->m_pParentNode;
+																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
+																{
+																	pFunctionCallNode->removeFromParent();
+																}
+																assert(pFunctionCallNode != nullptr);
+																{
+																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFullyQualifiedTempVariableName;
+																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append("_");
+																	sFullyQualifiedTempVariableName.append(sFuncName);
+																	
+																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedTempVariableName.c_str());
+																	{
+																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
+																		pBlockNode->addChild(pPrimIntNode);
+																	}
+																	
+																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																	{
+																		pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
+																		pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																		pExpressionLeftLeaf->addChild(pFunctionCallNode);
+																	}
+																	
+																	m_vPostFix.push_back(sFullyQualifiedTempVariableName);
+																}
+															"</code>"
+											|
+											TK_IDENTIFIER 	"<code>"
 																sOperand = GrammerUtils::m_pPrevToken.getText();
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
 																assert(!sFullyQualifiedVariableName.empty());

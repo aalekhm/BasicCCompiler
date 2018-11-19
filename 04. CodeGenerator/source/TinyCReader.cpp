@@ -119,7 +119,7 @@ void TinyCReader::checkOpPrecedenceAndPush(std::string sCurrentOperator)
 	}
 }
 
-Tree* TinyCReader::createPostFixExpr()
+Tree* TinyCReader::createPostFixExpr(Tree* pLeaf /* = nullptr*/)
 {
 	if (!m_vOperatorStack.empty())
 	{
@@ -144,7 +144,11 @@ Tree* TinyCReader::createPostFixExpr()
 
 	m_vPostFix.clear();
 
-	Tree* pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
+	if (pLeaf == nullptr)
+		pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
+	else
+		pLeaf->m_sText = sPostFixExpr;
+
 	return pLeaf;
 }
 
@@ -258,7 +262,7 @@ return false;
 
 																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
 															
-if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
 return false;
 
 																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
@@ -327,10 +331,6 @@ return true;
 }
 else
 if(GrammerUtils::match("void", OPTIONAL)) {
-return true;
-}
-else
-if(GrammerUtils::match("string", OPTIONAL)) {
 return true;
 }
 else
@@ -432,6 +432,14 @@ return true;
 bool TinyCReader::stmt_list() {
 while(true) {
 if(stmt()) {
+if(!GrammerUtils::match(';', OPTIONAL)) {
+
+}
+
+else {
+
+}
+
 }
 else
 break;
@@ -442,7 +450,11 @@ return true;
 }
 
 bool TinyCReader::stmt() {
-if(assignOrFuncCall()) {
+if(functionCall()) {
+return true;
+}
+else
+if(assignmentRHS()) {
 return true;
 }
 else
@@ -470,30 +482,54 @@ if(bracesstmtlist()) {
 return true;
 }
 else
-return false;
-
-return true;
-
-}
-
-bool TinyCReader::assignOrFuncCall() {
-if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
-return false;
-if(assignmentRHS()) {
-return true;
-}
-else
-if(functionCall()) {
+if(returnStatement()) {
 return true;
 }
 else
 return false;
 
+return true;
+
+}
+
+bool TinyCReader::returnStatement() {
+if(!GrammerUtils::match("return", MANDATORY))
+return false;
+
+														updateBlockString("return");
+														
+														Tree* pReturnStmtNode = makeLeaf(ASTNodeType::ASTNode_RETURNSTMT, "return");
+														{
+															pReturnStmtNode->m_pParentNode = m_pASTCurrentNode;
+														}
+														
+														Tree* pTemp = nullptr;
+														Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														{
+															pExpressionLeftLeaf->m_pParentNode = pReturnStmtNode;
+															
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pExpressionLeftLeaf;
+														}
+													
+if(!expr())
+return false;
+
+														removeLastFromBlockString();
+														
+														m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+														pReturnStmtNode->addChild(pExpressionLeftLeaf);
+														
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pReturnStmtNode);
+													
 return true;
 
 }
 
 bool TinyCReader::functionCall() {
+if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
+return false;
 
 											std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
 										
@@ -515,8 +551,6 @@ else {
 }
 
 if(!GrammerUtils::match(')', MANDATORY))
-return false;
-if(!GrammerUtils::match(';', MANDATORY))
 return false;
 
 															Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sIdentifier.c_str());
@@ -619,26 +653,31 @@ return true;
 bool TinyCReader::_if() {
 if(!GrammerUtils::match("if", MANDATORY))
 return false;
-
-															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, GrammerUtils::m_pPrevToken.getText());
-															Tree* pTemp = nullptr;
-															{
-																m_pASTCurrentNode->addChild(pIfNode);
-
-																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pIfNode;
-															}
-														
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
+
+															updateBlockString("if");
+
+															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, "if");
+															{
+																pIfNode->m_pParentNode = m_pASTCurrentNode;
+															}
+
+															Tree* pTemp = nullptr;
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pIfNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pIfNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
+															}
+														
 if(!expr())
 return false;
 
-															Tree* pExpressionLeftLeaf = createPostFixExpr();
-															{
-																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
-															}
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															m_pASTCurrentNode = pIfNode;
 														
 if(!GrammerUtils::match(')', MANDATORY))
 return false;
@@ -650,9 +689,6 @@ else {
 
 }
 
-
-															updateBlockString("if");
-														
 if(!stmt_list())
 return false;
 if(!GrammerUtils::match('}', OPTIONAL)) {
@@ -673,6 +709,7 @@ else {
 
 
 															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pIfNode);
 														
 return true;
 
@@ -682,6 +719,8 @@ bool TinyCReader::_else() {
 if(!GrammerUtils::match("else", MANDATORY))
 return false;
 
+															updateBlockString("else");
+															
 															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
 															Tree* pIfNode = nullptr;
 															{	
@@ -699,9 +738,6 @@ else {
 
 }
 
-
-															updateBlockString("else");
-														
 if(!stmt_list())
 return false;
 if(!GrammerUtils::match('}', OPTIONAL)) {
@@ -727,26 +763,31 @@ return true;
 bool TinyCReader::_while() {
 if(!GrammerUtils::match("while", MANDATORY))
 return false;
-
-															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, GrammerUtils::m_pPrevToken.getText());
-															Tree* pTemp = nullptr;
-															{
-																m_pASTCurrentNode->addChild(pWhileNode);
-																
-																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pWhileNode;
-															}
-														
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
+
+															updateBlockString("while");
+															
+															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
+															{
+																pWhileNode->m_pParentNode = m_pASTCurrentNode;
+															}
+															
+															Tree* pTemp = nullptr;
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pWhileNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
+															}
+														
 if(!expr())
 return false;
 
-															Tree* pExpressionLeftLeaf = createPostFixExpr();
-															{
-																pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
-															}
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															m_pASTCurrentNode = pWhileNode;
 														
 if(!GrammerUtils::match(')', MANDATORY))
 return false;
@@ -758,9 +799,6 @@ else {
 
 }
 
-
-															updateBlockString("while");
-														
 if(!stmt_list())
 return false;
 if(!GrammerUtils::match('}', OPTIONAL)) {
@@ -773,7 +811,9 @@ else {
 
 
 															removeLastFromBlockString();
+															
 															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pWhileNode);
 														
 return true;
 
@@ -797,8 +837,6 @@ return false;
 if(!print_list())
 return false;
 if(!GrammerUtils::match(')', MANDATORY))
-return false;
-if(!GrammerUtils::match(';', MANDATORY))
 return false;
 
 															m_pASTCurrentNode = pTemp;
@@ -892,8 +930,6 @@ if(!putcList())
 return false;
 if(!GrammerUtils::match(')', MANDATORY))
 return false;
-if(!GrammerUtils::match(';', MANDATORY))
-return false;
 
 																m_pASTCurrentNode = pTemp;
 															
@@ -981,24 +1017,30 @@ return false;
 															
 if(!GrammerUtils::match('=', MANDATORY))
 return false;
- 
+
 																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedVariableName.c_str());
+																Tree* pTemp = nullptr;
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
+																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																}
+																
+																Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																{
+																	pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
+																	pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																	
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pExpressionLeftLeaf;
+																}
+
 															
 if(!expr())
 return false;
 
-																Tree* pExpressionLeftLeaf = createPostFixExpr();
-																{
-																	pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
-																	pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
-																}
+																m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															
-if(!GrammerUtils::match(';', MANDATORY))
-return false;
-
+																m_pASTCurrentNode = pTemp;
 																m_pASTCurrentNode->addChild(pPrimIntNode);
 															
 return true;
@@ -1033,8 +1075,6 @@ return false;
 																	pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 																}
 															
-if(!GrammerUtils::match(';', MANDATORY))
-return false;
 
 																m_pASTCurrentNode->addChild(pPrimStringNode);
 															
@@ -1043,22 +1083,21 @@ return true;
 }
 
 bool TinyCReader::assignmentRHS() {
+if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+return false;
 
 											std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
 										
 if(!GrammerUtils::match('=', MANDATORY))
 return false;
- 
+
 															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 															assert(!sFullyQualifiedVariableName.empty());
 
-															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, "");
+															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
 															Tree* pTemp = nullptr;
 															{
-																m_pASTCurrentNode->addChild(pAssignmentNode);
-																
-																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pAssignmentNode;
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
 															}
 															
 															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
@@ -1066,20 +1105,23 @@ return false;
 																pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
 																pAssignmentNode->m_pRightNode = pIdentifierLeaf;
 															}
+															
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pAssignmentNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
+															}
 														
 if(!expr())
 return false;
 
-															Tree* pExpressionLeftLeaf = createPostFixExpr();
-															{
-																m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
-															}
-														
-if(!GrammerUtils::match(';', MANDATORY))
-return false;
-
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+															
 															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pAssignmentNode);
 														
 return true;
 
@@ -1372,6 +1414,53 @@ bool TinyCReader::operands() {
 
 											std::string sOperand;
 										
+if(functionCall()) {
+
+																// The idea here is to create a temporary variable of the type returned by the function
+																// & add it before the expression statement.
+																// The temporary variable is then inserted in the expression.
+																// Eg:
+																// 		int iRet = 10;
+																//		iRet = 10 + retFunc(); // where retFunc return type is "int".
+																//		This will create a dummy code as follows:
+																//			int iRet = 10;
+																//			int iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
+																//			iRet = 10 + iRet_retFunc;
+																
+																Tree* pExpressionNode = m_pASTCurrentNode;
+																Tree* pAssignNode = pExpressionNode->m_pParentNode;
+																Tree* pBlockNode = pAssignNode->m_pParentNode;
+																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
+																{
+																	pFunctionCallNode->removeFromParent();
+																}
+																assert(pFunctionCallNode != nullptr);
+																{
+																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFullyQualifiedTempVariableName;
+																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append("_");
+																	sFullyQualifiedTempVariableName.append(sFuncName);
+																	
+																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedTempVariableName.c_str());
+																	{
+																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
+																		pBlockNode->addChild(pPrimIntNode);
+																	}
+																	
+																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																	{
+																		pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
+																		pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																		pExpressionLeftLeaf->addChild(pFunctionCallNode);
+																	}
+																	
+																	m_vPostFix.push_back(sFullyQualifiedTempVariableName);
+																}
+															
+return true;
+}
+else
 if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
 																sOperand = GrammerUtils::m_pPrevToken.getText();

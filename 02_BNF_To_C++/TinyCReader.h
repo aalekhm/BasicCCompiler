@@ -12,9 +12,9 @@ class TinyCReader {
 		void addKeywords() {
 			GrammerUtils::m_vKeywords.push_back("int");
 			GrammerUtils::m_vKeywords.push_back("void");
-			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("int");
 			GrammerUtils::m_vKeywords.push_back("string");
+			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
 			GrammerUtils::m_vKeywords.push_back("else");
 			GrammerUtils::m_vKeywords.push_back("while");
@@ -40,7 +40,7 @@ class TinyCReader {
 		bool primitiveTypeString();
 		bool stmt_list();
 		bool stmt();
-		bool assignOrFuncCall();
+		bool returnStatement();
 		bool functionCall();
 		bool functionArgumentList();
 		bool functionArgumentItem();
@@ -88,7 +88,7 @@ class TinyCReader {
 		
 		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
 		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);
-		Tree*						createPostFixExpr();
+		Tree*						createPostFixExpr(Tree* pLeaf = nullptr);
 		
 		void						updateBlockString(std::string sIdent);
 		void						removeLastFromBlockString();

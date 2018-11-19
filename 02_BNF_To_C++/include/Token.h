@@ -56,6 +56,7 @@ namespace TokenType
 		TK_BNFNONTERMINAL,
 		TK_BNFASSIGNMENT,
 		TK_BNFCODE,
+		TK_FUNCTIONCALL,
 		TK_UNKNOWN
 	};
 
@@ -114,6 +115,7 @@ namespace TokenType
 			case Type::TK_BNFNONTERMINAL:		return "TK_BNFNONTERMINAL";
 			case Type::TK_BNFASSIGNMENT:		return "TK_BNFASSIGNMENT";
 			case Type::TK_BNFCODE:				return "TK_BNFCODE";
+			case Type::TK_FUNCTIONCALL:			return "TK_FUNCTIONCALL";
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
 
@@ -172,6 +174,7 @@ namespace TokenType
 		else if(sTokenType == "TK_BNFNONTERMINAL")		return Type::TK_BNFNONTERMINAL;
 		else if(sTokenType == "TK_BNFASSIGNMENT")		return Type::TK_BNFASSIGNMENT;
 		else if(sTokenType == "TK_BNFCODE")				return Type::TK_BNFCODE;
+		else if(sTokenType == "TK_FUNCTIONCALL")		return Type::TK_FUNCTIONCALL;
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;
 	}

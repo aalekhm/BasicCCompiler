@@ -6,7 +6,7 @@
 		
 		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
 		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);
-		Tree*						createPostFixExpr();
+		Tree*						createPostFixExpr(Tree* pLeaf = nullptr);
 		
 		void						updateBlockString(std::string sIdent);
 		void						removeLastFromBlockString();

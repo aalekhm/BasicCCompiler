@@ -1,22 +1,22 @@
 #include "GrammerUtils.h"
 #include <assert.h>
 
-Token						GrammerUtils::m_pToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
-Token						GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
+Token									GrammerUtils::m_pToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
+Token									GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
 
-std::vector<std::string>	GrammerUtils::m_vKeywords;
+std::vector<std::string>				GrammerUtils::m_vKeywords;
 
-StringTokenizer*			GrammerUtils::m_pStrTok = NULL;
-int							GrammerUtils::iTabCount = -1;
-std::vector<std::string>	GrammerUtils::m_vVariables;
-std::vector<std::string>	GrammerUtils::m_vStrings;
-int							GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
-//std::map<std::string, Tree*>GrammerUtils::m_MapFunctionNodes;
-//std::map<std::string, int>	GrammerUtils::m_MapFunctionOffsets;
+StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
+int										GrammerUtils::iTabCount = -1;
+std::vector<std::string>				GrammerUtils::m_vVariables;
+std::vector<std::string>				GrammerUtils::m_vStrings;
+int										GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
 std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapFunctionInfos;
 FunctionInfo*							GrammerUtils::m_pCurrentFunction;
 
-#define VERBOSE 1
+#define VERBOSE							1
+#define EMIT(__ICODE__)					emit((int)__ICODE__, m_iByteCode, iOffset++);
+#define EMIT_NOOFFSETINCR(__ICODE__)	emit((int)__ICODE__, m_iByteCode, iOffset);
 
 CodeMap opCodeMap[] =
 {
@@ -56,42 +56,6 @@ CodeMap opCodeMap[] =
 
 	{ "HLT",		OPCODE::HLT,		1 },
 };
-//struct CodeMap
-//{
-//	const char*		sOpCode;
-//	OPCODE			eOpCode;
-//	int				iOpcodeOperandCount;
-//} opCodeMap[] =
-//{
-//	{ "NOP",		OPCODE::NOP,		1},
-//	{ "FETCH",		OPCODE::FETCH,		2},
-//	{ "STORE",		OPCODE::STORE,		2 },
-//	{ "PUSH",		OPCODE::PUSH,		2 },
-//	{ "POP",		OPCODE::POP,		2 },
-//	{ "MUL",		OPCODE::MUL,		1 },
-//	{ "DIV",		OPCODE::DIV,		1 },
-//	{ "MOD",		OPCODE::MOD,		1 },
-//	{ "ADD",		OPCODE::ADD,		1 },
-//	{ "SUB",		OPCODE::SUB,		1 },
-//	{ "JMP_LT",		OPCODE::JMP_LT,		1 },
-//	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1 },
-//	{ "JMP_GT",		OPCODE::JMP_GT,		1 },
-//	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1 },
-//	{ "JMP_EQ",		OPCODE::JMP_EQ,		1 },
-//	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1 },
-//	{ "LOGICALOR",	OPCODE::LOGICALOR,	1 },
-//	{ "LOGICALAND",	OPCODE::LOGICALAND,	1 },
-//	{ "NOT",		OPCODE::_NOT,		1 },
-//	{ "JMP",		OPCODE::JMP,		2 },
-//	{ "JZ",			OPCODE::JZ,			2 },
-//	{ "JNZ",		OPCODE::JNZ,		2 },
-//	{ "PRTS",		OPCODE::PRTS,		1 },
-//	{ "PRTC",		OPCODE::PRTC,		1 },
-//	{ "PRTI",		OPCODE::PRTI,		1 },
-//	{ "CALL",		OPCODE::CALL,		2 },
-//	{ "RET",		OPCODE::RET,		1 },
-//	{ "HLT",		OPCODE::HLT,		1 },
-//};
 
 void GrammerUtils::init()
 {
@@ -134,7 +98,7 @@ Token GrammerUtils::getNextToken()
 		m_pToken.getType() == TokenType::Type::TK_MULTILINECOMMENT
 		||
 		m_pToken.getType() == TokenType::Type::TK_WHITESPACE
-		) {
+	) {
 		getNextToken();
 	}
 
@@ -230,12 +194,36 @@ void GrammerUtils::printAST(Tree* pNode)
 			iTabCount++;
 		}
 		break;
+		case ASTNodeType::ASTNode_FUNCTIONCALL:
+		{
+			std::cout << pNode->m_sText << "(";
+
+			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+			for (Tree* pChildNode : *vStatements)
+			{
+				if(pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+					std::cout << pChildNode->m_sText << ", ";
+			}
+			std::cout << ");";
+
+			bProcessChildren = false;
+		}
+		break;
 		case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
 		{
 			std::cout << "int " << pNode->m_sText;
 			std::cout << " = ";
 
 			Tree* pExpressionNode = pNode->m_pLeftNode;
+
+			if (pExpressionNode->m_vStatements.size() > 0)
+			{
+				for (Tree* pChild : pExpressionNode->m_vStatements)
+				{
+					std::cout << pChild->m_sText << " ";
+				}
+			}
+			else
 			if(pExpressionNode != nullptr)
 				std::cout << pExpressionNode->m_sText;
 
@@ -256,7 +244,12 @@ void GrammerUtils::printAST(Tree* pNode)
 		break;
 		case ASTNodeType::ASTNode_ASSIGN:
 		{
-			std::cout << pRightNode->m_sText << " = " << pLeftNode->m_sText << ";";
+			Tree* pIdentifierNode = pRightNode;
+			Tree* pExpressionNode = pLeftNode;
+
+			std::cout << pIdentifierNode->m_sText << " = " << pExpressionNode->m_sText;
+
+			std::cout << ";";
 			bProcessChildren = false;
 		}
 		break;
@@ -293,7 +286,7 @@ void GrammerUtils::printAST(Tree* pNode)
 		break;
 		case ASTNodeType::ASTNode_PUTC:
 		{
-			std::cout << "put(";
+			std::cout << "putc(";
 			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
 			for (Tree* pChildNode : *vStatements)
 			{
@@ -313,6 +306,20 @@ void GrammerUtils::printAST(Tree* pNode)
 		case ASTNodeType::ASTNode_EXPRESSION:
 		{
 			std::cout << pNode->m_sText << " ";
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_RETURNSTMT:
+		{
+			std::cout << "return" << " ";
+
+			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+			for (Tree* pChildNode : *vStatements)
+			{
+				std::cout << pChildNode->m_sText << ", ";
+			}
+			std::cout << ";";
+
 			bProcessChildren = false;
 		}
 		break;
@@ -375,9 +382,6 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 {
 	printAST(pRootNode);
 
-//	populateVariables(pRootNode, m_vVariables);
-//	int iDataSize = m_vVariables.size();
-
 	populateStrings(pRootNode, m_vStrings);
 	int iStrings = m_vStrings.size();
 
@@ -387,20 +391,20 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 		// Call to main()
 		int iJumpMainOffsetHole = 0;
 		int iMainRetAddressHole = 0;
-		{	
+		{
 			// RET
-			emit((int)OPCODE::PUSHI, m_iByteCode, iOffset++);
+			EMIT(OPCODE::PUSHI);
 			iMainRetAddressHole = iOffset++;
 
 			// EBP
-			emit((int)OPCODE::PUSHR, m_iByteCode, iOffset++);
-			emit((int)EREGISTERS::RBP, m_iByteCode, iOffset++);
+			EMIT(OPCODE::PUSHR);
+			EMIT(EREGISTERS::RBP);
 
 			// Currently main() does not take any arguments.
 			// Else push arguments here...
 
 			// Call to main(), offset populated later.
-			emit((int)OPCODE::CALL, m_iByteCode, iOffset++);
+			EMIT(OPCODE::CALL);
 #if (VERBOSE == 1)
 			std::cout << (iOffset - 1) << ". " << "CALL ";
 #endif
@@ -412,7 +416,7 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 		//////////////////////////////////////////////////////////////////////////////
 
 		//////////////////////////////////////////////////////////////////////////////
-		emit((int)OPCODE::HLT, m_iByteCode, iOffset);
+		EMIT_NOOFFSETINCR(OPCODE::HLT);
 		std::cout << iOffset << ". " << "HLT" << std::endl;
 
 		emit(iOffset, m_iByteCode, iMainRetAddressHole);
@@ -437,40 +441,6 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 		printAssembly(m_iByteCode, iOffset, m_vVariables, m_vStrings);
 	}
 }
-
-//void GrammerUtils::populateVariables(Tree* pParentNode, std::vector<std::string>& sVector)
-//{
-//	if (pParentNode != nullptr)
-//	{
-//		std::vector<Tree*> vStatements = pParentNode->m_vStatements;
-//		for (Tree* pNode : vStatements)
-//		{
-//			switch (pNode->m_eASTNodeType)
-//			{
-//			case ASTNodeType::ASTNode_ASSIGN:
-//			{
-//				addString(pNode->m_pRightNode->m_sText, sVector);
-//			}
-//			break;
-//			case ASTNodeType::ASTNode_IF:
-//			{
-//				populateVariables(pNode, sVector);
-//				Tree* pElseNode = pNode->m_pRightNode;
-//				if (pElseNode != nullptr)
-//				{
-//					populateVariables(pElseNode, sVector);
-//				}
-//			}
-//			break;
-//			case ASTNodeType::ASTNode_WHILE:
-//			{
-//				populateVariables(pNode, sVector);
-//			}
-//			break;
-//			}
-//		}
-//	}
-//}
 
 void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& sVector)
 {
@@ -559,8 +529,8 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 
 				///////////////////////////////////////////
 				// Stack Frame: Subtract local variable count from ESP.
-				emit((int)OPCODE::SUB_REG, pByteCode, iOffset++);
-				emit((int)EREGISTERS::RSP, pByteCode, iOffset++);
+				EMIT(OPCODE::SUB_REG);
+				EMIT(EREGISTERS::RSP);
 				emit((int)-m_pCurrentFunction->getLocalVariableCount(), pByteCode, iOffset++);
 
 #if (VERBOSE == 1)
@@ -575,16 +545,16 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			{
 				///////////////////////////////////////////
 				// Stack Frame: Add local variable count from ESP.
-				emit((int)OPCODE::SUB_REG, pByteCode, iOffset++);
-				emit((int)EREGISTERS::RSP, pByteCode, iOffset++);
+				EMIT(OPCODE::SUB_REG);
+				EMIT(EREGISTERS::RSP);
 				emit((int)m_pCurrentFunction->getLocalVariableCount(), pByteCode, iOffset++);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 3) << ". " << "SUB_REG";
 				std::cout << " " << (int)EREGISTERS::RSP;
 				std::cout << " " << m_pCurrentFunction->getLocalVariableCount() << std::endl;
 #endif
-				emit((int)OPCODE::SUB_REG, pByteCode, iOffset++);
-				emit((int)EREGISTERS::RSP, pByteCode, iOffset++);
+				EMIT(OPCODE::SUB_REG);
+				EMIT(EREGISTERS::RSP);
 				emit((int)m_pCurrentFunction->getArgumentsCount(), pByteCode, iOffset++);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 3) << ". " << "SUB_REG";
@@ -592,16 +562,23 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 				std::cout << " " << m_pCurrentFunction->getArgumentsCount() << std::endl;
 #endif
 				// Pop
-				emit((int)OPCODE::POPR, pByteCode, iOffset++);
-				emit((int)EREGISTERS::RBP, pByteCode, iOffset++);
+				EMIT(OPCODE::POPR);
+				EMIT(EREGISTERS::RBP);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "POPR RBP" << std::endl << std::endl;
 #endif
 				// Ret
-				emit((int)OPCODE::RET, pByteCode, iOffset++);
+				EMIT(OPCODE::RET);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "RET" << std::endl << std::endl;
 #endif
+
+				if (m_pCurrentFunction->m_pFunctionReturnType->m_sText != "void")
+				{
+					////// Push the already Popped Return Value in EAX onto the stack.
+					EMIT(OPCODE::PUSHR);
+					EMIT(EREGISTERS::RAX);
+				}
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONCALLEND:
@@ -638,25 +615,26 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 						//////////////////////////////////////////////////////
 						//// STACK FRAME
 						//////////////////////////////////////////////////////
-							LocN		<-- ESP		EBP + N
-							...						...
-							Loc0					EBP + 1
-							ARG0		<--	EBP		EBP + 0
-							...						...
-							ARGN		<--|		EBP - N
-										   |--		Function arguments. Last Arg 1st.
-							EBP			<-- Old EBP
-							RET			<-- Call Return Address
+							Local(N)	<-- ESP		EBP + N										|	- High Mem
+							...						...											|
+							Local(0)				EBP + 1										|
+							ARG0		<--	EBP		EBP											|
+							...						...											|
+							ARGN		<--|		EBP - N										|	    /\
+										   |--		Function arguments. Last Arg 1st(R to L).	|		||
+							EBP			<-- Old EBP												|		||
+							RET			<-- Call Return Address									|	- Low Mem
 						//////////////////////////////////////////////////////
 						*/
+
 						//////////////////////////////////////////////////////
 						// RET
-						emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+						EMIT(OPCODE::PUSHI);
 						int iReturnAddressOffsetHole = iOffset++;
 
 						// EBP
-						emit((int)OPCODE::PUSHR, pByteCode, iOffset++);
-						emit((int)EREGISTERS::RBP, pByteCode, iOffset++);
+						EMIT(OPCODE::PUSHR);
+						EMIT(EREGISTERS::RBP);
 #if (VERBOSE == 1)
 						std::cout << (iOffset - 1) << ". " << "PUSHR RBP" << std::endl << std::endl;
 #endif
@@ -666,7 +644,6 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 						{
 							// 1. Push arguments onto the stack...
 							std::vector<Tree*>::reverse_iterator rItr = pCALLEE_Node->m_vStatements.rbegin();
-							//for (Tree* pArgNode : pCALLEE_Node->m_vStatements)
 							for(; rItr != pCALLEE_Node->m_vStatements.rend(); ++rItr)
 							{
 								Tree* pArgNode = *rItr;
@@ -680,7 +657,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 						//////////////////////////////////////////////////////
 						// Call
 						int iCalleeFunctionAddress = pCalleeFunctionInfo->m_iStartOffsetInCode;
-						emit((int)OPCODE::CALL, pByteCode, iOffset++);
+						EMIT(OPCODE::CALL);
 #if (VERBOSE == 1)
 						std::cout << (iOffset - 1) << ". " << "CALL ";
 #endif
@@ -700,7 +677,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			break;
 			case ASTNodeType::ASTNode_CHARACTER:
 			{
-				emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+				EMIT(OPCODE::PUSHI);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "PUSHI ";
 #endif
@@ -716,7 +693,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			break;
 			case ASTNodeType::ASTNode_INTEGER:
 			{
-				emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+				EMIT(OPCODE::PUSHI);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "PUSHI ";
 #endif
@@ -728,7 +705,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			break;
 			case ASTNodeType::ASTNode_IDENTIFIER:
 			{
-				emit((int)OPCODE::FETCH, pByteCode, iOffset++);
+				EMIT(OPCODE::FETCH);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "FETCH ";
 #endif
@@ -741,7 +718,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			break;
 			case ASTNodeType::ASTNode_STRING:
 			{
-				emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+				EMIT(OPCODE::PUSHI);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "PUSHI ";
 #endif
@@ -765,140 +742,140 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 
 					switch (tok.getType())
 					{
-					case TokenType::Type::TK_CHARACTER:
-					{
-						emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+						case TokenType::Type::TK_CHARACTER:
+						{
+							EMIT(OPCODE::PUSHI);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "PUSHI ";
+							std::cout << (iOffset - 1) << ". " << "PUSHI ";
 #endif
-						char pStr[255] = { 0 };
-						sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
+							char pStr[255] = { 0 };
+							sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
 
-						int ch = atoi(pStr);
-						emit(ch, pByteCode, iOffset++);
+							int ch = atoi(pStr);
+							emit(ch, pByteCode, iOffset++);
 #if (VERBOSE == 1)
-						std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
+							std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
 #endif
-					}
-					break;
-					case TokenType::Type::TK_INTEGER:
-					{
-						emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+						}
+						break;
+						case TokenType::Type::TK_INTEGER:
+						{
+							EMIT(OPCODE::PUSHI);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "PUSHI ";
+							std::cout << (iOffset - 1) << ". " << "PUSHI ";
 #endif
-						emit(atoi(tok.getText()), pByteCode, iOffset++);
+							emit(atoi(tok.getText()), pByteCode, iOffset++);
 #if (VERBOSE == 1)
-						std::cout << atoi(tok.getText()) << std::endl;
+							std::cout << atoi(tok.getText()) << std::endl;
 #endif
-					}
-					break;
-					case TokenType::Type::TK_IDENTIFIER:
-					{
-						emit((int)OPCODE::FETCH, pByteCode, iOffset++);
+						}
+						break;
+						case TokenType::Type::TK_IDENTIFIER:
+						{
+							EMIT(OPCODE::FETCH);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "FETCH ";
+							std::cout << (iOffset - 1) << ". " << "FETCH ";
 #endif
-						emit(m_pCurrentFunction->getLocalVariablePosition(tok.getText()), pByteCode, iOffset++);
+							emit(m_pCurrentFunction->getLocalVariablePosition(tok.getText()), pByteCode, iOffset++);
 #if (VERBOSE == 1)
-						std::cout << m_pCurrentFunction->getLocalVariablePosition(tok.getText()) << std::endl;
+							std::cout << m_pCurrentFunction->getLocalVariablePosition(tok.getText()) << std::endl;
 #endif
-					}
-					break;
-					case TokenType::Type::TK_STRING:
-					{
-						emit((int)OPCODE::PUSHI, pByteCode, iOffset++);
+						}
+						break;
+						case TokenType::Type::TK_STRING:
+						{
+							EMIT(OPCODE::PUSHI);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "PUSHI ";
+							std::cout << (iOffset - 1) << ". " << "PUSHI ";
 #endif
-						emit(getStringPosition(tok.getText()), pByteCode, iOffset++);
+							emit(getStringPosition(tok.getText()), pByteCode, iOffset++);
 #if (VERBOSE == 1)
-						std::cout << getStringPosition(tok.getText()) << std::endl;
+							std::cout << getStringPosition(tok.getText()) << std::endl;
 #endif
-					}
-					break;
-					case TokenType::Type::TK_MUL:
-						emit((int)OPCODE::MUL, pByteCode, iOffset++);
+						}
+						break;
+						case TokenType::Type::TK_MUL:
+							EMIT(OPCODE::MUL);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "MUL" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "MUL" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_DIV:
-						emit((int)OPCODE::DIV, pByteCode, iOffset++);
+						case TokenType::Type::TK_DIV:
+							EMIT(OPCODE::DIV);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "DIV" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "DIV" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_MOD:
-						emit((int)OPCODE::MOD, pByteCode, iOffset++);
+						case TokenType::Type::TK_MOD:
+							emit((int)OPCODE::MOD, pByteCode, iOffset++);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "MOD" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "MOD" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_ADD:
-						emit((int)OPCODE::ADD, pByteCode, iOffset++);
+						case TokenType::Type::TK_ADD:
+							EMIT(OPCODE::ADD);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "ADD" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "ADD" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_SUB:
-						emit((int)OPCODE::SUB, pByteCode, iOffset++);
+						case TokenType::Type::TK_SUB:
+							EMIT(OPCODE::SUB);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "SUB" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "SUB" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_LT:
-						emit((int)OPCODE::JMP_LT, pByteCode, iOffset++);
+						case TokenType::Type::TK_LT:
+							EMIT(OPCODE::JMP_LT);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "JMP_LT" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "JMP_LT" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_LTEQ:
-						emit((int)OPCODE::JMP_LTEQ, pByteCode, iOffset++);
+						case TokenType::Type::TK_LTEQ:
+							EMIT(OPCODE::JMP_LTEQ);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "JMP_LTEQ" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "JMP_LTEQ" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_GT:
-						emit((int)OPCODE::JMP_GT, pByteCode, iOffset++);
+						case TokenType::Type::TK_GT:
+							EMIT(OPCODE::JMP_GT);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "JMP_GT" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "JMP_GT" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_GTEQ:
-						emit((int)OPCODE::JMP_GTEQ, pByteCode, iOffset++);
+						case TokenType::Type::TK_GTEQ:
+							EMIT(OPCODE::JMP_GTEQ);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "JMP_GTEQ" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "JMP_GTEQ" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_EQ:
-						emit((int)OPCODE::JMP_EQ, pByteCode, iOffset++);
+						case TokenType::Type::TK_EQ:
+							EMIT(OPCODE::JMP_EQ);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "JMP_EQ" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "JMP_EQ" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_NEQ:
-						emit((int)OPCODE::JMP_NEQ, pByteCode, iOffset++);
+						case TokenType::Type::TK_NEQ:
+							EMIT(OPCODE::JMP_NEQ);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "JMP_NEQ" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "JMP_NEQ" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_LOGICALAND:
-						emit((int)OPCODE::LOGICALAND, pByteCode, iOffset++);
+						case TokenType::Type::TK_LOGICALAND:
+							EMIT(OPCODE::LOGICALAND);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "LOGICALAND" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "LOGICALAND" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_LOGICALOR:
-						emit((int)OPCODE::LOGICALOR, pByteCode, iOffset++);
+						case TokenType::Type::TK_LOGICALOR:
+							EMIT(OPCODE::LOGICALOR);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "LOGICALOR" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "LOGICALOR" << std::endl;
 #endif
 						break;
-					case TokenType::Type::TK_NOT:
-						emit((int)OPCODE::_NOT, pByteCode, iOffset++);
+						case TokenType::Type::TK_NOT:
+							EMIT(OPCODE::_NOT);
 #if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "NOT" << std::endl;
+							std::cout << (iOffset - 1) << ". " << "NOT" << std::endl;
 #endif
 						break;
 					}
@@ -909,9 +886,21 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			{
 				Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
 																// In case of ASSIGN, right node will be the lvalue.
-				populateCode(pExpressionNode, pByteCode, iOffset);
 
-				emit((int)OPCODE::STORE, pByteCode, iOffset++);
+				if (pExpressionNode->m_vStatements.size() > 0)
+				{
+					for (Tree* pChild : pExpressionNode->m_vStatements)
+					{
+						populateCode(pChild, pByteCode, iOffset);
+					}
+
+					EMIT(OPCODE::PUSHR);
+					EMIT(EREGISTERS::RAX);
+				}
+				else
+					populateCode(pExpressionNode, pByteCode, iOffset);
+
+				EMIT(OPCODE::STORE);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "STORE ";
 #endif
@@ -927,7 +916,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 																// In case of ASSIGN, right node will be the lvalue.
 				populateCode(pExpressionNode, pByteCode, iOffset);
 
-				emit((int)OPCODE::STORE, pByteCode, iOffset++);
+				EMIT(OPCODE::STORE);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "STORE ";
 #endif
@@ -945,7 +934,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 
 				populateCode(pExpressionNode, pByteCode, iOffset);
 
-				emit((int)OPCODE::JZ, pByteCode, iOffset++);
+				EMIT(OPCODE::JZ);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "JZ" << std::endl;
 #endif
@@ -974,7 +963,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			{
 				case ASTNodeType::ASTNode_PUTC:
 				{
-					emit((int)OPCODE::PRTC, pByteCode, iOffset++);
+					EMIT(OPCODE::PRTC);
 #if (VERBOSE == 1)
 					std::cout << (iOffset - 1) << ". " << "PRTC" << std::endl;
 #endif
@@ -988,19 +977,19 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 						case ASTNodeType::ASTNode_INTEGER:
 						case ASTNodeType::ASTNode_IDENTIFIER:
 						case ASTNodeType::ASTNode_EXPRESSION:
-							emit((int)OPCODE::PRTI, pByteCode, iOffset++);
+							EMIT(OPCODE::PRTI);
 #if (VERBOSE == 1)
 							std::cout << (iOffset - 1) << ". " << "PRTI" << std::endl;
 #endif
 						break;
 						case ASTNodeType::ASTNode_STRING:
-							emit((int)OPCODE::PRTS, pByteCode, iOffset++);
+							EMIT(OPCODE::PRTS);
 #if (VERBOSE == 1)
 							std::cout << (iOffset - 1) << ". " << "PRTS" << std::endl;
 #endif
 						break;
 						case ASTNodeType::ASTNode_CHARACTER:
-							emit((int)OPCODE::PRTC, pByteCode, iOffset++);
+							EMIT(OPCODE::PRTC);
 #if (VERBOSE == 1)
 							std::cout << (iOffset - 1) << ". " << "PRTC" << std::endl;
 #endif
@@ -1013,10 +1002,25 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 
 		switch (pNode->m_eASTNodeType)
 		{
+			case ASTNodeType::ASTNode_RETURNSTMT:
+			{
+				//Tree* pExpressionNode = pNode->m_pLeftNode;				// Remember we have added expression node to any parent's Left.
+				//populateCode(pExpressionNode, pByteCode, iOffset);
+
+				///////////////////////////////////////////////////////////////
+				// The expression result is already pushed onto the stack !
+				// Need to retrieve the result & save it in EAX.
+				EMIT(OPCODE::POPR);
+				EMIT(EREGISTERS::RAX);
+#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "POPR RAX" << std::endl << std::endl;
+#endif
+			}
+			break;
 			case ASTNodeType::ASTNode_IF:
 			{
 				Tree* pElseNode = pNode->m_pRightNode;
-				emit((int)OPCODE::JMP, m_iByteCode, iOffset++);
+				EMIT(OPCODE::JMP);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
 #endif
@@ -1039,7 +1043,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			break;
 			case ASTNodeType::ASTNode_WHILE:
 			{
-				emit((int)OPCODE::JMP, m_iByteCode, iOffset++);
+				EMIT(OPCODE::JMP);
 #if (VERBOSE == 1)
 				std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
 #endif
@@ -1101,8 +1105,6 @@ int	GrammerUtils::getStringPosition(const char* sString)
 
 void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings)
 {
-	//pRaf->writeByte(m_vVariables.size());
-	
 	pRaf->writeByte(vStrings.size());
 	for (std::string sString : vStrings)
 	{

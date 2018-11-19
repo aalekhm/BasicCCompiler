@@ -240,63 +240,65 @@ Token StringTokenizer::readDefault(char ch0)
 {
 	char ch1 = peek(1);
 
-	if(ch0 == END_OF_INPUT)																		{ return createToken(TokenType::Type::TK_EOI); }
-	else if(ch0 == 'w' && ch1 == 'h' && peek(2) == 'i' && peek(3) == 'l' && peek(4) == 'e')		{ initRead(); consume(5); return createToken(TokenType::Type::TK_WHILE); }
-	else if(ch0 == 'p' && ch1 == 'r' && peek(2) == 'i' && peek(3) == 'n' && peek(4) == 't')		{ initRead(); consume(5); return createToken(TokenType::Type::TK_PRINT); }
-	else if(ch0 == 'f' && ch1 == 'o' && peek(2) == 'r')											{ initRead(); consume(3); return createToken(TokenType::Type::TK_FOR); }
-	else if(ch0 == 'i' && ch1 == 'f')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_IF); }
-	else if(ch0 == 'e' && ch1 == 'l' && peek(2) == 's' && peek(3) == 'e')						{ initRead(); consume(4); return createToken(TokenType::Type::TK_ELSE); }
-	else if(ch0 == WHITESPACE_SPACE || ch0 == WHITESPACE_TAB)									{ initRead(); consume(1); return createToken(TokenType::Type::TK_WHITESPACE); }
+	if(ch0 == END_OF_INPUT)																		
+																			{ return createToken(TokenType::Type::TK_EOI); }
+	else if(ch0 == 'w' && ch1 == 'h' && peek(2) == 'i' && peek(3) == 'l' && peek(4) == 'e' && peek(5) == '(')		
+																			{ initRead(); consume(5); return createToken(TokenType::Type::TK_WHILE); }
+	else if(ch0 == 'f' && ch1 == 'o' && peek(2) == 'r' && peek(3) == '(')	{ initRead(); consume(3); return createToken(TokenType::Type::TK_FOR); }
+	else if(ch0 == 'i' && ch1 == 'f' && peek(2) == '(')						{ initRead(); consume(2); return createToken(TokenType::Type::TK_IF); }
+	else if(ch0 == 'e' && ch1 == 'l' && peek(2) == 's' && peek(3) == 'e')	{ initRead(); consume(4); return createToken(TokenType::Type::TK_ELSE); }
+	else if(ch0 == WHITESPACE_SPACE || ch0 == WHITESPACE_TAB)				{ initRead(); consume(1); return createToken(TokenType::Type::TK_WHITESPACE); }
 
-	else if(ch0 == CARRIAGE_RETURN && ch1 == LINE_FEED)											{ initRead(); consume(2); return readEOL(); }
-	else if(ch0 == LINE_FEED)																	{ return readEOL(); }
-	else if(isdigit(ch0) || (ch0 == '-' && isdigit(ch1)))										{ return readNumber(); }
-	else if(ch0 == '/' && ch1 == '/')															{ return readSingleLineComment(); }
-	else if(ch0 == '/' && ch1 == '*')															{ return readMultiLineComment(); }
-	else if(isBNFCode(true) && NOT m_bIgnoreBNFNonTerminals)									{ return readBNFCode(); }
-	else if(ch0 == '"')																			{ return readString(); }
-	else if(ch0 == '\'' && peek(2) == '\'')														{ return readCharacter(); }
+	else if(ch0 == CARRIAGE_RETURN && ch1 == LINE_FEED)						{ initRead(); consume(2); return readEOL(); }
+	else if(ch0 == LINE_FEED)												{ return readEOL(); }
+	else if(isdigit(ch0) || (ch0 == '-' && isdigit(ch1)))					{ return readNumber(); }
+	else if(ch0 == '/' && ch1 == '/')										{ return readSingleLineComment(); }
+	else if(ch0 == '/' && ch1 == '*')										{ return readMultiLineComment(); }
+	else if(isBNFCode(true) && NOT m_bIgnoreBNFNonTerminals)				{ return readBNFCode(); }
+	else if(ch0 == '"')														{ return readString(); }
+	else if(ch0 == '\'' && peek(2) == '\'')									{ return readCharacter(); }
 
-	else if(ch0 == '(')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_LPAREN); }
-	else if(ch0 == ')')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_RPAREN); }
-	else if(ch0 == '{')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_LBRACE); }
-	else if(ch0 == '}')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_RBRACE); }
-	else if(ch0 == '[')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_LSQBRACKET); }
-	else if(ch0 == ']')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_RSQBRACKET); }
+	else if(ch0 == '(')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_LPAREN); }
+	else if(ch0 == ')')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_RPAREN); }
+	else if(ch0 == '{')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_LBRACE); }
+	else if(ch0 == '}')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_RBRACE); }
+	else if(ch0 == '[')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_LSQBRACKET); }
+	else if(ch0 == ']')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_RSQBRACKET); }
 
-	else if(ch0 == ';')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_SEMICOL);}
-	else if(ch0 == ',')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_COMMA); }
+	else if(ch0 == ';')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_SEMICOL);}
+	else if(ch0 == ',')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_COMMA); }
 
-	else if(ch0 == '*' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_MULEQ); }
-	else if(ch0 == '*')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_MUL); }
-	else if(ch0 == '/' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_DIVEQ); }
-	else if(ch0 == '/')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_DIV); }
-	else if(ch0 == '%')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_MOD); }
-	else if(ch0 == '+' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_ADDEQ); }
-	else if(ch0 == '+' && ch1 == '+')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_INCR); }
-	else if(ch0 == '+')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_ADD); }
-	else if(ch0 == '-' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_SUBEQ); }
-	else if(ch0 == '-' && ch1 == '-')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_DECR); }
-	else if(ch0 == '-')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_SUB); }
-	else if(ch0 == '<' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_LTEQ); }
+	else if(ch0 == '*' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_MULEQ); }
+	else if(ch0 == '*')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_MUL); }
+	else if(ch0 == '/' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_DIVEQ); }
+	else if(ch0 == '/')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_DIV); }
+	else if(ch0 == '%')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_MOD); }
+	else if(ch0 == '+' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_ADDEQ); }
+	else if(ch0 == '+' && ch1 == '+')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_INCR); }
+	else if(ch0 == '+')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_ADD); }
+	else if(ch0 == '-' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_SUBEQ); }
+	else if(ch0 == '-' && ch1 == '-')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_DECR); }
+	else if(ch0 == '-')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_SUB); }
+	else if(ch0 == '<' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_LTEQ); }
 
-	else if(ch0 == '<' && NOT m_bIgnoreBNFNonTerminals)											{ return readBNFNonTerminal(); }
+	else if(ch0 == '<' && NOT m_bIgnoreBNFNonTerminals)						{ return readBNFNonTerminal(); }
 	
-	else if(ch0 == '<')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_LT); }
-	else if(ch0 == '>' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_GTEQ); }
-	else if(ch0 == '>')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_GT); }
-	else if(ch0 == '=' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_EQ); }
-	else if(ch0 == '=')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_ASSIGN); }
-	else if(ch0 == '!' && ch1 == '=')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_NEQ); }
-	else if(ch0 == '!')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_NOT); }
-	else if(ch0 == '&' && ch1 == '&')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_LOGICALAND); }
-	else if(ch0 == '&')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEAND); }
-	else if(ch0 == '|' && ch1 == '|')															{ initRead(); consume(2); return createToken(TokenType::Type::TK_LOGICALOR); }
-	else if(ch0 == '|')																			{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEOR); }
+	else if(ch0 == '<')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_LT); }
+	else if(ch0 == '>' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_GTEQ); }
+	else if(ch0 == '>')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_GT); }
+	else if(ch0 == '=' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_EQ); }
+	else if(ch0 == '=')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_ASSIGN); }
+	else if(ch0 == '!' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_NEQ); }
+	else if(ch0 == '!')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_NOT); }
+	else if(ch0 == '&' && ch1 == '&')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_LOGICALAND); }
+	else if(ch0 == '&')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEAND); }
+	else if(ch0 == '|' && ch1 == '|')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_LOGICALOR); }
+	else if(ch0 == '|')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEOR); }
 	
-	else if(isalpha(ch0) || ch0 == '_')															{ return readIdentifier(); }
-	else if(ch0 == ':' && ch1 == ':' && peek(2) == '=' && NOT m_bIgnoreBNFNonTerminals)			{ initRead(); consume(3); return createToken(TokenType::Type::TK_BNFASSIGNMENT); }
-	else																						{ initRead(); consume(1); return createToken(TokenType::Type::TK_UNKNOWN); }
+	else if(isalpha(ch0) || ch0 == '_')										{ return readIdentifier(); }
+	else if(ch0 == ':' && ch1 == ':' && peek(2) == '=' && NOT m_bIgnoreBNFNonTerminals)			
+																			{ initRead(); consume(3); return createToken(TokenType::Type::TK_BNFASSIGNMENT); }
+	else																	{ initRead(); consume(1); return createToken(TokenType::Type::TK_UNKNOWN); }
 }
 
 Token StringTokenizer::readIdentifier()
@@ -309,6 +311,13 @@ Token StringTokenizer::readIdentifier()
 		char ch = peek(0);
 		if (isalpha(ch) || ch == '_' || isdigit(ch))
 			consume(1);
+		else
+		if (ch == '(')
+		{
+			Token tok = createToken(TokenType::Type::TK_FUNCTIONCALL);
+			
+			return tok;
+		}
 		else
 			break;
 	}

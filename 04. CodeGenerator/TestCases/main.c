@@ -15,13 +15,54 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+int retNewFunc()
+{
+	print("In retNewFunc................");
+	putc(10);
+
+	return 1977;
+}
+
+int retFunc()
+{
+	print("In retFunc................");
+	putc(10);
+	
+	return retNewFunc();
+}
+
 void tempFunc(int arg0, int arg1)
 {
 	print("In tempFunc()");
 	putc(10);
-	int j = 111 + arg0;
+	
+	int iRet = 10;
+	iRet = (10 + retFunc()) + 10;
+	print("iRet = ", iRet);
+	putc(10);
+	
+	if(((retFunc() + 10) - 1900) == 87)
+	{
+		print("retFunc returned 1977")
+		putc(10);
+	}
+	
+	int iRet1 = 101 + retFunc();
+	print("iRet1 = ", iRet1);
+	putc(10);
+	
+	int j = 111;
+	j = j + arg0 + retFunc();
 	print("tempFunc() args = ", j, ", ", arg1);
 	putc(10);
+	
+	int iCount = 1970;
+	while(iCount <= retFunc())
+	{
+		iCount = iCount + 1;
+		print("In While = ", iCount);
+		putc(10);
+	}
 	
 	if(j < 10)
 	{
@@ -42,6 +83,9 @@ void tempFunc(int arg0, int arg1)
 		
 		k = j * 2;
 	}
+	
+	print("End of tempFunc()");
+	putc(10);
 }
 
 void testPrinting()
@@ -299,12 +343,11 @@ void callMe()
 	}
 }
 
-int main()
+void main()
 {
 	print("In main()");
 	putc(10);
-	
-	//int i = 10;
+		
 	tempFunc(55, 101);
 	testPrinting();
 	simpleCount();
@@ -318,4 +361,7 @@ int main()
 	//AsciiMandlebrot();
 	
 	callMe();
+	
+	print("End of main()................");
+	putc(10);
 }
