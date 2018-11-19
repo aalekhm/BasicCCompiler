@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <map>
 #include <assert.h>
 
 namespace TokenType
@@ -361,7 +362,6 @@ enum class ENUM_OP_PRECEDENCE
 	OP_NOT,
 	OP_PLUS = OP_NOT,
 	OP_NEGATE = OP_NOT,
-	//OP_DEREF = OP_NOT,
 	OP_BITWISENOT = OP_NOT,
 
 	OP_RPAREN,
@@ -427,15 +427,6 @@ enum class ASTNodeType
 	ASTNode_FUNCTIONARGLIST,
 	ASTNode_FUNCTIONSTART,
 	ASTNode_FUNCTIONEND,
-	ASTNode_PRIMITIVETYPEINT8,
-	ASTNode_PRIMITIVETYPEINT16,
-	ASTNode_PRIMITIVETYPEINT32,
-	ASTNode_PRIMITIVETYPEINT64,
-	ASTNode_PRIMITIVETYPESTRING,
-	ASTNode_PRIMITIVETYPEVOIDPTR,
-	ASTNode_PRIMITIVETYPEINT8PTR,
-	ASTNode_PRIMITIVETYPEINT16PTR,
-	ASTNode_PRIMITIVETYPEINT32PTR,
 	ASTNode_FUNCTIONCALL,
 	ASTNode_RETURNSTMT,
 	ASTNode_FUNCTIONCALLEND,
@@ -451,10 +442,8 @@ enum class ASTNodeType
 	ASTNode_SWITCHBREAK,
 	ASTNode_MALLOC,
 	ASTNode_FREE,
-	ASTNode_PRIMITIVETYPESTATICVOIDPTR,
-	ASTNode_PRIMITIVETYPESTATICINT8PTR,
-	ASTNode_PRIMITIVETYPESTATICINT16PTR,
-	ASTNode_PRIMITIVETYPESTATICINT32PTR,
+	ASTNode_TYPE,
+	ASTNode_TYPESTATIC,
 };
 
 typedef struct Tree
@@ -514,6 +503,32 @@ typedef struct Tree
 		}
 	}
 
+	void setAdditionalInfo(std::string sKey, std::string sValue)
+	{
+		std::map<std::string, std::string>::const_iterator itr = m_MapAdditionalInfo.find(sKey);
+		if (itr != m_MapAdditionalInfo.end())
+		{
+			//itr->second = sValue;
+			m_MapAdditionalInfo[sKey] = sValue;
+		}
+		else
+		{
+			m_MapAdditionalInfo.insert(std::pair<std::string, std::string>(sKey, sValue));
+		}
+	}
+
+	std::string getAdditionalInfoFor(std::string sKey)
+	{
+		std::string sReturn = "";
+		std::map<std::string, std::string>::const_iterator itr = m_MapAdditionalInfo.find(sKey);
+		if (itr != m_MapAdditionalInfo.end())
+		{
+			sReturn = itr->second;
+		}
+
+		return sReturn;
+	}
+
 	ASTNodeType			m_eASTNodeType;
 
 	std::vector<Tree*>	m_vStatements;
@@ -525,6 +540,8 @@ typedef struct Tree
 	Tree*				m_pParentNode;
 	Tree*				m_pLeftNode;
 	Tree*				m_pRightNode;
+
+	std::map<std::string, std::string>	m_MapAdditionalInfo;
 } Tree;
 
 enum class E_VARIABLETYPE
@@ -554,14 +571,7 @@ typedef struct FunctionInfo
 		{
 			switch(pChild->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
-				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
+				case ASTNodeType::ASTNode_TYPE:
 				{
 					m_vLocalVariables.push_back(pChild);
 				}
@@ -589,14 +599,7 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
-				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
+				case ASTNodeType::ASTNode_TYPE:
 				{
 					m_vArguments.push_back(pChild);
 				}
@@ -662,48 +665,49 @@ typedef struct FunctionInfo
 		return iPosition;
 	}
 
-	ASTNodeType getVariableNodeType(const char* sLocalVariableName)
+	std::string getVariableNodeType(const char* sLocalVariableName)
 	{
-		ASTNodeType eASTNodeType = ASTNodeType::ASTNode_INVALID;
+		std::string sType;
+		bool bFound = false;
 
 		// Check for 'Locals'
 		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
 		{
 			if (pLocalVar->m_sText == sLocalVariableName)
 			{
-				eASTNodeType = pLocalVar->m_eASTNodeType;
+				sType = pLocalVar->getAdditionalInfoFor("type");
+				bFound = true;
 				break;
 			}
 		}
 
 		// Check for 'Arguments'
-		if (eASTNodeType == ASTNodeType::ASTNode_INVALID)
+		if (bFound)
 		{
 			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
 			{
 				if (pLocalVar->m_sText == sLocalVariableName)
 				{
-					eASTNodeType = pLocalVar->m_eASTNodeType;
+					sType = pLocalVar->getAdditionalInfoFor("type");
 					break;
 				}
 			}
 		}
 
 		// Check for 'Static'
-		if (eASTNodeType == ASTNodeType::ASTNode_INVALID)
+		if (!bFound)
 		{
 			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
 			{
 				if (pStaticVar->m_sText == sLocalVariableName)
 				{
-					eASTNodeType = pStaticVar->m_eASTNodeType;
+					sType = pStaticVar->getAdditionalInfoFor("type");
 					break;
 				}
 			}
 		}
 
-		assert(eASTNodeType != ASTNodeType::ASTNode_INVALID);
-		return eASTNodeType;
+		return sType;
 	}
 
 	bool IsVariableAPointerType(const char* sLocalVariableName)

@@ -7,6 +7,7 @@ Token									GrammerUtils::m_pToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
 Token									GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
 
 std::vector<std::string>				GrammerUtils::m_vKeywords;
+std::vector<std::string>				GrammerUtils::m_vTypes;
 
 StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
 int										GrammerUtils::iTabCount = 0;
@@ -222,21 +223,11 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 
 	switch (pNode->m_eASTNodeType)
 	{
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
+		case ASTNodeType::ASTNode_TYPESTATIC:
 		{
 			std::cout << "static ";
-			switch (pNode->m_eASTNodeType)
-			{
-				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:	std::cout << "void";		break;
-				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:	std::cout << "int8_t";		break;
-				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:	std::cout << "int16_t";		break;
-				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:	std::cout << "int32_t";		break;
-			}
-
-			std::cout << "* " << pNode->m_sText << ";";
+			std::string sType = pNode->getAdditionalInfoFor("type");
+			std::cout << sType << "* " << pNode->m_sText << ";";
 		}
 		break;
 		case ASTNodeType::ASTNode_FUNCTIONDEF:
@@ -249,12 +240,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			// Arg List
 			for (Tree* pArgNode : pArgListNode->m_vStatements)
 			{
-				if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8)		std::cout << "int8_t ";
-				else if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16)	std::cout << "int16_t ";
-				else if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32)	std::cout << "int32_t ";
-				else if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING)	std::cout << "string ";
-
-				std::cout << pArgNode->m_sText << ", ";
+				std::cout << pArgNode->getAdditionalInfoFor("type") << " " << pArgNode->m_sAdditionalInfo << ", ";
 			}
 
 			std::cout << ") {" << std::endl;
@@ -276,15 +262,9 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			bProcessChildren = false;
 		}
 		break;
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
+		case ASTNodeType::ASTNode_TYPE:
 		{
-			if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8)		std::cout << "int8_t ";
-			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16)	std::cout << "int16_t ";
-			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32)	std::cout << "int32_t ";
-
-			std::cout << pNode->m_sText;
+			std::cout << pNode->getAdditionalInfoFor("type");
 			std::cout << " = ";
 
 			Tree* pExpressionNode = pNode->m_pLeftNode;
@@ -315,29 +295,6 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			std::cout << ");";
 		}
 		break;
-		case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
-		{
-			switch (pNode->m_eASTNodeType)
-			{
-				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:		std::cout << "void";	break;
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:		std::cout << "int8_t";	break;
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:	std::cout << "int16_t";	break;
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:	std::cout << "int32_t";	break;
-			}
-
-			std::cout << "* " << pNode->m_sText << " = ";
-
-			for (Tree* pChild : pNode->m_vStatements)
-			{
-				printAST(pChild, false);
-			}
-
-			bProcessChildren = false;
-		}
-		break;
 		case ASTNodeType::ASTNode_PREDECR:
 		case ASTNodeType::ASTNode_PREINCR:
 		{
@@ -348,18 +305,6 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		case ASTNodeType::ASTNode_POSTINCR:
 		{
 			std::cout << pNode->m_sText << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";";
-		}
-		break;
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
-		{
-			std::cout << "string " << pNode->m_sText;
-			std::cout << " = ";
-
-			Tree* pExpressionNode = pNode->m_pLeftNode;
-			if (pExpressionNode != nullptr)
-				std::cout << pExpressionNode->m_sText;
-
-			std::cout << ";";
 		}
 		break;
 		case ASTNodeType::ASTNode_ASSIGN:
@@ -752,10 +697,7 @@ void GrammerUtils::populateCode(Tree* pNode)
 		// Prologues
 		switch (pNode->m_eASTNodeType)
 		{
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
+			case ASTNodeType::ASTNode_TYPESTATIC:
 			{
 				handleStatics(pNode);
 			}
@@ -817,11 +759,10 @@ void GrammerUtils::populateCode(Tree* pNode)
 				handleExpression(pNode);
 			}
 			break;
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
+			case ASTNodeType::ASTNode_TYPE:
 			{
-				handlePrimitiveInt(pNode);
+				if(NOT pNode->m_bIsPointerType)
+					handlePrimitiveInt(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_ASSIGN:
@@ -870,12 +811,10 @@ void GrammerUtils::populateCode(Tree* pNode)
 				handleReturnStatement(pNode);
 			}
 			break;
-			case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
+			case ASTNodeType::ASTNode_TYPE:
 			{
-				handlePrimitivePtrEpilogue(pNode);
+				if (pNode->m_bIsPointerType)
+					handlePrimitivePtrEpilogue(pNode);
 			}
 			break;
 		}
@@ -1176,8 +1115,8 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 				int8_t iIncrementValue = 1;
 				if (IS_POINTER_TYPE(pPreFixNode->m_sText.c_str()))
 				{
-					ASTNodeType _eASTNodeType = GET_VARIABLE_NODETYPE(pPreFixNode->m_sText.c_str());
-					iIncrementValue = sizeOf(_eASTNodeType);
+					std::string sType = GET_VARIABLE_NODETYPE(pPreFixNode->m_sText.c_str());
+					iIncrementValue = sizeOf(sType);
 				}
 
 				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? iIncrementValue : -iIncrementValue);
@@ -1289,9 +1228,9 @@ void GrammerUtils::handleExpression(Tree* pNode)
 			{
 				// Send in the 'CAST' value of the pointer Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF)
 				// which will be used @ runtime to make a 'CAST'.
-				ASTNodeType eASTNodeType = GET_VARIABLE_NODETYPE(prevTok.getText());
-				uint32_t iCastValue = castValueFor(eASTNodeType);
-				EMIT_1(OPCODE::PUSHI, sizeOf(eASTNodeType));		// Push the size of the node for ArrayIndexing.
+				std::string sType = GET_VARIABLE_NODETYPE(prevTok.getText());
+				uint32_t iCastValue = castValueFor(sType);
+				EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push the size of the node for ArrayIndexing.
 				EMIT_1(OPCODE::LDA, iCastValue);
 			}
 			break;
@@ -1335,8 +1274,8 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 				int8_t iIncrementValue = 1;
 				if (IS_POINTER_TYPE(pPostFixNode->m_sText.c_str()))
 				{
-					ASTNodeType _eASTNodeType = GET_VARIABLE_NODETYPE(pPostFixNode->m_sText.c_str());
-					iIncrementValue = sizeOf(_eASTNodeType);
+					std::string sType = GET_VARIABLE_NODETYPE(pPostFixNode->m_sText.c_str());
+					iIncrementValue = sizeOf(sType);
 				}
 
 				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? iIncrementValue : -iIncrementValue);
@@ -1395,7 +1334,7 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 		else
 			populateCode(pExpressionNode);
 
-		cast(castValueFor(pNode->m_eASTNodeType));
+		cast(castValueFor(pNode->getAdditionalInfoFor("type")));
 		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 	}
 }
@@ -1418,7 +1357,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 
 	populateCode(pExpressionNode);
 
-	ASTNodeType eVariableType = GET_VARIABLE_NODETYPE(pNode->m_sText.c_str());
+	std::string sType = GET_VARIABLE_NODETYPE(pNode->m_sText.c_str());
 	// Cast only int8_t, int16_t, int32_t, @DEREF assignments to their respective 'TYPES'.
 	// DO NOT cast pointer assignments ie.
 	//		int32_t* pPtr0, pPtr1;
@@ -1432,19 +1371,19 @@ void GrammerUtils::handleAssign(Tree* pNode)
 			case ASTNodeType::ASTNode_IDENTIFIER:
 			{
 				if (NOT IS_POINTER_TYPE(pNode->m_sText.c_str()))
-					cast(castValueFor(eVariableType));
+					cast(castValueFor(sType));
 				EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 			}
 			break;
 			case ASTNodeType::ASTNode_DEREF:
 			{
-				cast(castValueFor(eVariableType));					// Perform relevant 'CAST'
+				cast(castValueFor(sType));					// Perform relevant 'CAST'
 
-				EMIT_1(OPCODE::PUSHI, 0);							// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
-																	// @pVar = iRValue; ==> @pVar[0] = iRValue;
+				EMIT_1(OPCODE::PUSHI, 0);					// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
+															// @pVar = iRValue; ==> @pVar[0] = iRValue;
 
-				EMIT_1(OPCODE::PUSHI, sizeOf(eVariableType));		// Push variable TYPE onto the STACK as it will be
-																	// required to access the array pointer.
+				EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push variable TYPE onto the STACK as it will be
+															// required to access the array pointer.
 
 				EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 			}
@@ -1454,14 +1393,14 @@ void GrammerUtils::handleAssign(Tree* pNode)
 				Tree* pDerefExpressionLeaf = pIdentifiedNode->m_pLeftNode;
 				if (pDerefExpressionLeaf != nullptr)
 				{
-					cast(castValueFor(eVariableType));					// Perform relevant 'CAST'
+					cast(castValueFor(sType));					// Perform relevant 'CAST'
 
-					populateCode(pDerefExpressionLeaf);					// ArrayIndex pushed as an expression.
-																		// which will be read from STACK @ runtime.
-																		// @pVar[index] = iRValue;
+					populateCode(pDerefExpressionLeaf);			// ArrayIndex pushed as an expression.
+																// which will be read from STACK @ runtime.
+																// @pVar[index] = iRValue;
 
-					EMIT_1(OPCODE::PUSHI, sizeOf(eVariableType));		// Push variable TYPE onto the STACK as it will be
-																		// required to access the array pointer.
+					EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push variable TYPE onto the STACK as it will be
+																// required to access the array pointer.
 
 					EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 				}
@@ -1763,45 +1702,31 @@ void GrammerUtils::handleStatements(Tree* pNode)
 	}
 }
 
-int32_t GrammerUtils::sizeOf(ASTNodeType eASTNodeType)
+int32_t GrammerUtils::sizeOf(std::string sType)
 {
-	switch (eASTNodeType)
-	{
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-			return sizeof(int8_t);
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-			return sizeof(int16_t);
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
-			return sizeof(int32_t);
-		default:
-			return 1;
-	}
+	if (sType == "int8_t")
+		return sizeof(int8_t);
+	else
+	if (sType == "int16_t")
+		return sizeof(int16_t);
+	else
+	if (sType == "int32_t")
+		return sizeof(int32_t);
+
+	return 1;
 }
 
-int32_t GrammerUtils::castValueFor(ASTNodeType eASTNodeType)
+int32_t GrammerUtils::castValueFor(std::string sType)
 {
-		// Cast the expresseion with relevant cast
-	switch (eASTNodeType)
-	{
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:	// & 0xFF
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
-			return 0xFF;
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:	// & 0xFFFF
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
-			return 0xFFFF;
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:	// & 0xFFFFFFFF
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
-		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
-			return 0xFFFFFFFF;
-	}
+	// Cast the expression with relevant cast
+	if (sType == "int8_t")
+		return 0xFF;
+	else
+	if (sType == "int16_t")
+		return 0xFFFF;
+	else
+	if (sType == "int32_t")
+		return 0xFFFFFFFF;
 
 	return 0;
 }

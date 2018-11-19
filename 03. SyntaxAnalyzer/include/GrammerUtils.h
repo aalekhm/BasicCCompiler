@@ -32,6 +32,7 @@ class GrammerUtils
 
 		static StringTokenizer*						m_pStrTok;
 		static std::vector<std::string>				m_vKeywords;
+		static std::vector<std::string>				m_vTypes;
 
 		static int									iTabCount;
 		static void									printAST(Tree* pNode, bool bPrintTabs = true);
@@ -80,8 +81,8 @@ class GrammerUtils
 
 		static void									populateCode(Tree* pNode);
 
-		static int32_t								sizeOf(ASTNodeType eASTNodeType);
-		static int32_t								castValueFor(ASTNodeType eASTNodeType);
+		static int32_t								sizeOf(std::string sType);
+		static int32_t								castValueFor(std::string sType);
 		static void									cast(int32_t iCastValue);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);

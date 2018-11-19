@@ -12,6 +12,9 @@
 		void						removeLastFromBlockString();
 		std::string					getBlockString();
 		std::string					getFullyQualifiedNameForVariable(Tree* pNode, std::string sVariable);
+
+		void 						addType(std::string sType);
+		bool						isValidType(std::string sType);
 	protected:
 		
 	private:

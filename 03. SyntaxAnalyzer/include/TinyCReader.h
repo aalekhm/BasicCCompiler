@@ -11,16 +11,6 @@ class TinyCReader {
 
 		void addKeywords() {
 			GrammerUtils::m_vKeywords.push_back("static");
-			GrammerUtils::m_vKeywords.push_back("void");
-			GrammerUtils::m_vKeywords.push_back("int8_t");
-			GrammerUtils::m_vKeywords.push_back("int16_t");
-			GrammerUtils::m_vKeywords.push_back("int32_t");
-			GrammerUtils::m_vKeywords.push_back("int32_t");
-			GrammerUtils::m_vKeywords.push_back("void");
-			GrammerUtils::m_vKeywords.push_back("int8_t");
-			GrammerUtils::m_vKeywords.push_back("int16_t");
-			GrammerUtils::m_vKeywords.push_back("int32_t");
-			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
 			GrammerUtils::m_vKeywords.push_back("else");
@@ -33,7 +23,6 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("for");
 			GrammerUtils::m_vKeywords.push_back("print");
 			GrammerUtils::m_vKeywords.push_back("putc");
-			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("malloc");
 			GrammerUtils::m_vKeywords.push_back("free");
 			GrammerUtils::m_vKeywords.push_back("&&");
@@ -49,15 +38,12 @@ class TinyCReader {
 		bool def();
 		bool functionList();
 		bool staticDeclarations();
-		bool primPointerTypes();
-		bool staticVoidPtr();
+		bool primitiveType();
+		bool staticPtr();
 		bool functionDef();
-		bool returnType();
 		bool functionArgumentDefList();
 		bool functionArgumentDefListMore();
-		bool primitiveType();
 		bool primitiveTypeInt();
-		bool primitiveTypeString();
 		bool stmt_list();
 		bool stmt();
 		bool prePostFixedIncrDecr();
@@ -88,12 +74,10 @@ class TinyCReader {
 		bool putc();
 		bool putcList();
 		bool bracesstmtlist();
-		bool assignmentNewVariable();
 		bool newPtrOrInt();
 		bool primPtrOrInt();
 		bool primPtr();
 		bool primInt();
-		bool newString();
 		bool ptrAssign();
 		bool malloc();
 		bool assignmentDerefArray();
@@ -142,6 +126,9 @@ class TinyCReader {
 		void						removeLastFromBlockString();
 		std::string					getBlockString();
 		std::string					getFullyQualifiedNameForVariable(Tree* pNode, std::string sVariable);
+
+		void 						addType(std::string sType);
+		bool						isValidType(std::string sType);
 	protected:
 		
 	private:

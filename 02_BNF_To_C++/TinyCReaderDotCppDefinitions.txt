@@ -254,22 +254,8 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	for (Tree* pChild : pNode->m_vStatements)
 	{
-		if (	pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR
-				||
-				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR
-		) {
+		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE)
+		{
 			if (pChild->m_sAdditionalInfo == sVariable)
 			{
 				sFullyQualifiedName = pChild->m_sText;
@@ -300,4 +286,25 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 	}
 
 	return sFullyQualifiedName;
+}
+
+void TinyCReader::addType(std::string sType)
+{
+	GrammerUtils::m_vTypes.push_back(sType);
+}
+
+bool TinyCReader::isValidType(std::string sType)
+{
+	for(std::string sInBuiltType : GrammerUtils::m_vTypes)
+	{
+		if(sType == sInBuiltType)
+		{
+			GrammerUtils::m_pPrevToken = GrammerUtils::m_pToken;
+			GrammerUtils::getNextToken();
+
+			return true;
+		}
+	}
+	
+	return false;
 }

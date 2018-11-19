@@ -1,45 +1,42 @@
 
-<def>							::= 	{ <functionList> };
+<def>							::= 	"<code>"
+											addType("int8_t");
+											addType("int16_t");
+											addType("int32_t");
+										"</code>"
+										{ <functionList> };
+										
 <functionList>					::=		( 	<staticDeclarations>
 											|
 											<functionDef> 
 										) ;
 										
 <staticDeclarations>			::=		"static"
-										( <staticVoidPtr> );
-
-<primPointerTypes>				::=		(	"void"
-											|
-											"int8_t"
-											|
-											"int16_t"
-											|
-											"int32_t"
-										);
+										( <staticPtr> );
 										
-<staticVoidPtr>					::=		<primPointerTypes>	"<code>"
+<primitiveType>					::=		"<code>"
+											std::string sType = GrammerUtils::m_pToken.getText(); 
+											return isValidType(sType);
+										"</code>"
+										;
+
+<staticPtr>						::=		<primitiveType>		"<code>"
 																std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
 										'*'
 										TK_IDENTIFIER		"<code>"
 																std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
 																
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_INVALID;
-																if(sPointerType == "void")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR;
-																else if(sPointerType == "int8_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR;
-																else if(sPointerType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR;
-																else if(sPointerType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR;
-
-																assert(eASTNodeType != ASTNodeType::ASTNode_INVALID);
-																
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPESTATIC;																
 																Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
 																pStaticPtrNode->m_bIsPointerType = true;
+																pStaticPtrNode->setAdditionalInfo("type", sPointerType);
 																m_pASTCurrentNode->addChild(pStaticPtrNode);
 																FunctionInfo::addStaticVariable(pStaticPtrNode);
 															"</code>"
 										';';
 
-<functionDef>					::=		<returnType>		"<code>"
+<functionDef>					::=		TK_IDENTIFIER		"<code>"
 																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
 										TK_FUNCTIONCALL		"<code>"
@@ -89,27 +86,12 @@
 															"</code>"
 										;
 
-<returnType>					::=		(	"int32_t"
-											|
-											"void"
-										);
 <functionArgumentDefList>		::=		{ <functionArgumentDefListMore> };
-<functionArgumentDefListMore>	::=		(	<primitiveTypeInt>
-											[',']
-											|
-											<primitiveTypeString>
-											[',']
-										);
-										
-<primitiveType>					::=		(	"int8_t"
-											|
-											"int16_t"
-											|
-											"int32_t"
-										);
-										
+<functionArgumentDefListMore>	::=		<primitiveTypeInt>
+										[','];
+																				
 <primitiveTypeInt>				::= 	<primitiveType>		"<code>"
-																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+																std::string sType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
 										TK_IDENTIFIER		"<code>"
 																std::string sArgName = GrammerUtils::m_pPrevToken.getText();
@@ -117,37 +99,17 @@
 																sFullyQualifiedArgName.append(getBlockString());
 																sFullyQualifiedArgName.append(sArgName);
 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
-																if(sPrimitiveType == "int8_t")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
-																else if(sPrimitiveType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16;
-																else if(sPrimitiveType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32;
-																
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedArgName.c_str());
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sArgName);
+																	pPrimIntNode->setAdditionalInfo("type", sType);
 																	
 																	m_pASTCurrentNode->addChild(pPrimIntNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
 																}
 															"</code>"
-										;
-<primitiveTypeString>			::= 	"string" 
-										TK_IDENTIFIER		"<code>"
-																std::string sArgName = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedArgName;
-																sFullyQualifiedArgName.append(getBlockString());
-																sFullyQualifiedArgName.append(sArgName);
-																
-																Tree* pPrimStringNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPESTRING, sFullyQualifiedArgName.c_str());
-																{
-																	pPrimStringNode->m_sAdditionalInfo.append(sArgName);
-																	
-																	m_pASTCurrentNode->addChild(pPrimStringNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("S");
-																}
-															"</code>"
-										;
-										
+										;										
 										
 <stmt_list> 					::=		{ <stmt> [';'] };
 
@@ -156,10 +118,12 @@
 											<prePostFixedIncrDecr>
 											|
 											<assignmentDerefArray>
+											//|
+											//<arrayDeclaration>
+											| 
+											<newPtrOrInt> 
 											|
 											<assignmentRHS>
-											| 
-											<assignmentNewVariable> 
 											| 
 											<ifelseStatement> 
 											| 
@@ -681,9 +645,7 @@
 															"</code>"
 										;
 
-<assignmentNewVariable>			::=		( <newPtrOrInt> | <newString> );
-
-<newPtrOrInt>					::= 	<primPointerTypes> <primPtrOrInt>;
+<newPtrOrInt>					::= 	<primitiveType> <primPtrOrInt>;
 										
 <primPtrOrInt>					::=		(	<primPtr>
 											|
@@ -702,18 +664,14 @@
 																sFullyQualifiedVariableName.append(sVariableName);
 															"</code>"
 												'='			"<code>" 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR;
-																if(sPointerType == "void")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR;
-																else if(sPointerType == "int8_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR;
-																else if(sPointerType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR;
-																else if(sPointerType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR;
-																
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 																Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
 																	pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimPtrNode->m_bIsPointerType = true;
+																	pPrimPtrNode->setAdditionalInfo("type", sPointerType);
 																	pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
 																	m_pASTCurrentNode = pPrimPtrNode;
 																}																
@@ -734,15 +692,12 @@
 																sFullyQualifiedVariableName.append(sVariableName);
 															"</code>"
 										'='					"<code>"
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
-																if(sPrimitiveType == "int8_t")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
-																else if(sPrimitiveType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16;
-																else if(sPrimitiveType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32;
-
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
+																	pPrimIntNode->setAdditionalInfo("type", sPrimitiveType);
 																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																}
 																
@@ -760,31 +715,6 @@
 															
 																m_pASTCurrentNode = pTemp;
 																m_pASTCurrentNode->addChild(pPrimIntNode);
-															"</code>"
-										;
-										
-<newString>						::= 	"string" 
-										TK_IDENTIFIER 		"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedVariableName;
-																sFullyQualifiedVariableName.append(getBlockString());
-																sFullyQualifiedVariableName.append(sVariableName);
-															"</code>"
-										'='					"<code>" 
-																Tree* pPrimStringNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPESTRING, sFullyQualifiedVariableName.c_str());
-																{
-																	pPrimStringNode->m_sAdditionalInfo.append(sVariableName);
-																}
-															"</code>"
-										<expr>				"<code>"
-																Tree* pExpressionLeftLeaf = createPostFixExpr();
-																{
-																	pPrimStringNode->m_pLeftNode = pExpressionLeftLeaf;
-																	pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
-																}
-															"</code>"
-															"<code>"
-																m_pASTCurrentNode->addChild(pPrimStringNode);
 															"</code>"
 										;
 
@@ -1049,9 +979,10 @@
 																	sFullyQualifiedTempVariableName.append("_");
 																	sFullyQualifiedTempVariableName.append(sFuncName);
 																	
-																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT32, sFullyQualifiedTempVariableName.c_str());
+																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
 																	{
 																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
+																		pPrimIntNode->setAdditionalInfo("type", "int32_t");
 																		pBlockNode->addChild(pPrimIntNode);
 																	}
 																	
