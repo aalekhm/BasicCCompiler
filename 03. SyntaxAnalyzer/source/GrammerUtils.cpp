@@ -7,7 +7,7 @@ Token									GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1
 std::vector<std::string>				GrammerUtils::m_vKeywords;
 
 StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
-int										GrammerUtils::iTabCount = -1;
+int										GrammerUtils::iTabCount = 0;
 std::vector<std::string>				GrammerUtils::m_vVariables;
 std::vector<std::string>				GrammerUtils::m_vStrings;
 int										GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
@@ -173,9 +173,9 @@ bool GrammerUtils::isOneOfTheKeywords(std::string sKeyword)
 
 void GrammerUtils::printTabs()
 {
-	if (iTabCount >= 0)
+	if (iTabCount > 0)
 	{
-		for (int i = 0; i <= iTabCount; i++)
+		for (int i = 0; i < iTabCount; i++)
 			std::cout << "\t";
 	}
 }
@@ -208,7 +208,7 @@ void GrammerUtils::printAST(Tree* pNode)
 				std::cout << pArgNode->m_sText << ", ";
 			}
 
-			std::cout << ") {";
+			std::cout << ") {" << std::endl;
 			iTabCount++;
 		}
 		break;
@@ -248,6 +248,18 @@ void GrammerUtils::printAST(Tree* pNode)
 			std::cout << ";";
 		}
 		break;
+		case ASTNodeType::ASTNode_PREDECR:
+		case ASTNodeType::ASTNode_PREINCR:
+		{
+			std::cout << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << pNode->m_sText << ";";
+		}
+		break;
+		case ASTNodeType::ASTNode_POSTDECR:
+		case ASTNodeType::ASTNode_POSTINCR:
+		{
+			std::cout << pNode->m_sText << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";";
+		}
+		break;
 		case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
 		{
 			std::cout << "string " << pNode->m_sText;
@@ -265,9 +277,26 @@ void GrammerUtils::printAST(Tree* pNode)
 			Tree* pIdentifierNode = pRightNode;
 			Tree* pExpressionNode = pLeftNode;
 
-			std::cout << pIdentifierNode->m_sText << " = " << pExpressionNode->m_sText;
+			// PreFix
+			if (pExpressionNode->m_pLeftNode != nullptr)
+			{
+				for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
+			}
 
-			std::cout << ";";
+			std::cout << pIdentifierNode->m_sText << " = " << pExpressionNode->m_sText << ";" << std::endl;
+
+			// PostFix
+			if (pExpressionNode->m_pRightNode != nullptr)
+			{
+				for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
+			}
+
 			bProcessChildren = false;
 		}
 		break;
@@ -285,7 +314,19 @@ void GrammerUtils::printAST(Tree* pNode)
 		break;
 		case ASTNodeType::ASTNode_WHILE:
 		{
+			Tree* pExpressionNode = pLeftNode;
+
+			// PreFix
+			if (pExpressionNode->m_pLeftNode != nullptr)
+			{
+				for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
+			}
+
 			std::cout << "while(" << pLeftNode->m_sText << ") {" << std::endl;
+			
 			iTabCount++;
 		}
 		break;
@@ -385,6 +426,17 @@ void GrammerUtils::printAST(Tree* pNode)
 		break;
 		case ASTNodeType::ASTNode_WHILE:
 		{
+			Tree* pExpressionNode = pLeftNode;
+
+			// PostFix
+			if (pExpressionNode->m_pRightNode != nullptr)
+			{
+				for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
+			}
+
 			if (iTabCount >= 0)
 				iTabCount--;
 
@@ -548,6 +600,18 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			case ASTNodeType::ASTNode_FUNCTIONCALLEND:
 			{
 				handleFunctionCall(pNode, pByteCode, iOffset);
+			}
+			break;
+			case ASTNodeType::ASTNode_PREDECR:
+			case ASTNodeType::ASTNode_PREINCR:
+			{
+				handlePreFixExpression(pNode, pByteCode, iOffset);
+			}
+			break;
+			case ASTNodeType::ASTNode_POSTDECR:
+			case ASTNodeType::ASTNode_POSTINCR:
+			{
+				handlePostFixExpression(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_CHARACTER:
@@ -892,32 +956,43 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode, int* pByteCode, int
 {
 	if (pPreFixNode != nullptr)
 	{
-		for (Tree* pChild : pPreFixNode->m_vStatements)
+		bool bAddCode = false;
+		ASTNodeType eASTNodeType = pPreFixNode->m_eASTNodeType;
+		switch (eASTNodeType)
 		{
-			ASTNodeType eASTNodeType = pChild->m_eASTNodeType;
-			switch (eASTNodeType)
+			case ASTNodeType::ASTNode_EXPRESSION_PREFIX:
 			{
-				case ASTNodeType::ASTNode_PREDECR:
-				case ASTNodeType::ASTNode_PREINCR:
+				for (Tree* pChild : pPreFixNode->m_vStatements)
 				{
-					/////////////////////////////////////////////////
-					// 1. Fetch variable value & store it onto the stack
-					EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()));
-
-					/////////////////////////////////////////////////
-					// 2. Push integer 1.
-					EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? 1 : -1);
-
-					/////////////////////////////////////////////////
-					// 3. Add the 2 operands
-					EMIT_1(OPCODE::ADD, 0);
-
-					//////////////////////////////////////////////////////
-					// Store the decremented/incremented value from the stack back to the variable
-					EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()));
+					handlePreFixExpression(pChild, pByteCode, iOffset);
 				}
-				break;
 			}
+			break;
+			case ASTNodeType::ASTNode_PREDECR:
+			case ASTNodeType::ASTNode_PREINCR:
+			{
+				bAddCode = true;
+			}
+			break;
+		}
+
+		if (bAddCode)
+		{
+			/////////////////////////////////////////////////
+			// 1. Fetch variable value & store it onto the stack
+			EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pPreFixNode->m_sText.c_str()));
+
+			/////////////////////////////////////////////////
+			// 2. Push integer 1.
+			EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? 1 : -1);
+
+			/////////////////////////////////////////////////
+			// 3. Add the 2 operands
+			EMIT_1(OPCODE::ADD, 0);
+
+			//////////////////////////////////////////////////////
+			// Store the decremented/incremented value from the stack back to the variable
+			EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pPreFixNode->m_sText.c_str()));
 		}
 	}
 }
@@ -1003,32 +1078,43 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode, int* pByteCode, i
 {
 	if (pPostFixNode != nullptr)
 	{
-		for (Tree* pChild : pPostFixNode->m_vStatements)
+		bool bAddCode = false;
+		ASTNodeType eASTNodeType = pPostFixNode->m_eASTNodeType;
+		switch (eASTNodeType)
 		{
-			ASTNodeType eASTNodeType = pChild->m_eASTNodeType;
-			switch (eASTNodeType)
+			case ASTNodeType::ASTNode_EXPRESSION_POSTFIX:
 			{
+				for (Tree* pChild : pPostFixNode->m_vStatements)
+				{
+					handlePostFixExpression(pChild, pByteCode, iOffset);
+				}
+			}
+			break;
 			case ASTNodeType::ASTNode_POSTDECR:
 			case ASTNodeType::ASTNode_POSTINCR:
 			{
-				/////////////////////////////////////////////////
-				// 1. Fetch variable value & store it onto the stack
-				EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()));
-
-				/////////////////////////////////////////////////
-				// 2. Push integer 1.
-				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? 1 : -1);
-
-				/////////////////////////////////////////////////
-				// 3. Add the 2 operands
-				EMIT_1(OPCODE::ADD, 0);
-
-				//////////////////////////////////////////////////////
-				// Store the decremented/incremented value from the stack back to the variable
-				EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()));
+				bAddCode = true;
 			}
 			break;
-			}
+		}
+
+		if (bAddCode)
+		{
+			/////////////////////////////////////////////////
+			// 1. Fetch variable value & store it onto the stack
+			EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pPostFixNode->m_sText.c_str()));
+
+			/////////////////////////////////////////////////
+			// 2. Push integer 1.
+			EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? 1 : -1);
+
+			/////////////////////////////////////////////////
+			// 3. Add the 2 operands
+			EMIT_1(OPCODE::ADD, 0);
+
+			//////////////////////////////////////////////////////
+			// Store the decremented/incremented value from the stack back to the variable
+			EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pPostFixNode->m_sText.c_str()));
 		}
 	}
 }
@@ -1091,7 +1177,7 @@ void GrammerUtils::handleAssign(Tree* pNode, int* pByteCode, int& iOffset)
 
 	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 
-	// Compute PreFixExpr
+	// Compute PostFixExpr
 	{
 		handlePostFixExpression(pExpressionNode->m_pRightNode, pByteCode, iOffset);
 	}

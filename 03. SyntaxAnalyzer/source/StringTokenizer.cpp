@@ -305,10 +305,14 @@ Token StringTokenizer::readDefault(char ch0)
 	else if(ch0 == '/')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_DIV); }
 	else if(ch0 == '%')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_MOD); }
 	else if(ch0 == '+' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_ADDEQ); }
-	else if(ch0 == '+' && ch1 == '+')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_INCR); }
+	else if(ch0 == '-' && ch1 == '-' && (isalpha(peek(2)) || peek(2) == '_'))
+																			{ return readPrefixIncrDecr(false); }
+	else if(ch0 == '+' && ch1 == '+' && (isalpha(peek(2)) || peek(2) == '_'))
+																			{ return readPrefixIncrDecr(true); }
+	else if(isalpha(ch0) || ch0 == '_')										{ return readIdentifier(); }
+
 	else if(ch0 == '+')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_ADD); }
 	else if(ch0 == '-' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_SUBEQ); }
-	else if(ch0 == '-' && ch1 == '-')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_DECR); }
 	else if(ch0 == '-')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_SUB); }
 	else if(ch0 == '<' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_LTEQ); }
 
@@ -326,7 +330,6 @@ Token StringTokenizer::readDefault(char ch0)
 	else if(ch0 == '|' && ch1 == '|')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_LOGICALOR); }
 	else if(ch0 == '|')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEOR); }
 	
-	else if(isalpha(ch0) || ch0 == '_')										{ return readIdentifier(); }
 	else if(ch0 == ':' && ch1 == ':' && peek(2) == '=' && NOT m_bIgnoreBNFNonTerminals)			
 																			{ initRead(); consume(3); return createToken(TokenType::Type::TK_BNFASSIGNMENT); }
 	else																	{ initRead(); consume(1); return createToken(TokenType::Type::TK_UNKNOWN); }
@@ -346,7 +349,22 @@ Token StringTokenizer::readIdentifier()
 		if (ch == '(')
 		{
 			Token tok = createToken(TokenType::Type::TK_FUNCTIONCALL);
-			
+			return tok;
+		}
+		else
+		if (ch == '-' && peek(1) == '-')
+		{
+			Token tok = createToken(TokenType::Type::TK_POSTFIXDECR);
+			consume(2);
+
+			return tok;
+		}
+		else
+		if (ch == '+' && peek(1) == '+')
+		{	
+			Token tok = createToken(TokenType::Type::TK_POSTFIXINCR);
+			consume(2);
+
 			return tok;
 		}
 		else
@@ -354,6 +372,23 @@ Token StringTokenizer::readIdentifier()
 	}
 
 	return createToken(TokenType::Type::TK_IDENTIFIER);
+}
+
+Token StringTokenizer::readPrefixIncrDecr(bool bIsIncr)
+{
+	consume(2);
+	initRead();
+
+	while (true)
+	{
+		char ch = peek(0);
+		if (isalpha(ch) || ch == '_' || isdigit(ch))
+			consume(1);
+		else
+			break;
+	}
+
+	return createToken(bIsIncr ? TokenType::Type::TK_PREFIXINCR : TokenType::Type::TK_PREFIXDECR);
 }
 
 Token StringTokenizer::readBNFNonTerminal()

@@ -481,43 +481,124 @@ bool TinyCReader::stmt() {
 		return true;
 	}
 	else
-		if (assignmentRHS()) {
+		if (prePostFixedIncrDecr()) {
 			return true;
 		}
 		else
-			if (assignmentNewVariable()) {
+			if (assignmentRHS()) {
 				return true;
 			}
 			else
-				if (ifelse()) {
+				if (assignmentNewVariable()) {
 					return true;
 				}
 				else
-					if (_while()) {
+					if (ifelse()) {
 						return true;
 					}
 					else
-						if (forStatement()) {
+						if (_while()) {
 							return true;
 						}
 						else
-							if (print()) {
+							if (forStatement()) {
 								return true;
 							}
 							else
-								if (putc()) {
+								if (print()) {
 									return true;
 								}
 								else
-									if (bracesstmtlist()) {
+									if (putc()) {
 										return true;
 									}
 									else
-										if (returnStatement()) {
+										if (bracesstmtlist()) {
 											return true;
 										}
 										else
-											return false;
+											if (returnStatement()) {
+												return true;
+											}
+											else
+												return false;
+
+	return true;
+
+}
+
+bool TinyCReader::prePostFixedIncrDecr() {
+	if (preFixIncrDecr()) {
+		return true;
+	}
+	else
+		if (postFixIncrDecr()) {
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
+bool TinyCReader::preFixIncrDecr() {
+	if (GrammerUtils::match(TokenType::Type::TK_PREFIXDECR, OPTIONAL)) {
+
+		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+		Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREDECR, sFullyQualifiedVariableName.c_str());
+		{
+			m_pASTCurrentNode->addChild(pPreDecrNode);
+		}
+
+		return true;
+	}
+	else
+		if (GrammerUtils::match(TokenType::Type::TK_PREFIXINCR, OPTIONAL)) {
+
+			std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+			Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREINCR, sFullyQualifiedVariableName.c_str());
+			{
+				m_pASTCurrentNode->addChild(pPreDecrNode);
+			}
+
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
+bool TinyCReader::postFixIncrDecr() {
+	if (GrammerUtils::match(TokenType::Type::TK_POSTFIXDECR, OPTIONAL)) {
+
+		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+		Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTDECR, sFullyQualifiedVariableName.c_str());
+		{
+			m_pASTCurrentNode->addChild(pPreDecrNode);
+		}
+
+		return true;
+	}
+	else
+		if (GrammerUtils::match(TokenType::Type::TK_POSTFIXINCR, OPTIONAL)) {
+
+			std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+			Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTINCR, sFullyQualifiedVariableName.c_str());
+			{
+				m_pASTCurrentNode->addChild(pPreDecrNode);
+			}
+
+			return true;
+		}
+		else
+			return false;
 
 	return true;
 
@@ -1008,11 +1089,31 @@ bool TinyCReader::oneOrMoreLoopExprs() {
 }
 
 bool TinyCReader::loopExpr() {
-	if (assignmentRHS()) {
+	if (preFixIncrDecr()) {
+
+		// If it's a pre-fixed expression, we shoule be adding it to the beginning of the whileNode list.
+		// i.e 1st removing it from the 'moreLoop' expression list
+		// & then adding it at the start of the 'whileNode' list.
+
+		Tree* pWhileNode = m_pASTCurrentNode->m_pParentNode;
+		Tree* pPreFixNode = m_pASTCurrentNode->getLastStatement();
+		{
+			pPreFixNode->removeFromParent();
+			pWhileNode->insertAt(0, pPreFixNode);
+		}
+
 		return true;
 	}
 	else
-		return false;
+		if (postFixIncrDecr()) {
+			return true;
+		}
+		else
+			if (assignmentRHS()) {
+				return true;
+			}
+			else
+				return false;
 
 	return true;
 
@@ -1678,28 +1779,30 @@ bool TinyCReader::operands() {
 }
 
 bool TinyCReader::tk_identifier() {
-	if (!preFixOper()) {
+	if (preFixIncrDecrInExpr()) {
+		return true;
 	}
-	else {
-	}
+	else
+		if (postFixIncrDecrInExpr()) {
+			return true;
+		}
+		else
+			if (GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
-	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
-		return false;
+				std::string sOperand = GrammerUtils::m_pPrevToken.getText();
+				std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
+				assert(!sFullyQualifiedVariableName.empty());
+				if (!sFullyQualifiedVariableName.empty())
+				{
+					sOperand = sFullyQualifiedVariableName;
+				}
 
-	std::string sOperand = GrammerUtils::m_pPrevToken.getText();
-	std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
-	assert(!sFullyQualifiedVariableName.empty());
-	if (!sFullyQualifiedVariableName.empty())
-	{
-		sOperand = sFullyQualifiedVariableName;
-	}
+				m_vPostFix.push_back(sOperand);
 
-	m_vPostFix.push_back(sOperand);
-
-	if (!postFixOper()) {
-	}
-	else {
-	}
+				return true;
+			}
+			else
+				return false;
 
 	return true;
 
@@ -1735,8 +1838,8 @@ bool TinyCReader::unary_oper() {
 
 }
 
-bool TinyCReader::preFixOper() {
-	if (GrammerUtils::match("--", OPTIONAL)) {
+bool TinyCReader::preFixIncrDecrInExpr() {
+	if (GrammerUtils::match(TokenType::Type::TK_PREFIXDECR, OPTIONAL)) {
 
 		if (m_pASTCurrentNode->m_pLeftNode == nullptr)
 		{
@@ -1744,17 +1847,18 @@ bool TinyCReader::preFixOper() {
 			m_pASTCurrentNode->m_pLeftNode = pPreFixNode;
 		}
 
-		std::string sVariableName = GrammerUtils::m_pToken.m_sText;
+		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 		Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREDECR, sFullyQualifiedVariableName.c_str());
 		{
 			m_pASTCurrentNode->m_pLeftNode->addChild(pPreDecrNode);
+			m_vPostFix.push_back(sFullyQualifiedVariableName);
 		}
 
 		return true;
 	}
 	else
-		if (GrammerUtils::match("++", OPTIONAL)) {
+		if (GrammerUtils::match(TokenType::Type::TK_PREFIXINCR, OPTIONAL)) {
 
 			if (m_pASTCurrentNode->m_pLeftNode == nullptr)
 			{
@@ -1762,11 +1866,12 @@ bool TinyCReader::preFixOper() {
 				m_pASTCurrentNode->m_pLeftNode = pPreFixNode;
 			}
 
-			std::string sVariableName = GrammerUtils::m_pToken.m_sText;
+			std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 			Tree* pPreIncrNode = makeLeaf(ASTNodeType::ASTNode_PREINCR, sFullyQualifiedVariableName.c_str());
 			{
 				m_pASTCurrentNode->m_pLeftNode->addChild(pPreIncrNode);
+				m_vPostFix.push_back(sFullyQualifiedVariableName);
 			}
 
 			return true;
@@ -1778,11 +1883,8 @@ bool TinyCReader::preFixOper() {
 
 }
 
-bool TinyCReader::postFixOper() {
-
-	std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
-
-	if (GrammerUtils::match("--", OPTIONAL)) {
+bool TinyCReader::postFixIncrDecrInExpr() {
+	if (GrammerUtils::match(TokenType::Type::TK_POSTFIXDECR, OPTIONAL)) {
 
 		if (m_pASTCurrentNode->m_pRightNode == nullptr)
 		{
@@ -1790,16 +1892,18 @@ bool TinyCReader::postFixOper() {
 			m_pASTCurrentNode->m_pRightNode = pPostFixNode;
 		}
 
+		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 		Tree* pPostDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTDECR, sFullyQualifiedVariableName.c_str());
 		{
 			m_pASTCurrentNode->m_pRightNode->addChild(pPostDecrNode);
+			m_vPostFix.push_back(sFullyQualifiedVariableName);
 		}
 
 		return true;
 	}
 	else
-		if (GrammerUtils::match("++", OPTIONAL)) {
+		if (GrammerUtils::match(TokenType::Type::TK_POSTFIXINCR, OPTIONAL)) {
 
 			if (m_pASTCurrentNode->m_pRightNode == nullptr)
 			{
@@ -1807,10 +1911,12 @@ bool TinyCReader::postFixOper() {
 				m_pASTCurrentNode->m_pRightNode = pPostFixNode;
 			}
 
+			std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 			Tree* pPostIncrNode = makeLeaf(ASTNodeType::ASTNode_POSTINCR, sFullyQualifiedVariableName.c_str());
 			{
 				m_pASTCurrentNode->m_pRightNode->addChild(pPostIncrNode);
+				m_vPostFix.push_back(sFullyQualifiedVariableName);
 			}
 
 			return true;

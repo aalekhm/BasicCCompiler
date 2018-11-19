@@ -51,13 +51,15 @@ namespace TokenType
 		TK_EOI,
 		TK_SINGLELINECOMMENT,
 		TK_MULTILINECOMMENT,
-		TK_INCR,
-		TK_DECR,
 		TK_WHITESPACE,
 		TK_BNFNONTERMINAL,
 		TK_BNFASSIGNMENT,
 		TK_BNFCODE,
 		TK_FUNCTIONCALL,
+		TK_PREFIXDECR,
+		TK_PREFIXINCR,
+		TK_POSTFIXDECR,
+		TK_POSTFIXINCR,
 		TK_UNKNOWN
 	};
 
@@ -110,13 +112,15 @@ namespace TokenType
 			case Type::TK_EOI:					return "TK_EOI";
 			case Type::TK_SINGLELINECOMMENT:	return "TK_SINGLELINECOMMENT";
 			case Type::TK_MULTILINECOMMENT:		return "TK_MULTILINECOMMENT";
-			case Type::TK_INCR:					return "TK_INCR";
-			case Type::TK_DECR:					return "TK_DECR";
 			case Type::TK_WHITESPACE:			return "TK_WHITESPACE";
 			case Type::TK_BNFNONTERMINAL:		return "TK_BNFNONTERMINAL";
 			case Type::TK_BNFASSIGNMENT:		return "TK_BNFASSIGNMENT";
 			case Type::TK_BNFCODE:				return "TK_BNFCODE";
 			case Type::TK_FUNCTIONCALL:			return "TK_FUNCTIONCALL";
+			case Type::TK_PREFIXDECR:			return "TK_PREFIXDECR";
+			case Type::TK_PREFIXINCR:			return "TK_PREFIXINCR";
+			case Type::TK_POSTFIXDECR:			return "TK_POSTFIXDECR";
+			case Type::TK_POSTFIXINCR:			return "TK_POSTFIXINCR";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -170,13 +174,16 @@ namespace TokenType
 		else if(sTokenType == "TK_EOI")					return Type::TK_EOI;
 		else if(sTokenType == "TK_SINGLELINECOMMENT")	return Type::TK_SINGLELINECOMMENT;
 		else if(sTokenType == "TK_MULTILINECOMMENT")	return Type::TK_MULTILINECOMMENT;
-		else if(sTokenType == "TK_INCR")				return Type::TK_INCR;
-		else if(sTokenType == "TK_DECR")				return Type::TK_DECR;
 		else if(sTokenType == "TK_WHITESPACE")			return Type::TK_WHITESPACE;
 		else if(sTokenType == "TK_BNFNONTERMINAL")		return Type::TK_BNFNONTERMINAL;
 		else if(sTokenType == "TK_BNFASSIGNMENT")		return Type::TK_BNFASSIGNMENT;
 		else if(sTokenType == "TK_BNFCODE")				return Type::TK_BNFCODE;
 		else if(sTokenType == "TK_FUNCTIONCALL")		return Type::TK_FUNCTIONCALL;
+		else if(sTokenType == "TK_PREFIXDECR")		return Type::TK_PREFIXDECR;
+		else if(sTokenType == "TK_PREFIXINCR")		return Type::TK_PREFIXINCR;
+		else if(sTokenType == "TK_POSTFIXDECR")		return Type::TK_POSTFIXDECR;
+		else if(sTokenType == "TK_POSTFIXINCR")		return Type::TK_POSTFIXINCR;
+
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;
 	}

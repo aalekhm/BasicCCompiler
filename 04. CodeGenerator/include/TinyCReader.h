@@ -29,10 +29,6 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("!=");
 			GrammerUtils::m_vKeywords.push_back("<=");
 			GrammerUtils::m_vKeywords.push_back(">=");
-			GrammerUtils::m_vKeywords.push_back("--");
-			GrammerUtils::m_vKeywords.push_back("++");
-			GrammerUtils::m_vKeywords.push_back("--");
-			GrammerUtils::m_vKeywords.push_back("++");
 		}
 
 		bool def();
@@ -45,6 +41,9 @@ class TinyCReader {
 		bool primitiveTypeString();
 		bool stmt_list();
 		bool stmt();
+		bool prePostFixedIncrDecr();
+		bool preFixIncrDecr();
+		bool postFixIncrDecr();
 		bool returnStatement();
 		bool functionCall();
 		bool functionArgumentList();
@@ -90,8 +89,8 @@ class TinyCReader {
 		bool tk_identifier();
 		bool unary_expr();
 		bool unary_oper();
-		bool preFixOper();
-		bool postFixOper();
+		bool preFixIncrDecrInExpr();
+		bool postFixIncrDecrInExpr();
 		bool paren_expr();
 
 		
