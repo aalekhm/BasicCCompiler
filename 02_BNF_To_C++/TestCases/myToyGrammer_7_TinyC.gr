@@ -107,14 +107,16 @@
 											<ifelse> 
 											| 
 											<_while> 
-											| 
+											|
+											<forStatement>											
+											|
 											<print> 
 											| 
 											<putc> 
 											| 
 											<bracesstmtlist> 
 											| 
-											<returnStatement> 
+											<returnStatement>
 										);
 
 <returnStatement>				::=		"return"
@@ -234,7 +236,7 @@
 														"</code>"
 										')'
 										['{']
-										<stmt_list> 
+										<stmt_list>
 										['}'] 			"<code>"
 															removeLastFromBlockString();
 														"</code>"
@@ -257,7 +259,7 @@
 															}
 														"</code>"
 										['{']
-										<stmt_list> 
+										<stmt_list>
 										['}'] 			"<code>"
 															removeLastFromBlockString();
 															
@@ -301,6 +303,89 @@
 															m_pASTCurrentNode->addChild(pWhileNode);
 														"</code>"
 										;
+
+<forStatement>					::= 	"for"
+										'('				"<code>"
+															updateBlockString("for");
+															
+															////////////////////////////////
+															// for ( init-expression ; cond-expression ; loop-expression ) 
+															// {
+															//		statement;
+															// }
+															////////////////////////////////
+															// init-expression;
+															// while(cond-expression)
+															// {
+															//   	...
+															//		...
+															//		loop-expression
+															// }
+															////////////////////////////////
+															// A "for" loop is an extended "while" loop where:
+															// 		- The "init-expression" list forms a set of statements before the "while" block.
+															//		- The "cond-expression" forms the "cond-expression" of the "while" block.
+															//		- And the "loop-expression" are the set of statements that are at the tail-end of the "while" block.
+															////////////////////////////////
+														"</code>"
+										[ <oneOrMoreInitExprs> ]
+										';'				"<code>"
+															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
+															{
+																pWhileNode->m_pParentNode = m_pASTCurrentNode;
+															}
+
+															Tree* pTemp = nullptr;
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pWhileNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
+															}
+														"</code>"
+										<expr>			"<code>"
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+														"</code>"
+										';'				"<code>"
+															Tree* pFor_LoopExpressionsLeaf = makeLeaf(ASTNodeType::ASTNode_INVALID, "");
+															{
+																pFor_LoopExpressionsLeaf->m_pParentNode = pWhileNode;
+																m_pASTCurrentNode = pFor_LoopExpressionsLeaf;
+															}
+														"</code>"
+										[ <oneOrMoreLoopExprs> ]
+										')'				"<code>"
+															m_pASTCurrentNode = pWhileNode;
+														"</code>"
+										[ '{' ]
+										<stmt_list>
+										[ '}' ]			"<code>"
+															removeLastFromBlockString();
+															
+															for(Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
+															{
+																pWhileNode->addChild(pLoopExpr);
+															}
+
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pWhileNode);
+														"</code>"
+										;
+										
+<oneOrMoreInitExprs>			::= 	<initExpr> { ',' <initExpr> };
+
+<initExpr>						::=		(	<newInt>
+											|
+											<assignmentRHS>
+										);
+
+<oneOrMoreLoopExprs>			::=		<loopExpr> { ',' <loopExpr> };
+<loopExpr>						::=		( 	//<tk_identifier>
+											//|
+											<assignmentRHS>
+										);
 
 <print>							::= 	"print" 
 										'(' 			"<code>"
@@ -427,6 +512,7 @@
 																m_pASTCurrentNode->addChild(pPrimIntNode);
 															"</code>"
 										;
+										
 <newString>						::= 	"string" 
 										TK_IDENTIFIER 		"<code>"
 																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();

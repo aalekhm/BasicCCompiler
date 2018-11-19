@@ -497,6 +497,10 @@ if(_while()) {
 return true;
 }
 else
+if(forStatement()) {
+return true;
+}
+else
 if(print()) {
 return true;
 }
@@ -842,6 +846,174 @@ else {
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pWhileNode);
 														
+return true;
+
+}
+
+bool TinyCReader::forStatement() {
+if(!GrammerUtils::match("for", MANDATORY))
+return false;
+if(!GrammerUtils::match('(', MANDATORY))
+return false;
+
+															updateBlockString("for");
+															
+															////////////////////////////////
+															// for ( init-expression ; cond-expression ; loop-expression ) 
+															// {
+															//		statement;
+															// }
+															////////////////////////////////
+															// init-expression;
+															// while(cond-expression)
+															// {
+															//   	...
+															//		...
+															//		loop-expression
+															// }
+															////////////////////////////////
+															// A "for" loop is an extended "while" loop where:
+															// 		- The "init-expression" list forms a set of statements before the "while" block.
+															//		- The "cond-expression" forms the "cond-expression" of the "while" block.
+															//		- And the "loop-expression" are the set of statements that are at the tail-end of the "while" block.
+															////////////////////////////////
+														
+if(!oneOrMoreInitExprs()) {
+}
+else {
+}
+
+if(!GrammerUtils::match(';', MANDATORY))
+return false;
+
+															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
+															{
+																pWhileNode->m_pParentNode = m_pASTCurrentNode;
+															}
+
+															Tree* pTemp = nullptr;
+															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
+																pExpressionLeftLeaf->m_pParentNode = pWhileNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pExpressionLeftLeaf;
+															}
+														
+if(!expr())
+return false;
+
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+														
+if(!GrammerUtils::match(';', MANDATORY))
+return false;
+
+															Tree* pFor_LoopExpressionsLeaf = makeLeaf(ASTNodeType::ASTNode_INVALID, "");
+															{
+																pFor_LoopExpressionsLeaf->m_pParentNode = pWhileNode;
+																m_pASTCurrentNode = pFor_LoopExpressionsLeaf;
+															}
+														
+if(!oneOrMoreLoopExprs()) {
+}
+else {
+}
+
+if(!GrammerUtils::match(')', MANDATORY))
+return false;
+
+															m_pASTCurrentNode = pWhileNode;
+														
+if(!GrammerUtils::match('{', OPTIONAL)) {
+
+}
+
+else {
+
+}
+
+if(!stmt_list())
+return false;
+if(!GrammerUtils::match('}', OPTIONAL)) {
+
+}
+
+else {
+
+}
+
+
+															removeLastFromBlockString();
+															
+															for(Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
+															{
+																pWhileNode->addChild(pLoopExpr);
+															}
+
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pWhileNode);
+														
+return true;
+
+}
+
+bool TinyCReader::oneOrMoreInitExprs() {
+if(!initExpr())
+return false;
+while(true) {
+if(GrammerUtils::match(',', OPTIONAL)) {
+
+if(!initExpr())
+return false;
+}
+else
+break;
+}
+
+return true;
+
+}
+
+bool TinyCReader::initExpr() {
+if(newInt()) {
+return true;
+}
+else
+if(assignmentRHS()) {
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::oneOrMoreLoopExprs() {
+if(!loopExpr())
+return false;
+while(true) {
+if(GrammerUtils::match(',', OPTIONAL)) {
+
+if(!loopExpr())
+return false;
+}
+else
+break;
+}
+
+return true;
+
+}
+
+bool TinyCReader::loopExpr() {
+if(assignmentRHS()) {
+return true;
+}
+else
+return false;
+
 return true;
 
 }

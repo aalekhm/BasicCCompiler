@@ -20,6 +20,13 @@ int retNewFunc()
 	print("In retNewFunc................");
 	putc(10);
 
+	int j = 0;
+	for(int i = 0, j = 1, int iCount = 1; i < 10; i = i+1, iCount = iCount + 1)
+	{
+		print("ForLoop i = ", i, " ,val of j = ", j, " ,iCount = ", iCount);
+		putc(10);
+	}
+	
 	return 1977;
 }
 

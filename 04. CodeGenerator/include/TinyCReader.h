@@ -18,6 +18,7 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("if");
 			GrammerUtils::m_vKeywords.push_back("else");
 			GrammerUtils::m_vKeywords.push_back("while");
+			GrammerUtils::m_vKeywords.push_back("for");
 			GrammerUtils::m_vKeywords.push_back("print");
 			GrammerUtils::m_vKeywords.push_back("putc");
 			GrammerUtils::m_vKeywords.push_back("int");
@@ -52,6 +53,11 @@ class TinyCReader {
 		bool _if();
 		bool _else();
 		bool _while();
+		bool forStatement();
+		bool oneOrMoreInitExprs();
+		bool initExpr();
+		bool oneOrMoreLoopExprs();
+		bool loopExpr();
 		bool print();
 		bool print_list();
 		bool print_list_0();
