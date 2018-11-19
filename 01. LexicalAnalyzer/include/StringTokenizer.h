@@ -22,6 +22,7 @@ class StringTokenizer
 		void						tokenize();
 		bool						hasMoreTokens();
 		Token						nextToken();
+		Token						prevToken();
 protected:
 	private:
 									StringTokenizer() = delete;
@@ -29,6 +30,7 @@ protected:
 									virtual ~StringTokenizer();
 
 		void						init(const char* sData);
+		void						reset();
 		Token						getNextToken();
 		void						initRead();
 		char						peek(int iOffset);

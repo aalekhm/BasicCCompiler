@@ -30,6 +30,7 @@ protected:
 									virtual ~StringTokenizer();
 
 		void						init(const char* sData);
+		void						reset();
 		Token						getNextToken();
 		void						initRead();
 		char						peek(int iOffset);

@@ -13,7 +13,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "03. SyntaxAnalyzer", "03. S
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "04. CodeGenerator", "04. CodeGenerator\04. CodeGenerator.vcxproj", "{4253AB6D-FB1A-48B1-ACBC-C823A77876E8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "05. VirtualMachineInterpreter", "05. VirtualMachineInterpreter\05. VirtualMachineInterpreter.vcxproj", "{7C158D57-E224-463D-88D2-8042FDB10C7F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "05. VMInterpreter", "05. VMInterpreter\05. VMInterpreter.vcxproj", "{7C158D57-E224-463D-88D2-8042FDB10C7F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

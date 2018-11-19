@@ -136,25 +136,24 @@ void negativeTest()
 	print("-(1) = ", -(1));
 	putc(10);
 	
-	
 	int i = a;
 	print("i = a = ", a);
 	putc(10);
 
-	i = ++a;
-	print("i = ++a = ", a);
+	i = ++a + ++a + ++a;
+	print("i = ", i, " , a = ", a);
 	putc(10);
 	
-	i = --a;
-	print("i = --a = ", a);
+	i = --a + --a + --a;
+	print("i = ", i, " , a = ", a);
 	putc(10);
 	
-	i = a++;
-	print("i = a++ = ", a);
+	i = a++ + a++ + a++;
+	print("i = ", i, " , a = ", a);
 	putc(10);
-
-	i = a--;
-	print("i = a-- = ", a);
+    
+	i = a-- + a-- + a--;
+	print("i = ", i, " , a = ", a);
 	putc(10);
 }
 

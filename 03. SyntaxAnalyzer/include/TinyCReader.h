@@ -28,6 +28,10 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("!=");
 			GrammerUtils::m_vKeywords.push_back("<=");
 			GrammerUtils::m_vKeywords.push_back(">=");
+			GrammerUtils::m_vKeywords.push_back("--");
+			GrammerUtils::m_vKeywords.push_back("++");
+			GrammerUtils::m_vKeywords.push_back("--");
+			GrammerUtils::m_vKeywords.push_back("++");
 		}
 
 		bool def();
@@ -58,7 +62,6 @@ class TinyCReader {
 		bool newInt();
 		bool newString();
 		bool assignmentRHS();
-		bool paren_expr();
 		bool expr();
 		bool logicalor_expr();
 		bool and_expr();
@@ -78,7 +81,12 @@ class TinyCReader {
 		bool primary();
 		bool defaults();
 		bool operands();
+		bool tk_identifier();
+		bool unary_expr();
 		bool unary_oper();
+		bool preFixOper();
+		bool postFixOper();
+		bool paren_expr();
 
 		
 		void 						read(const char* sFile);

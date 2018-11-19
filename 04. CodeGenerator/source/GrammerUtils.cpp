@@ -54,10 +54,6 @@ CodeMap opCodeMap[] =
 	{ "POPI",		OPCODE::POPI,		2 },
 	{ "POPR",		OPCODE::POPR,		2 },
 	{ "NEGATE",		OPCODE::NEGATE,		1 },
-	{ "PREDECR",	OPCODE::PREDECR,	1 },
-	{ "PREINCR",	OPCODE::PREINCR,	1 },
-	{ "POSTDECR",	OPCODE::POSTDECR,	1 },
-	{ "POSTINCR",	OPCODE::POSTINCR,	1 },
 
 	{ "HLT",		OPCODE::HLT,		1 },
 };
@@ -513,639 +509,92 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 	if (pNode != nullptr)
 	{
 		int i_IfWhile_JCondition_Hole = 0, i_While_Loop_Hole = 0, i_ElseEnd_JMP_Offset = 0;
+
+		// Prologues
 		switch (pNode->m_eASTNodeType)
 		{
 			case ASTNodeType::ASTNode_FUNCTIONDEF:
 			{
-				std::string sFuncName = pNode->m_sText;
-				Tree* pReturnTypeNode = pNode->m_pLeftNode;
-				Tree* pArgListNode = pNode->m_pRightNode;
-
-				m_pCurrentFunction = new FunctionInfo(pNode, iOffset);
-				if(m_pCurrentFunction != nullptr)
-				{
-					m_MapFunctionInfos[sFuncName] = m_pCurrentFunction;
-				}
+				handleFunctionDef(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONSTART:
 			{
-				std::cout << m_pCurrentFunction->m_sFunctionName << ":" << std::endl;
-
-				///////////////////////////////////////////
-				// Stack Frame: Subtract local variable count from ESP.
-				EMIT(OPCODE::SUB_REG);
-				EMIT(EREGISTERS::RSP);
-				emit((int)-m_pCurrentFunction->getLocalVariableCount(), pByteCode, iOffset++);
-
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 3) << ". " << "SUB_REG";
-				std::cout << " " << (int)EREGISTERS::RSP;
-				std::cout << " " << -m_pCurrentFunction->getLocalVariableCount() << std::endl;
-#endif			
-				///////////////////////////////////////////
+				handleFunctionStart(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONEND:
 			{
-				///////////////////////////////////////////
-				// Stack Frame: Add local variable count from ESP.
-				EMIT(OPCODE::SUB_REG);
-				EMIT(EREGISTERS::RSP);
-				emit((int)m_pCurrentFunction->getLocalVariableCount(), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 3) << ". " << "SUB_REG";
-				std::cout << " " << (int)EREGISTERS::RSP;
-				std::cout << " " << m_pCurrentFunction->getLocalVariableCount() << std::endl;
-#endif
-				EMIT(OPCODE::SUB_REG);
-				EMIT(EREGISTERS::RSP);
-				emit((int)m_pCurrentFunction->getArgumentsCount(), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 3) << ". " << "SUB_REG";
-				std::cout << " " << (int)EREGISTERS::RSP;
-				std::cout << " " << m_pCurrentFunction->getArgumentsCount() << std::endl;
-#endif
-				// Pop
-				EMIT(OPCODE::POPR);
-				EMIT(EREGISTERS::RBP);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "POPR RBP" << std::endl << std::endl;
-#endif
-				// Ret
-				EMIT(OPCODE::RET);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "RET" << std::endl << std::endl;
-#endif
-
-				if (m_pCurrentFunction->m_pFunctionReturnType->m_sText != "void")
-				{
-					////// Push the already Popped Return Value in EAX onto the stack.
-					EMIT(OPCODE::PUSHR);
-					EMIT(EREGISTERS::RAX);
-				}
+				handleFunctionEnd(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONCALLEND:
 			{
-				// Callee function name
-				std::string sFuncCallee = pNode->m_sText;
-
-				// Check if the 'Callee' is our list !
-				FunctionInfo* pCalleeFunctionInfo = m_MapFunctionInfos[sFuncCallee];
-				assert(pCalleeFunctionInfo != nullptr);
-				if (pCalleeFunctionInfo != nullptr)
-				{
-					// Get Actual Function Def details like argument Count & function signature.
-					Tree* pFUNCDEF_ArgListNode = pCalleeFunctionInfo->m_pFunctionArguments;
-					int iFUNCDEF_ArgCount = pFUNCDEF_ArgListNode->m_vStatements.size();
-					std::string sFUNCDEF_Signature = pFUNCDEF_ArgListNode->m_sAdditionalInfo;
-
-					// Get Callee Function Def details like argument Count & function signature.
-					Tree* pCALLEE_Node = pNode->m_pParentNode;
-					int iCALLEE_ArgCount = pCALLEE_Node->m_vStatements.size() - 1/*ASTNode_FUNCTIONCALLEND*/;
-					std::string sCALLEE_Signature = pCALLEE_Node->m_sAdditionalInfo;
-
-					// Check if the Callee meets Actual function requirements.
-					// Else give a compilation error here.
-					assert(	(iFUNCDEF_ArgCount == iCALLEE_ArgCount)
-							&&
-							(sFUNCDEF_Signature == sCALLEE_Signature));
-
-					if(	(iFUNCDEF_ArgCount == iCALLEE_ArgCount)
-						&&
-						(sFUNCDEF_Signature == sCALLEE_Signature)
-					) {
-						/*
-						//////////////////////////////////////////////////////
-						//// STACK FRAME
-						//////////////////////////////////////////////////////
-							Local(N)	<-- ESP		EBP + N										|	- High Mem
-							...						...											|
-							Local(0)				EBP + 1										|
-							ARG0		<--	EBP		EBP											|
-							...						...											|
-							ARGN		<--|		EBP - N										|	    /\
-										   |--		Function arguments. Last Arg 1st(R to L).	|		||
-							EBP			<-- Old EBP												|		||
-							RET			<-- Call Return Address									|	- Low Mem
-						//////////////////////////////////////////////////////
-						*/
-
-						//////////////////////////////////////////////////////
-						// RET
-						EMIT(OPCODE::PUSHI);
-						int iReturnAddressOffsetHole = iOffset++;
-
-						// EBP
-						EMIT(OPCODE::PUSHR);
-						EMIT(EREGISTERS::RBP);
-#if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "PUSHR RBP" << std::endl << std::endl;
-#endif
-						//////////////////////////////////////////////////////
-						// If the Callee has arguments, they need to be pushed onto the stack.
-						if (iCALLEE_ArgCount > 0)
-						{
-							// 1. Push arguments onto the stack...
-							std::vector<Tree*>::reverse_iterator rItr = pCALLEE_Node->m_vStatements.rbegin();
-							for(; rItr != pCALLEE_Node->m_vStatements.rend(); ++rItr)
-							{
-								Tree* pArgNode = *rItr;
-								if (pArgNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
-								{
-									populateCode(pArgNode, pByteCode, iOffset);
-								}
-							}
-						}
-
-						//////////////////////////////////////////////////////
-						// Call
-						int iCalleeFunctionAddress = pCalleeFunctionInfo->m_iStartOffsetInCode;
-						EMIT(OPCODE::CALL);
-#if (VERBOSE == 1)
-						std::cout << (iOffset - 1) << ". " << "CALL ";
-#endif
-						emit(iCalleeFunctionAddress, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-						std::cout << iCalleeFunctionAddress << std::endl;
-#endif
-						//////////////////////////////////////////////////////
-						// Patch the return address
-						emit(iOffset, m_iByteCode, iReturnAddressOffsetHole);
-#if (VERBOSE == 1)
-						std::cout << "------" << "iReturnAddressOffsetHole [" << iReturnAddressOffsetHole << "] = " << iOffset << std::endl;
-#endif
-					}
-				}
+				handleFunctionCall(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_CHARACTER:
 			{
-				EMIT(OPCODE::PUSHI);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "PUSHI ";
-#endif
-				char pStr[255] = { 0 };
-				sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
-
-				int ch = atoi(pStr);
-				emit(ch, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
-#endif
+				handleCharacter(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_INTEGER:
 			{
-				EMIT(OPCODE::PUSHI);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "PUSHI ";
-#endif
-				emit(atoi(pNode->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
-#endif
+				handleInteger(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_IDENTIFIER:
 			{
-				EMIT(OPCODE::FETCH);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "FETCH ";
-#endif
-
-				emit(m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()) << std::endl;
-#endif
+				handleIdentifier(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_STRING:
 			{
-				EMIT(OPCODE::PUSHI);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "PUSHI ";
-#endif
-				emit(getStringPosition(pNode->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << getStringPosition(pNode->m_sText.c_str()) << std::endl;
-#endif
+				handleString(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_EXPRESSION:
 			{
-				std::string sRValuePostFixExpression = pNode->m_sText;
-				StringTokenizer* st = StringTokenizer::create(sRValuePostFixExpression.c_str());
-				st->tokenize();
-				while (st->hasMoreTokens())
-				{
-					Token prevTok = st->prevToken();
-					Token tok = st->nextToken();
-
-					TokenType::Type eCurrTokenType = tok.getType();
-					if (eCurrTokenType == TokenType::Type::TK_WHITESPACE || eCurrTokenType == TokenType::Type::TK_EOI || eCurrTokenType == TokenType::Type::TK_COMMA)
-						continue;
-
-					switch (eCurrTokenType)
-					{
-						case TokenType::Type::TK_CHARACTER:
-						{
-							EMIT(OPCODE::PUSHI);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "PUSHI ";
-#endif
-							char pStr[255] = { 0 };
-							sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
-
-							int ch = atoi(pStr);
-							emit(ch, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-							std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
-#endif
-						}
-						break;
-						case TokenType::Type::TK_INTEGER:
-						{
-							EMIT(OPCODE::PUSHI);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "PUSHI ";
-#endif
-							emit(atoi(tok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-							std::cout << atoi(tok.getText()) << std::endl;
-#endif
-						}
-						break;
-						case TokenType::Type::TK_IDENTIFIER:
-						{
-							EMIT(OPCODE::FETCH);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "FETCH ";
-#endif
-							emit(m_pCurrentFunction->getLocalVariablePosition(tok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-							std::cout << m_pCurrentFunction->getLocalVariablePosition(tok.getText()) << std::endl;
-#endif
-						}
-						break;
-						case TokenType::Type::TK_STRING:
-						{
-							EMIT(OPCODE::PUSHI);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "PUSHI ";
-#endif
-							emit(getStringPosition(tok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-							std::cout << getStringPosition(tok.getText()) << std::endl;
-#endif
-						}
-						break;
-						case TokenType::Type::TK_MUL:
-							EMIT(OPCODE::MUL);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "MUL" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_DIV:
-							EMIT(OPCODE::DIV);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "DIV" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_MOD:
-							emit((int)OPCODE::MOD, pByteCode, iOffset++);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "MOD" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_ADD:
-							EMIT(OPCODE::ADD);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "ADD" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_SUB:
-							EMIT(OPCODE::SUB);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "SUB" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_LT:
-							EMIT(OPCODE::JMP_LT);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP_LT" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_LTEQ:
-							EMIT(OPCODE::JMP_LTEQ);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP_LTEQ" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_GT:
-							EMIT(OPCODE::JMP_GT);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP_GT" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_GTEQ:
-							EMIT(OPCODE::JMP_GTEQ);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP_GTEQ" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_EQ:
-							EMIT(OPCODE::JMP_EQ);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP_EQ" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_NEQ:
-							EMIT(OPCODE::JMP_NEQ);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP_NEQ" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_LOGICALAND:
-							EMIT(OPCODE::LOGICALAND);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "LOGICALAND" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_LOGICALOR:
-							EMIT(OPCODE::LOGICALOR);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "LOGICALOR" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_NOT:
-							EMIT(OPCODE::_NOT);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "NOT" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_NEGATE:
-							EMIT(OPCODE::NEGATE);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "NEGATE" << std::endl;
-#endif
-						break;
-						case TokenType::Type::TK_PREDECR:
-						case TokenType::Type::TK_POSTDECR:
-						{
-							assert(prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER);
-							if (prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER)
-							{
-								//////////////////////////////////////////////////////
-								// Fetch variable value & store it onto the stack
-								EMIT(OPCODE::FETCH);
-#if (VERBOSE == 1)
-								std::cout << (iOffset - 1) << ". " << "FETCH ";
-#endif
-								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
-#endif
-								//////////////////////////////////////////////////////
-
-								//////////////////////////////////////////////////////
-								// Decrement the variable value, stored onto the stack
-								EMIT((eCurrTokenType == TokenType::Type::TK_PREDECR) ? (int)OPCODE::PREDECR : (int)OPCODE::POSTDECR);
-#if (VERBOSE == 1)
-								std::cout << (iOffset - 1) << ". " << ((eCurrTokenType == TokenType::Type::TK_PREDECR) ? "PREDECR" : "POSTDECR") << std::endl;
-#endif
-								//////////////////////////////////////////////////////
-
-								//////////////////////////////////////////////////////
-								// Store the decremented value from the stack back to the variable
-								EMIT(OPCODE::STORE);
-#if (VERBOSE == 1)
-								std::cout << (iOffset - 1) << ". " << "STORE ";
-#endif
-								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
-#endif
-							}
-						}
-						break;
-						case TokenType::Type::TK_PREINCR:
-						case TokenType::Type::TK_POSTINCR:
-						{
-							assert(prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER);
-							if (prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER)
-							{
-								//////////////////////////////////////////////////////
-								// Fetch variable value & store it onto the stack
-								EMIT(OPCODE::FETCH);
-#if (VERBOSE == 1)
-								std::cout << (iOffset - 1) << ". " << "FETCH ";
-#endif
-								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
-#endif
-								//////////////////////////////////////////////////////
-
-								//////////////////////////////////////////////////////
-								// Decrement the variable value, stored onto the stack
-								EMIT((eCurrTokenType == TokenType::Type::TK_PREINCR) ? (int)OPCODE::PREINCR : (int)OPCODE::POSTINCR);
-#if (VERBOSE == 1)
-								std::cout << (iOffset - 1) << ". " << ((eCurrTokenType == TokenType::Type::TK_PREINCR) ? "PREINCR" : "POSTINCR") << std::endl;
-#endif
-								//////////////////////////////////////////////////////
-
-								//////////////////////////////////////////////////////
-								// Store the decremented value from the stack back to the variable
-								EMIT(OPCODE::STORE);
-#if (VERBOSE == 1)
-								std::cout << (iOffset - 1) << ". " << "STORE ";
-#endif
-								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
-#endif
-							}
-						}
-						break;
-					}
-				}
+				handleExpression(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
 			{
-				Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
-																// In case of ASSIGN, right node will be the lvalue.
-
-				if (pExpressionNode->m_vStatements.size() > 0)
-				{
-					for (Tree* pChild : pExpressionNode->m_vStatements)
-					{
-						populateCode(pChild, pByteCode, iOffset);
-					}
-
-					EMIT(OPCODE::PUSHR);
-					EMIT(EREGISTERS::RAX);
-				}
-				else
-					populateCode(pExpressionNode, pByteCode, iOffset);
-
-				EMIT(OPCODE::STORE);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "STORE ";
-#endif
-				emit(m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()) << std::endl;
-#endif
+				handlePrimitiveInt(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_ASSIGN:
 			{
-				Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
-																// In case of ASSIGN, right node will be the lvalue.
-				populateCode(pExpressionNode, pByteCode, iOffset);
-
-				EMIT(OPCODE::STORE);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "STORE ";
-#endif
-				emit(m_pCurrentFunction->getLocalVariablePosition(pNode->m_pRightNode->m_sText.c_str()), pByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << m_pCurrentFunction->getLocalVariablePosition(pNode->m_pRightNode->m_sText.c_str()) << std::endl;
-#endif
+				handleAssign(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_IF:
 			case ASTNodeType::ASTNode_WHILE:
 			{
-				Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
-				i_While_Loop_Hole = iOffset;
-
-				populateCode(pExpressionNode, pByteCode, iOffset);
-
-				EMIT(OPCODE::JZ);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "JZ" << std::endl;
-#endif
-				i_IfWhile_JCondition_Hole = iOffset++;
+				handleIfWhile_Prologue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
 			}
 			break;
 		}
 
-		std::vector<Tree*> vStatements = pNode->m_vStatements;
-		for (Tree* pChildNode : vStatements)
-		{
-			////////////////////////////////////////////////////////////////////////////
-			if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
-			{
-				// Bail out for the function arguments.
-				// They will be processed in 'ASTNode_FUNCTIONCALLEND'
-				if(pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
-					continue;
-			}
-			////////////////////////////////////////////////////////////////////////////
+		// Intermediates
+		handleStatements(pNode, pByteCode, iOffset);
 
-			ASTNodeType eASTNodeType = pNode->m_eASTNodeType;
-			populateCode(pChildNode, pByteCode, iOffset);
-
-			switch (eASTNodeType)
-			{
-				case ASTNodeType::ASTNode_PUTC:
-				{
-					EMIT(OPCODE::PRTC);
-#if (VERBOSE == 1)
-					std::cout << (iOffset - 1) << ". " << "PRTC" << std::endl;
-#endif
-				}
-				break;
-				case ASTNodeType::ASTNode_PRINT:
-				{
-					std::vector<Tree*> vStatements = pNode->m_vStatements;
-					switch (pChildNode->m_eASTNodeType)
-					{
-						case ASTNodeType::ASTNode_INTEGER:
-						case ASTNodeType::ASTNode_IDENTIFIER:
-						case ASTNodeType::ASTNode_EXPRESSION:
-							EMIT(OPCODE::PRTI);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "PRTI" << std::endl;
-#endif
-						break;
-						case ASTNodeType::ASTNode_STRING:
-							EMIT(OPCODE::PRTS);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "PRTS" << std::endl;
-#endif
-						break;
-						case ASTNodeType::ASTNode_CHARACTER:
-							EMIT(OPCODE::PRTC);
-#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "PRTC" << std::endl;
-#endif
-						break;
-					}
-				}
-				break;
-			}
-		}
-
+		// Epilogues
 		switch (pNode->m_eASTNodeType)
 		{
 			case ASTNodeType::ASTNode_RETURNSTMT:
 			{
-				//Tree* pExpressionNode = pNode->m_pLeftNode;				// Remember we have added expression node to any parent's Left.
-				//populateCode(pExpressionNode, pByteCode, iOffset);
-
-				///////////////////////////////////////////////////////////////
-				// The expression result is already pushed onto the stack !
-				// Need to retrieve the result & save it in EAX.
-				EMIT(OPCODE::POPR);
-				EMIT(EREGISTERS::RAX);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "POPR RAX" << std::endl << std::endl;
-#endif
+				handleReturnStatement(pNode, pByteCode, iOffset);
 			}
 			break;
 			case ASTNodeType::ASTNode_IF:
 			{
-				Tree* pElseNode = pNode->m_pRightNode;
-				EMIT(OPCODE::JMP);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-#endif
-				i_ElseEnd_JMP_Offset = iOffset++;
-
-				emit(iOffset, m_iByteCode, i_IfWhile_JCondition_Hole);
-#if (VERBOSE == 1)
-				std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
-#endif
-				if (pElseNode != nullptr)
-				{
-					populateCode(pElseNode, pByteCode, iOffset);
-				}
-
-				emit(iOffset, m_iByteCode, i_ElseEnd_JMP_Offset);
-#if (VERBOSE == 1)
-				std::cout << "------" << "i_ElseEnd_JMP_Offset [" << i_ElseEnd_JMP_Offset << "] = " << iOffset << std::endl;
-#endif
+				handleIf_Epilogue(pNode, pByteCode, iOffset, i_ElseEnd_JMP_Offset, i_IfWhile_JCondition_Hole);
 			}
 			break;
 			case ASTNodeType::ASTNode_WHILE:
 			{
-				EMIT(OPCODE::JMP);
-#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-#endif
-				emit(i_While_Loop_Hole, m_iByteCode, iOffset++);
-#if (VERBOSE == 1)
-				std::cout << "------" << "i_While_Loop_Hole [" << (iOffset - 1) << "] = " << i_While_Loop_Hole << std::endl;
-#endif
-				emit(iOffset, m_iByteCode, i_IfWhile_JCondition_Hole);
-#if (VERBOSE == 1)
-				std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
-#endif
+				handleWhile_Epilogue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
 			}
 			break;
 		}
@@ -1191,6 +640,679 @@ int	GrammerUtils::getStringPosition(const char* sString)
 		}
 
 		return -1;
+	}
+}
+
+void GrammerUtils::handleFunctionDef(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	std::string sFuncName = pNode->m_sText;
+	Tree* pReturnTypeNode = pNode->m_pLeftNode;
+	Tree* pArgListNode = pNode->m_pRightNode;
+
+	m_pCurrentFunction = new FunctionInfo(pNode, iOffset);
+	if (m_pCurrentFunction != nullptr)
+	{
+		m_MapFunctionInfos[sFuncName] = m_pCurrentFunction;
+	}
+}
+
+void GrammerUtils::handleFunctionStart(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	std::cout << m_pCurrentFunction->m_sFunctionName << ":" << std::endl;
+
+	///////////////////////////////////////////
+	// Stack Frame: Subtract local variable count from ESP.
+	EMIT(OPCODE::SUB_REG);
+	EMIT(EREGISTERS::RSP);
+	emit((int)-m_pCurrentFunction->getLocalVariableCount(), pByteCode, iOffset++);
+
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 3) << ". " << "SUB_REG";
+	std::cout << " " << (int)EREGISTERS::RSP;
+	std::cout << " " << -m_pCurrentFunction->getLocalVariableCount() << std::endl;
+#endif			
+	///////////////////////////////////////////
+}
+
+void GrammerUtils::handleFunctionEnd(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	///////////////////////////////////////////
+	// Stack Frame: Add local variable count from ESP.
+	EMIT(OPCODE::SUB_REG);
+	EMIT(EREGISTERS::RSP);
+	emit((int)m_pCurrentFunction->getLocalVariableCount(), pByteCode, iOffset++);
+
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 3) << ". " << "SUB_REG";
+	std::cout << " " << (int)EREGISTERS::RSP;
+	std::cout << " " << m_pCurrentFunction->getLocalVariableCount() << std::endl;
+#endif
+
+	EMIT(OPCODE::SUB_REG);
+	EMIT(EREGISTERS::RSP);
+	emit((int)m_pCurrentFunction->getArgumentsCount(), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 3) << ". " << "SUB_REG";
+	std::cout << " " << (int)EREGISTERS::RSP;
+	std::cout << " " << m_pCurrentFunction->getArgumentsCount() << std::endl;
+#endif
+
+	// Pop
+	EMIT(OPCODE::POPR);
+	EMIT(EREGISTERS::RBP);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "POPR RBP" << std::endl << std::endl;
+#endif
+	
+	// Ret
+	EMIT(OPCODE::RET);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "RET" << std::endl << std::endl;
+#endif
+
+	if (m_pCurrentFunction->m_pFunctionReturnType->m_sText != "void")
+	{
+		////// Push the already Popped Return Value in EAX onto the stack.
+		EMIT(OPCODE::PUSHR);
+		EMIT(EREGISTERS::RAX);
+	}
+}
+
+void GrammerUtils::handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	// Callee function name
+	std::string sFuncCallee = pNode->m_sText;
+
+	// Check if the 'Callee' is our list !
+	FunctionInfo* pCalleeFunctionInfo = m_MapFunctionInfos[sFuncCallee];
+
+	assert(pCalleeFunctionInfo != nullptr);
+	if (pCalleeFunctionInfo != nullptr)
+	{
+		// Get Actual Function Def details like argument Count & function signature.
+		Tree* pFUNCDEF_ArgListNode = pCalleeFunctionInfo->m_pFunctionArguments;
+		int iFUNCDEF_ArgCount = pFUNCDEF_ArgListNode->m_vStatements.size();
+		std::string sFUNCDEF_Signature = pFUNCDEF_ArgListNode->m_sAdditionalInfo;
+
+		// Get Callee Function Def details like argument Count & function signature.
+		Tree* pCALLEE_Node = pNode->m_pParentNode;
+		int iCALLEE_ArgCount = pCALLEE_Node->m_vStatements.size() - 1/*ASTNode_FUNCTIONCALLEND*/;
+		std::string sCALLEE_Signature = pCALLEE_Node->m_sAdditionalInfo;
+
+		// Check if the Callee meets Actual function requirements.
+		// Else give a compilation error here.
+		assert((iFUNCDEF_ArgCount == iCALLEE_ArgCount)
+			&&
+			(sFUNCDEF_Signature == sCALLEE_Signature));
+
+		if (	(iFUNCDEF_ArgCount == iCALLEE_ArgCount)
+				&&
+				(sFUNCDEF_Signature == sCALLEE_Signature)
+		) {
+			/*
+			//////////////////////////////////////////////////////
+			//// STACK FRAME
+			//////////////////////////////////////////////////////
+			Local(N)	<-- ESP		EBP + N										|	- High Mem
+			...						...											|
+			Local(0)				EBP + 1										|
+			ARG0		<--	EBP		EBP											|
+			...						...											|
+			ARGN		<--|		EBP - N										|	    /\
+			|--		Function arguments. Last Arg 1st(R to L).	|		||
+			EBP			<-- Old EBP												|		||
+			RET			<-- Call Return Address									|	- Low Mem
+			//////////////////////////////////////////////////////
+			*/
+
+			//////////////////////////////////////////////////////
+			// RET
+			EMIT(OPCODE::PUSHI);
+			int iReturnAddressOffsetHole = iOffset++;
+
+			// EBP
+			EMIT(OPCODE::PUSHR);
+			EMIT(EREGISTERS::RBP);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "PUSHR RBP" << std::endl << std::endl;
+#endif
+			//////////////////////////////////////////////////////
+			// If the Callee has arguments, they need to be pushed onto the stack.
+			if (iCALLEE_ArgCount > 0)
+			{
+				// 1. Push arguments onto the stack...
+				std::vector<Tree*>::reverse_iterator rItr = pCALLEE_Node->m_vStatements.rbegin();
+				for (; rItr != pCALLEE_Node->m_vStatements.rend(); ++rItr)
+				{
+					Tree* pArgNode = *rItr;
+					if (pArgNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+					{
+						populateCode(pArgNode, pByteCode, iOffset);
+					}
+				}
+			}
+
+			//////////////////////////////////////////////////////
+			// Call
+			int iCalleeFunctionAddress = pCalleeFunctionInfo->m_iStartOffsetInCode;
+			EMIT(OPCODE::CALL);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "CALL ";
+#endif
+			emit(iCalleeFunctionAddress, pByteCode, iOffset++);
+#if (VERBOSE == 1)
+			std::cout << iCalleeFunctionAddress << std::endl;
+#endif
+			//////////////////////////////////////////////////////
+			// Patch the return address
+			emit(iOffset, m_iByteCode, iReturnAddressOffsetHole);
+#if (VERBOSE == 1)
+			std::cout << "------" << "iReturnAddressOffsetHole [" << iReturnAddressOffsetHole << "] = " << iOffset << std::endl;
+#endif
+		}
+	}
+}
+
+void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode, int* pByteCode, int& iOffset)
+{
+	if (pPreFixNode != nullptr)
+	{
+		for (Tree* pChild : pPreFixNode->m_vStatements)
+		{
+			ASTNodeType eASTNodeType = pChild->m_eASTNodeType;
+			switch (eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_PREDECR:
+				case ASTNodeType::ASTNode_PREINCR:
+				{
+					/////////////////////////////////////////////////
+					// 1. Fetch variable value & store it onto the stack
+					EMIT(OPCODE::FETCH);
+#if (VERBOSE == 1)
+					std::cout << (iOffset - 1) << ". " << "FETCH ";
+#endif
+					emit(m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+					std::cout << m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()) << std::endl;
+#endif
+					/////////////////////////////////////////////////
+					// 2. Push integer 1.
+					EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+					std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+					emit( (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? 1 : -1, pByteCode, iOffset++);
+
+					/////////////////////////////////////////////////
+					// 3. Add the 2 operands
+					EMIT(OPCODE::ADD);
+#if (VERBOSE == 1)
+					std::cout << (iOffset - 1) << ". " << "ADD" << std::endl;
+#endif
+
+					//////////////////////////////////////////////////////
+					// Store the decremented/incremented value from the stack back to the variable
+					EMIT(OPCODE::STORE);
+#if (VERBOSE == 1)
+					std::cout << (iOffset - 1) << ". " << "STORE ";
+#endif
+					emit(m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+					std::cout << m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()) << std::endl;
+#endif
+				}
+				break;
+			}
+		}
+	}
+}
+
+void GrammerUtils::handleExpression(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	std::string sRValuePostFixExpression = pNode->m_sText;
+	StringTokenizer* st = StringTokenizer::create(sRValuePostFixExpression.c_str());
+	st->tokenize();
+	while (st->hasMoreTokens())
+	{
+		Token prevTok = st->prevToken();
+		Token tok = st->nextToken();
+
+		TokenType::Type eCurrTokenType = tok.getType();
+		if (eCurrTokenType == TokenType::Type::TK_WHITESPACE || eCurrTokenType == TokenType::Type::TK_EOI || eCurrTokenType == TokenType::Type::TK_COMMA)
+			continue;
+
+		switch (eCurrTokenType)
+		{
+		case TokenType::Type::TK_CHARACTER:
+		{
+			EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+			char pStr[255] = { 0 };
+			sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
+
+			int ch = atoi(pStr);
+			emit(ch, pByteCode, iOffset++);
+#if (VERBOSE == 1)
+			std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
+#endif
+		}
+		break;
+		case TokenType::Type::TK_INTEGER:
+		{
+			EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+			emit(atoi(tok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+			std::cout << atoi(tok.getText()) << std::endl;
+#endif
+		}
+		break;
+		case TokenType::Type::TK_IDENTIFIER:
+		{
+			EMIT(OPCODE::FETCH);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "FETCH ";
+#endif
+			emit(m_pCurrentFunction->getLocalVariablePosition(tok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+			std::cout << m_pCurrentFunction->getLocalVariablePosition(tok.getText()) << std::endl;
+#endif
+		}
+		break;
+		case TokenType::Type::TK_STRING:
+		{
+			EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+			emit(getStringPosition(tok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+			std::cout << getStringPosition(tok.getText()) << std::endl;
+#endif
+		}
+		break;
+		case TokenType::Type::TK_MUL:
+			EMIT(OPCODE::MUL);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "MUL" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_DIV:
+			EMIT(OPCODE::DIV);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "DIV" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_MOD:
+			emit((int)OPCODE::MOD, pByteCode, iOffset++);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "MOD" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_ADD:
+			EMIT(OPCODE::ADD);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "ADD" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_SUB:
+			EMIT(OPCODE::SUB);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "SUB" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_LT:
+			EMIT(OPCODE::JMP_LT);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JMP_LT" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_LTEQ:
+			EMIT(OPCODE::JMP_LTEQ);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JMP_LTEQ" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_GT:
+			EMIT(OPCODE::JMP_GT);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JMP_GT" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_GTEQ:
+			EMIT(OPCODE::JMP_GTEQ);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JMP_GTEQ" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_EQ:
+			EMIT(OPCODE::JMP_EQ);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JMP_EQ" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_NEQ:
+			EMIT(OPCODE::JMP_NEQ);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JMP_NEQ" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_LOGICALAND:
+			EMIT(OPCODE::LOGICALAND);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "LOGICALAND" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_LOGICALOR:
+			EMIT(OPCODE::LOGICALOR);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "LOGICALOR" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_NOT:
+			EMIT(OPCODE::_NOT);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "NOT" << std::endl;
+#endif
+			break;
+		case TokenType::Type::TK_NEGATE:
+			EMIT(OPCODE::NEGATE);
+#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "NEGATE" << std::endl;
+#endif
+			break;
+		}
+	}
+}
+
+void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode, int* pByteCode, int& iOffset)
+{
+	if (pPostFixNode != nullptr)
+	{
+		for (Tree* pChild : pPostFixNode->m_vStatements)
+		{
+			ASTNodeType eASTNodeType = pChild->m_eASTNodeType;
+			switch (eASTNodeType)
+			{
+			case ASTNodeType::ASTNode_POSTDECR:
+			case ASTNodeType::ASTNode_POSTINCR:
+			{
+				/////////////////////////////////////////////////
+				// 1. Fetch variable value & store it onto the stack
+				EMIT(OPCODE::FETCH);
+#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "FETCH ";
+#endif
+				emit(m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+				std::cout << m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()) << std::endl;
+#endif
+				/////////////////////////////////////////////////
+				// 2. Push integer 1.
+				EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+				emit((eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? 1 : -1, pByteCode, iOffset++);
+
+				/////////////////////////////////////////////////
+				// 3. Add the 2 operands
+				EMIT(OPCODE::ADD);
+#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "ADD" << std::endl;
+#endif
+				//////////////////////////////////////////////////////
+				// Store the decremented/incremented value from the stack back to the variable
+				EMIT(OPCODE::STORE);
+#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "STORE ";
+#endif
+				emit(m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+				std::cout << m_pCurrentFunction->getLocalVariablePosition(pChild->m_sText.c_str()) << std::endl;
+#endif
+			}
+			break;
+			}
+		}
+	}
+}
+
+void GrammerUtils::handleCharacter(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+	char pStr[255] = { 0 };
+	sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
+
+	int ch = atoi(pStr);
+	emit(ch, pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
+#endif
+}
+
+void GrammerUtils::handleInteger(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+	emit(atoi(pNode->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << atoi(pNode->m_sText.c_str()) << std::endl;
+#endif
+}
+
+void GrammerUtils::handleIdentifier(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	EMIT(OPCODE::FETCH);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "FETCH ";
+#endif
+
+	emit(m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()) << std::endl;
+#endif
+}
+
+void GrammerUtils::handleString(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	EMIT(OPCODE::PUSHI);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "PUSHI ";
+#endif
+	emit(getStringPosition(pNode->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << getStringPosition(pNode->m_sText.c_str()) << std::endl;
+#endif
+}
+
+void GrammerUtils::handlePrimitiveInt(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
+													// In case of ASSIGN, right node will be the lvalue.
+
+	if (pExpressionNode->m_vStatements.size() > 0)
+	{
+		for (Tree* pChild : pExpressionNode->m_vStatements)
+		{
+			populateCode(pChild, pByteCode, iOffset);
+		}
+
+		EMIT(OPCODE::PUSHR);
+		EMIT(EREGISTERS::RAX);
+	}
+	else
+		populateCode(pExpressionNode, pByteCode, iOffset);
+
+	EMIT(OPCODE::STORE);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "STORE ";
+#endif
+	emit(m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()) << std::endl;
+#endif
+}
+
+void GrammerUtils::handleAssign(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
+													// In case of ASSIGN, right node will be the lvalue.
+
+													// Compute PreFixExpr
+	{
+		handlePreFixExpression(pExpressionNode->m_pLeftNode, pByteCode, iOffset);
+	}
+
+	populateCode(pExpressionNode, pByteCode, iOffset);
+
+	EMIT(OPCODE::STORE);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "STORE ";
+#endif
+	emit(m_pCurrentFunction->getLocalVariablePosition(pNode->m_pRightNode->m_sText.c_str()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << m_pCurrentFunction->getLocalVariablePosition(pNode->m_pRightNode->m_sText.c_str()) << std::endl;
+#endif
+
+	// Compute PreFixExpr
+	{
+		handlePostFixExpression(pExpressionNode->m_pRightNode, pByteCode, iOffset);
+	}
+}
+
+void GrammerUtils::handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	///////////////////////////////////////////////////////////////
+	// The expression result is already pushed onto the stack !
+	// Need to retrieve the result & save it in EAX.
+	EMIT(OPCODE::POPR);
+	EMIT(EREGISTERS::RAX);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "POPR RAX" << std::endl << std::endl;
+#endif
+}
+
+void GrammerUtils::handleIfWhile_Prologue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
+{
+	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
+	i_While_Loop_Hole = iOffset;
+
+	populateCode(pExpressionNode, pByteCode, iOffset);
+
+	EMIT(OPCODE::JZ);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "JZ" << std::endl;
+#endif
+	i_IfWhile_JCondition_Hole = iOffset++;
+}
+
+void GrammerUtils::handleIf_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole)
+{
+	Tree* pElseNode = pNode->m_pRightNode;
+	EMIT(OPCODE::JMP);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
+#endif
+	i_ElseEnd_JMP_Offset = iOffset++;
+
+	emit(iOffset, m_iByteCode, i_IfWhile_JCondition_Hole);
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
+#endif
+	if (pElseNode != nullptr)
+	{
+		populateCode(pElseNode, pByteCode, iOffset);
+	}
+
+	emit(iOffset, m_iByteCode, i_ElseEnd_JMP_Offset);
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_ElseEnd_JMP_Offset [" << i_ElseEnd_JMP_Offset << "] = " << iOffset << std::endl;
+#endif
+}
+
+void GrammerUtils::handleWhile_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
+{
+	EMIT(OPCODE::JMP);
+#if (VERBOSE == 1)
+	std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
+#endif
+	emit(i_While_Loop_Hole, m_iByteCode, iOffset++);
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_While_Loop_Hole [" << (iOffset - 1) << "] = " << i_While_Loop_Hole << std::endl;
+#endif
+	emit(iOffset, m_iByteCode, i_IfWhile_JCondition_Hole);
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
+#endif
+}
+
+void GrammerUtils::handleStatements(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	std::vector<Tree*> vStatements = pNode->m_vStatements;
+	for (Tree* pChildNode : vStatements)
+	{
+		////////////////////////////////////////////////////////////////////////////
+		if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
+		{
+			// Bail out for the function arguments.
+			// They will be processed in 'ASTNode_FUNCTIONCALLEND'
+			if(pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+				continue;
+		}
+		////////////////////////////////////////////////////////////////////////////
+
+		ASTNodeType eASTNodeType = pNode->m_eASTNodeType;
+		populateCode(pChildNode, pByteCode, iOffset);
+
+		switch (eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_PUTC:
+			{
+				EMIT(OPCODE::PRTC);
+#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "PRTC" << std::endl;
+#endif
+			}
+			break;
+			case ASTNodeType::ASTNode_PRINT:
+			{
+				std::vector<Tree*> vStatements = pNode->m_vStatements;
+				switch (pChildNode->m_eASTNodeType)
+				{
+					case ASTNodeType::ASTNode_INTEGER:
+					case ASTNodeType::ASTNode_IDENTIFIER:
+					case ASTNodeType::ASTNode_EXPRESSION:
+						EMIT(OPCODE::PRTI);
+#if (VERBOSE == 1)
+						std::cout << (iOffset - 1) << ". " << "PRTI" << std::endl;
+#endif
+					break;
+					case ASTNodeType::ASTNode_STRING:
+						EMIT(OPCODE::PRTS);
+#if (VERBOSE == 1)
+						std::cout << (iOffset - 1) << ". " << "PRTS" << std::endl;
+#endif
+					break;
+					case ASTNodeType::ASTNode_CHARACTER:
+						EMIT(OPCODE::PRTC);
+#if (VERBOSE == 1)
+						std::cout << (iOffset - 1) << ". " << "PRTC" << std::endl;
+#endif
+					break;
+				}
+			}
+			break;
+		}
 	}
 }
 

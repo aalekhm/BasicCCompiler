@@ -57,10 +57,6 @@ namespace TokenType
 		TK_BNFASSIGNMENT,
 		TK_BNFCODE,
 		TK_FUNCTIONCALL,
-		TK_PREDECR,
-		TK_PREINCR,
-		TK_POSTDECR,
-		TK_POSTINCR,
 		TK_UNKNOWN
 	};
 
@@ -120,10 +116,6 @@ namespace TokenType
 			case Type::TK_BNFASSIGNMENT:		return "TK_BNFASSIGNMENT";
 			case Type::TK_BNFCODE:				return "TK_BNFCODE";
 			case Type::TK_FUNCTIONCALL:			return "TK_FUNCTIONCALL";
-			case Type::TK_PREDECR:				return "TK_PREDECR";
-			case Type::TK_PREINCR:				return "TK_PREINCR";
-			case Type::TK_POSTDECR:				return "TK_POSTDECR";
-			case Type::TK_POSTINCR:				return "TK_POSTINCR";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}

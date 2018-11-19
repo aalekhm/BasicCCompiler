@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 
 int main(int argc, char* argv[])
 {
@@ -8,6 +9,13 @@ int main(int argc, char* argv[])
 		i = 11;
 		int i = 12;
 	}
+
+	i = 2;
+	int j = ++i + (2 + i);
+
+	std::vector<int> v(3, 100);
+	
+	v.insert(v.begin() + 1, 10);
 
 	exit(EXIT_SUCCESS);
 }

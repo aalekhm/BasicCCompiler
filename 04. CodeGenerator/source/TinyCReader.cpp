@@ -94,12 +94,6 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 	else
 	if (sOperator == "NEGATE")
 		eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
-	else
-	if (sOperator == "PREDECR")
-		eOperator = ENUM_OP_PRECEDENCE::OP_PREDECR;
-	else
-	if (sOperator == "PREINCR")
-		eOperator = ENUM_OP_PRECEDENCE::OP_PREINCR;
 
 	return eOperator;
 }
@@ -1572,14 +1566,36 @@ return true;
 bool TinyCReader::preFixOper() {
 if(GrammerUtils::match("--", OPTIONAL)) {
  
-															checkOpPrecedenceAndPush("PREDECR");
+															if(m_pASTCurrentNode->m_pLeftNode == nullptr)
+															{
+																Tree* pPreFixNode = makeLeaf(ASTNodeType::ASTNode_EXPRESSION_PREFIX, "");
+																m_pASTCurrentNode->m_pLeftNode = pPreFixNode;
+															}
+															
+															std::string sVariableName = GrammerUtils::m_pToken.m_sText;
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREDECR, sFullyQualifiedVariableName.c_str());
+															{
+																m_pASTCurrentNode->m_pLeftNode->addChild(pPreDecrNode);
+															}
 														
 return true;
 }
 else
 if(GrammerUtils::match("++", OPTIONAL)) {
  
-															checkOpPrecedenceAndPush("PREINCR");
+															if(m_pASTCurrentNode->m_pLeftNode == nullptr)
+															{
+																Tree* pPreFixNode = makeLeaf(ASTNodeType::ASTNode_EXPRESSION_PREFIX, "");
+																m_pASTCurrentNode->m_pLeftNode = pPreFixNode;
+															}
+
+															std::string sVariableName = GrammerUtils::m_pToken.m_sText;
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															Tree* pPreIncrNode = makeLeaf(ASTNodeType::ASTNode_PREINCR, sFullyQualifiedVariableName.c_str());
+															{
+																m_pASTCurrentNode->m_pLeftNode->addChild(pPreIncrNode);
+															}
 														
 return true;
 }
@@ -1591,16 +1607,39 @@ return true;
 }
 
 bool TinyCReader::postFixOper() {
+ 
+										std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+									
 if(GrammerUtils::match("--", OPTIONAL)) {
  
-															checkOpPrecedenceAndPush("POSTDECR");
+															if(m_pASTCurrentNode->m_pRightNode == nullptr)
+															{
+																Tree* pPostFixNode = makeLeaf(ASTNodeType::ASTNode_EXPRESSION_POSTFIX, "");
+																m_pASTCurrentNode->m_pRightNode = pPostFixNode;
+															}
+
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															Tree* pPostDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTDECR, sFullyQualifiedVariableName.c_str());
+															{
+																m_pASTCurrentNode->m_pRightNode->addChild(pPostDecrNode);
+															}
 														
 return true;
 }
 else
 if(GrammerUtils::match("++", OPTIONAL)) {
  
-															checkOpPrecedenceAndPush("POSTINCR");
+															if(m_pASTCurrentNode->m_pRightNode == nullptr)
+															{
+																Tree* pPostFixNode = makeLeaf(ASTNodeType::ASTNode_EXPRESSION_POSTFIX, "");
+																m_pASTCurrentNode->m_pRightNode = pPostFixNode;
+															}
+
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															Tree* pPostIncrNode = makeLeaf(ASTNodeType::ASTNode_POSTINCR, sFullyQualifiedVariableName.c_str());
+															{
+																m_pASTCurrentNode->m_pRightNode->addChild(pPostIncrNode);
+															}
 														
 return true;
 }

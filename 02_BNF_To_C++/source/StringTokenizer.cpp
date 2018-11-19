@@ -29,6 +29,11 @@ void StringTokenizer::init(const char* sData)
 	m_TokensIterator = m_vTokens.end();
 }
 
+void StringTokenizer::reset()
+{
+	init(m_sData.c_str());
+}
+
 void StringTokenizer::setData(const char* sData, bool bIgnoreBNFNonTerminals)
 {
 	init(sData);
@@ -56,8 +61,14 @@ Token StringTokenizer::prevToken()
 		int iCount = 1;
 		tok = *(m_TokensIterator - iCount++);
 		TokenType::Type eTokenType = tok.m_eTokenType;
-		while (eTokenType == TokenType::Type::TK_WHITESPACE || eTokenType == TokenType::Type::TK_EOI || eTokenType == TokenType::Type::TK_COMMA)
-		{
+		while (	eTokenType == TokenType::Type::TK_WHITESPACE 
+				||
+				eTokenType == TokenType::Type::TK_EOL
+				||
+				eTokenType == TokenType::Type::TK_EOI 
+				|| 
+				eTokenType == TokenType::Type::TK_COMMA
+		) {
 			tok = *(m_TokensIterator - iCount++);
 			eTokenType = tok.m_eTokenType;
 		}
@@ -268,18 +279,6 @@ Token StringTokenizer::readDefault(char ch0)
 	else if(ch0 == WHITESPACE_SPACE || ch0 == WHITESPACE_TAB)				{ initRead(); consume(1); return createToken(TokenType::Type::TK_WHITESPACE); }
 	else if(ch0 == 'N' && ch1 == 'E' && peek(2) == 'G' && peek(3) == 'A' && peek(4) == 'T' && peek(5) == 'E')
 																			{ initRead(); consume(6); return createToken(TokenType::Type::TK_NEGATE); }
-
-	else if(ch0 == 'P' && ch1 == 'R' && peek(2) == 'E' && peek(3) == 'D' && peek(4) == 'E' && peek(5) == 'C' && peek(6) == 'R')
-																			{ initRead(); consume(7); return createToken(TokenType::Type::TK_PREDECR); }
-
-	else if(ch0 == 'P' && ch1 == 'R' && peek(2) == 'E' && peek(3) == 'I' && peek(4) == 'N' && peek(5) == 'C' && peek(6) == 'R')
-																			{ initRead(); consume(7); return createToken(TokenType::Type::TK_PREINCR); }
-
-	else if(ch0 == 'P' && ch1 == 'O' && peek(2) == 'S' && peek(3) == 'T' && peek(4) == 'D' && peek(5) == 'E' && peek(6) == 'C' && peek(7) == 'R')
-																			{ initRead(); consume(8); return createToken(TokenType::Type::TK_POSTDECR); }
-
-	else if(ch0 == 'P' && ch1 == 'O' && peek(2) == 'S' && peek(3) == 'T' && peek(4) == 'I' && peek(5) == 'N' && peek(6) == 'C' && peek(7) == 'R')
-																			{ initRead(); consume(8); return createToken(TokenType::Type::TK_POSTINCR); }
 			
 	else if(ch0 == CARRIAGE_RETURN && ch1 == LINE_FEED)						{ initRead(); consume(2); return readEOL(); }
 	else if(ch0 == LINE_FEED)												{ return readEOL(); }

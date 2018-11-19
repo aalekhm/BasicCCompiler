@@ -58,10 +58,6 @@ namespace TokenType
 		TK_BNFASSIGNMENT,
 		TK_BNFCODE,
 		TK_FUNCTIONCALL,
-		TK_PREDECR,
-		TK_PREINCR,
-		TK_POSTDECR,
-		TK_POSTINCR,
 		TK_UNKNOWN
 	};
 
@@ -121,10 +117,6 @@ namespace TokenType
 			case Type::TK_BNFASSIGNMENT:		return "TK_BNFASSIGNMENT";
 			case Type::TK_BNFCODE:				return "TK_BNFCODE";
 			case Type::TK_FUNCTIONCALL:			return "TK_FUNCTIONCALL";
-			case Type::TK_PREDECR:				return "TK_PREDECR";
-			case Type::TK_PREINCR:				return "TK_PREINCR";
-			case Type::TK_POSTDECR:				return "TK_POSTDECR";
-			case Type::TK_POSTINCR:				return "TK_POSTINCR";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -243,10 +235,6 @@ enum class OPCODE
 	POPI,
 	POPR,
 	NEGATE,
-	PREDECR,
-	PREINCR,
-	POSTDECR,
-	POSTINCR,
 	HLT,
 };
 
@@ -315,10 +303,6 @@ enum class ENUM_OP_PRECEDENCE
 	OP_NOT,
 	OP_PLUS = OP_NOT,
 	OP_NEGATE = OP_NOT,
-	OP_PREDECR = OP_NOT,
-	OP_PREINCR = OP_NOT,
-	OP_POSTDECR = OP_NOT,
-	OP_POSTINCR = OP_NOT,
 
 	OP_RPAREN,
 };
@@ -381,7 +365,13 @@ enum class ASTNodeType
 	ASTNode_PRIMITIVETYPESTRING,
 	ASTNode_FUNCTIONCALL,
 	ASTNode_RETURNSTMT,
-	ASTNode_FUNCTIONCALLEND
+	ASTNode_FUNCTIONCALLEND,
+	ASTNode_EXPRESSION_PREFIX,
+	ASTNode_EXPRESSION_POSTFIX,
+	ASTNode_PREDECR,
+	ASTNode_PREINCR,
+	ASTNode_POSTDECR,
+	ASTNode_POSTINCR
 };
 
 typedef struct Tree
@@ -400,6 +390,21 @@ typedef struct Tree
 		if (pNode != nullptr)
 		{
 			m_vStatements.push_back(pNode);
+			pNode->m_pParentNode = this;
+		}
+	}
+
+	void insertAt(int i, Tree* pNode)
+	{
+		if (pNode != nullptr)
+		{
+			if (i < m_vStatements.size())
+			{
+				m_vStatements.insert(m_vStatements.begin() + i, pNode);
+			}
+			else
+				m_vStatements.push_back(pNode);
+
 			pNode->m_pParentNode = this;
 		}
 	}

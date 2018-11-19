@@ -35,11 +35,8 @@ class GrammerUtils
 		static void									printTabs();
 
 		static void									generateCode(Tree* pRootNode);
-		//static void									populateVariables(Tree* pParentNode, std::vector<std::string>& sVector);
 		static void									populateStrings(Tree* pParentNode, std::vector<std::string>& sVector);
 		static void									addString(std::string& sText, std::vector<std::string>& vVector);
-		static void									populateCode(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									emit(int iCode, int* pByteCode, int iOffset);
 
 		static int									getVariablePosition(const char* sIdentifier);
 		static int									getStringPosition(const char* sString);
@@ -56,4 +53,29 @@ class GrammerUtils
 		static int									m_iByteCode[MAX_BYTECODE_SIZE];
 		static int									m_iJumpHole;
 	private:
+		static void									handleFunctionDef(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleFunctionStart(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleFunctionEnd(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset);
+
+		static void									handlePreFixExpression(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleExpression(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handlePostFixExpression(Tree* pNode, int* pByteCode, int& iOffset);
+
+		static void									handleCharacter(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleInteger(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleIdentifier(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleString(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handlePrimitiveInt(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleAssign(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleIfWhile_Prologue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
+		static void									handleIf_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole);
+		static void									handleWhile_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
+
+		static void									handleStatements(Tree* pNode, int* pByteCode, int& iOffset);
+
+		static void									populateCode(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									emit(int iCode, int* pByteCode, int iOffset);
+
 };
