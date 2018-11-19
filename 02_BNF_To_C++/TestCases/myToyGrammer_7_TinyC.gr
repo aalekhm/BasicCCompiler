@@ -68,7 +68,7 @@
 															"</code>"
 										;
 
-<returnType>					::=		(	"int"
+<returnType>					::=		(	"int32_t"
 											|
 											"void"
 										);
@@ -79,14 +79,29 @@
 											<primitiveTypeString>
 											[',']
 										);
-<primitiveTypeInt>				::= 	"int" 
+										
+<primitiveType>					::=		(	"int8_t"
+											|
+											"int16_t"
+											|
+											"int32_t"
+										);
+										
+<primitiveTypeInt>				::= 	<primitiveType>		"<code>"
+																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+															"</code>"
 										TK_IDENTIFIER		"<code>"
 																std::string sArgName = GrammerUtils::m_pPrevToken.getText();
 																std::string sFullyQualifiedArgName;
 																sFullyQualifiedArgName.append(getBlockString());
 																sFullyQualifiedArgName.append(sArgName);
 
-																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedArgName.c_str());
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+																if(sPrimitiveType == "int8_t")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+																else if(sPrimitiveType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16;
+																else if(sPrimitiveType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32;
+																
+																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedArgName.c_str());
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sArgName);
 																	
@@ -645,7 +660,9 @@
 
 <assignmentNewVariable>			::=		( <newInt> | <newString> | <newVoidPtr> );
 
-<newInt>						::= 	"int" 
+<newInt>						::= 	<primitiveType>		"<code>"
+																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+															"</code>"
 										TK_IDENTIFIER 		"<code>"
 																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
 																std::string sFullyQualifiedVariableName;
@@ -653,7 +670,12 @@
 																sFullyQualifiedVariableName.append(sVariableName);
 															"</code>"
 										'='					"<code>"
-																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedVariableName.c_str());
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+																if(sPrimitiveType == "int8_t")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+																else if(sPrimitiveType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16;
+																else if(sPrimitiveType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32;
+
+																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
@@ -918,11 +940,11 @@
 																// & add it before the expression statement.
 																// The temporary variable is then inserted in the expression.
 																// Eg:
-																// 		int iRet = 10;
-																//		iRet = 10 + retFunc(); // where retFunc return type is "int".
+																// 		int32_t iRet = 10;
+																//		iRet = 10 + retFunc(); // where retFunc return type is "int32_t".
 																//		This will create a dummy code as follows:
-																//			int iRet = 10;
-																//			int iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
+																//			int32_t iRet = 10;
+																//			int32_t iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
 																//			iRet = 10 + iRet_retFunc;
 																
 																Tree* pExpressionNode = m_pASTCurrentNode;
@@ -940,7 +962,7 @@
 																	sFullyQualifiedTempVariableName.append("_");
 																	sFullyQualifiedTempVariableName.append(sFuncName);
 																	
-																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedTempVariableName.c_str());
+																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT32, sFullyQualifiedTempVariableName.c_str());
 																	{
 																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 																		pBlockNode->addChild(pPrimIntNode);

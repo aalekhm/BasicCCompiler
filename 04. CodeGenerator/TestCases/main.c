@@ -19,12 +19,20 @@ static void* pStaticPtr_0;
 static void* pStaticPtr_1;
 static void* pStaticPtr_2;
 static void* pStaticPtr_3;
-int retNewFunc()
+int32_t retNewFunc()
 {
 	print("In retNewFunc................");
 	putc(10);
 
-	int j = 1;
+	int8_t ch = 'A';
+	print("int8_t = ", ch);
+	putc(10);
+	
+	int16_t iShort = 131071;
+	print("int16_t = ", iShort);
+	putc(10);
+
+	int32_t j = 1;
 	void* pNew = malloc(j * 9);
 	print("pNew Allocated @", pNew);
 	putc(10);
@@ -32,6 +40,8 @@ int retNewFunc()
 	@pNew = 1977;
 	print("Value @ pNew = ", @pNew);
 	putc(10);	
+	
+	pStaticPtr_0++;
 	
 	pStaticPtr_0 = malloc(j * 19);
 	print("pNew Allocated @", @pStaticPtr_0);
@@ -45,7 +55,7 @@ int retNewFunc()
 	print("Assigned @pStaticPtr_0 = @pNew ==> ", @pStaticPtr_0);
 	putc(10);
 	
-	int iCount = @pStaticPtr_3;
+	int32_t iCount = @pStaticPtr_3;
 	iCount++;
 	@pStaticPtr_3 = iCount;
 	print("@pStaticPtr_3 Count ==> ", @pStaticPtr_3);
@@ -57,7 +67,7 @@ int retNewFunc()
 	print("Bitwise: (15 << 4) = ", (15 << 4), ", (240 >> 4) = ", (240 >> 4));
 	putc(10);	
 
-	int mmi = 11;
+	int32_t mmi = 11;
 	switch(mmi)
 	{
 		case 10:
@@ -77,16 +87,16 @@ int retNewFunc()
 		break;
 	}
 	
-	int j = 0;
+	int32_t j = 0;
 	++j;
 	
-	int m = 0;
+	int32_t m = 0;
 	m = ++j + ++j + ++j;
 	
 	print("m = ", m);
 	putc(10);
 	
-	for(int i = 0, j = 1, int iCount = 1; i < 10; ++i, ++iCount)
+	for(int32_t i = 0, j = 1, int32_t iCount = 1; i < 10; ++i, ++iCount)
 	{
 		print("ForLoop i = ", i, " ,val of j = ", j, " ,iCount = ", iCount);
 		putc(10);
@@ -95,12 +105,12 @@ int retNewFunc()
 	free(pNew);
 	free(pStaticPtr_0);
 	
-	int iReturnValue = 1977;
+	int32_t iReturnValue = 1977;
 	
 	return iReturnValue;
 }
 
-int retFunc()
+int32_t retFunc()
 {
 	pStaticPtr_1 = malloc(14);
 	
@@ -112,14 +122,14 @@ int retFunc()
 	return retNewFunc();
 }
 
-void tempFunc(int arg0, int arg1)
+void tempFunc(int32_t arg0, int32_t arg1)
 {
 	pStaticPtr_2 = malloc(19);
 	
 	print("In tempFunc()");
 	putc(10);
 		
-	int iRet = 10;
+	int32_t iRet = 10;
 	iRet = (10 + retFunc()) + 10;
 	print("iRet = ", iRet);
 	putc(10);
@@ -130,16 +140,16 @@ void tempFunc(int arg0, int arg1)
 		putc(10);
 	}
 	
-	int iRet1 = 101 + retFunc();
+	int32_t iRet1 = 101 + retFunc();
 	print("iRet1 = ", iRet1);
 	putc(10);
 	
-	int j = 111;
+	int32_t j = 111;
 	j = j + arg0 + retFunc();
 	print("tempFunc() args = ", j, ", ", arg1);
 	putc(10);
 	
-	int iCount = 1970;
+	int32_t iCount = 1970;
 	while(iCount <= retFunc())
 	{
 		iCount = iCount + 1;
@@ -150,15 +160,15 @@ void tempFunc(int arg0, int arg1)
 	if(j < 10)
 	{
 		j = 10;
-		int k = 2;
+		int32_t k = 2;
 		k = 3;
 	}
 	else
 	{
-		int k = 11;
+		int32_t k = 11;
 		while(j == 11)
 		{
-			int j = 1111;
+			int32_t j = 1111;
 			j = j + 1;
 			
 			arg0 = arg0 - 1;
@@ -183,7 +193,7 @@ void testPrinting()
 
 void simpleCount()
 {
-	int count = 1;
+	int32_t count = 1;
 	while (count < 10) {
 		print("count is: ", count, "\n");
 		putc(10);
@@ -194,7 +204,7 @@ void simpleCount()
 void _100Doors()
 {
 	/* 100 Doors */
-	int i = 1;
+	int32_t i = 1;
 	while (i * i <= 100) {
 		print("door ", i * i, " is open\n");
 		putc(10);
@@ -207,11 +217,11 @@ void negativeTest()
 	print("negativeTest : ");
 	putc(10);
 	
-	int a = (-1 * ((1 * (5 * 15)) / 10));
+	int32_t a = (-1 * ((1 * (5 * 15)) / 10));
 	print(a);
 	putc(10);
 	
-	int b = -a + (3 * 4);
+	int32_t b = -a + (3 * 4);
 	print("b = ", b);
 	putc(10);
 	
@@ -221,7 +231,7 @@ void negativeTest()
 	print("-(1) = ", -(1));
 	putc(10);
 	
-	int i = a;
+	int32_t i = a;
 	print("i = a = ", a);
 	putc(10);
 
@@ -277,12 +287,12 @@ void gcd()
 {
 	/* Compute the gcd of 1071, 1029:  21 */
  
-	int a = 1071;
-	int b = 1029;
+	int32_t a = 1071;
+	int32_t b = 1029;
 	print("gcd of ", a, " & ", b, " = ");
 	
 	while (b != 0) {
-		int new_a = b;
+		int32_t new_a = b;
 		b     = a % b;
 		a     = new_a;
 	}
@@ -295,9 +305,9 @@ void factorial()
 {
 	/* 12 factorial is 479001600 */
  
-	int n = 12;
-	int result = 1;
-	int i = 1;
+	int32_t n = 12;
+	int32_t result = 1;
+	int32_t i = 1;
 	while (i <= n) {
 		result = result * i;
 		i = i + 1;
@@ -311,13 +321,13 @@ void fibonacci()
 {
 	/* fibonacci of 44 is 701408733 */
  
-	int n = 44;
-	int i = 1;
-	int a = 0;
-	int b = 1;
-	int w = 0;
+	int32_t n = 44;
+	int32_t i = 1;
+	int32_t a = 0;
+	int32_t b = 1;
+	int32_t w = 0;
 	while (i < n) {
-		int w = a + b;
+		int32_t w = a + b;
 		a = b;
 		b = w;
 		i = i + 1;
@@ -329,7 +339,7 @@ void fibonacci()
 void fizzBuzz()
 {
 	/* FizzBuzz */
-	int i = 1;
+	int32_t i = 1;
 	while (i <= 100) {
 		if (!(i % 15))
 		{
@@ -367,7 +377,7 @@ void fizzBuzz()
 void _99BottlesOfBeer()
 {
 	/* 99 bottles */
-	int bottles = 99;
+	int32_t bottles = 99;
 	while (bottles > 0) {
 		print(bottles, " bottles of beer on the wall\n");
 		putc(10);
@@ -386,12 +396,12 @@ void primes()
 	/*
 	Simple prime number generator
 	*/
-	int count = 1;
-	int n = 1;
-	int limit = 100;
+	int32_t count = 1;
+	int32_t n = 1;
+	int32_t limit = 100;
 	while (n < limit) {
-		int k=3;
-		int p=1;
+		int32_t k=3;
+		int32_t p=1;
 		n=n+2;
 		while ((k*k<=n) && (p)) {
 			p=n/k*k!=n;
@@ -412,26 +422,26 @@ void AsciiMandlebrot()
 /*
  This is an integer ascii Mandelbrot generator
  */
-    int left_edge   = -420;
-    int right_edge  =  300;
-    int top_edge    =  300;
-    int bottom_edge = -300;
-    int x_step      =    7;
-    int y_step      =   15;
+    int32_t left_edge   = -420;
+    int32_t right_edge  =  300;
+    int32_t top_edge    =  300;
+    int32_t bottom_edge = -300;
+    int32_t x_step      =    7;
+    int32_t y_step      =   15;
  
-    int max_iter    =  200;
+    int32_t max_iter    =  200;
  
-    int y0 = top_edge;
+    int32_t y0 = top_edge;
     while (y0 > bottom_edge) {
-        int x0 = left_edge;
+        int32_t x0 = left_edge;
         while (x0 < right_edge) {
-            int y = 0;
-            int x = 0;
-            int the_char = ' ';
-            int i = 0;
+            int32_t y = 0;
+            int32_t x = 0;
+            int32_t the_char = ' ';
+            int32_t i = 0;
             while (i < max_iter) {
-                int x_x = (x * x) / 200;
-                int y_y = (y * y) / 200;
+                int32_t x_x = (x * x) / 200;
+                int32_t y_y = (y * y) / 200;
                 if (x_x + y_y > 800 ) {
                     the_char = '0' + i;
                     if (i > 9) {
@@ -453,7 +463,7 @@ void AsciiMandlebrot()
 
 void callMe()
 {
-	int ii = 0;
+	int32_t ii = 0;
 	while(ii < 3)
 	{
 		print("printing AsciiMandlebrot Before", ii);
@@ -479,7 +489,7 @@ void main()
 	print("In main()");
 	putc(10);
 		
-	int a = (1 * ((1 * (5 * 15)) / 10));
+	int32_t a = (1 * ((1 * (5 * 15)) / 10));
 		
 	tempFunc(55, 101);
 	testPrinting();

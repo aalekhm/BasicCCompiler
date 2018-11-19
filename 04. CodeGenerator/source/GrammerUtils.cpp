@@ -233,11 +233,10 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			// Arg List
 			for (Tree* pArgNode : pArgListNode->m_vStatements)
 			{
-				if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT)
-					std::cout << "int ";
-				else
-				if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING)
-					std::cout << "string ";
+				if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8)		std::cout << "int8_t ";
+				else if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16)	std::cout << "int16_t ";
+				else if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32)	std::cout << "int32_t ";
+				else if (pArgNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING)	std::cout << "string ";
 
 				std::cout << pArgNode->m_sText << ", ";
 			}
@@ -261,9 +260,16 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			bProcessChildren = false;
 		}
 		break;
-		case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
 		{
-			std::cout << "int " << pNode->m_sText;
+			if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8)		std::cout << "int8_t ";
+			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16)	std::cout << "int16_t ";
+			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32)	std::cout << "int32_t ";
+			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING)	std::cout << "string ";
+
+			std::cout << pNode->m_sText;
 			std::cout << " = ";
 
 			Tree* pExpressionNode = pNode->m_pLeftNode;
@@ -783,7 +789,9 @@ void GrammerUtils::populateCode(Tree* pNode)
 				handleExpression(pNode);
 			}
 			break;
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
 			{
 				handlePrimitiveInt(pNode);
 			}
@@ -1276,7 +1284,10 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 
 			/////////////////////////////////////////////////
 			// 2. Push integer 1.
-			EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? 1 : -1);
+			{
+				int8_t iIncrementValue = 1;
+				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? iIncrementValue : -iIncrementValue);
+			}
 
 			/////////////////////////////////////////////////
 			// 3. Add the 2 operands
@@ -1330,6 +1341,23 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 		}
 		else
 			populateCode(pExpressionNode);
+
+		// Cast the expresseion with relevant cast
+		switch (pNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:	// & 0xFF
+				EMIT_1(OPCODE::PUSHI, 0xFF);
+				EMIT_1(OPCODE::BITWISEAND, 0);
+			break;
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:	// & 0xFFFF
+				EMIT_1(OPCODE::PUSHI, 0xFFFF);
+				EMIT_1(OPCODE::BITWISEAND, 0);
+			break;
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:	// & 0xFFFFFFFF
+				EMIT_1(OPCODE::PUSHI, 0xFFFFFFFF);
+				EMIT_1(OPCODE::BITWISEAND, 0);
+			break;
+		}
 
 		EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 	}

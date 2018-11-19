@@ -12,9 +12,11 @@ class TinyCReader {
 		void addKeywords() {
 			GrammerUtils::m_vKeywords.push_back("static");
 			GrammerUtils::m_vKeywords.push_back("void");
-			GrammerUtils::m_vKeywords.push_back("int");
+			GrammerUtils::m_vKeywords.push_back("int32_t");
 			GrammerUtils::m_vKeywords.push_back("void");
-			GrammerUtils::m_vKeywords.push_back("int");
+			GrammerUtils::m_vKeywords.push_back("int8_t");
+			GrammerUtils::m_vKeywords.push_back("int16_t");
+			GrammerUtils::m_vKeywords.push_back("int32_t");
 			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
@@ -28,7 +30,6 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("for");
 			GrammerUtils::m_vKeywords.push_back("print");
 			GrammerUtils::m_vKeywords.push_back("putc");
-			GrammerUtils::m_vKeywords.push_back("int");
 			GrammerUtils::m_vKeywords.push_back("string");
 			GrammerUtils::m_vKeywords.push_back("void");
 			GrammerUtils::m_vKeywords.push_back("malloc");
@@ -51,6 +52,7 @@ class TinyCReader {
 		bool returnType();
 		bool functionArgumentDefList();
 		bool functionArgumentDefListMore();
+		bool primitiveType();
 		bool primitiveTypeInt();
 		bool primitiveTypeString();
 		bool stmt_list();

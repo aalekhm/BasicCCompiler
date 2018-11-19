@@ -423,7 +423,10 @@ enum class ASTNodeType
 	ASTNode_FUNCTIONARGLIST,
 	ASTNode_FUNCTIONSTART,
 	ASTNode_FUNCTIONEND,
-	ASTNode_PRIMITIVETYPEINT,
+	ASTNode_PRIMITIVETYPEINT8,
+	ASTNode_PRIMITIVETYPEINT16,
+	ASTNode_PRIMITIVETYPEINT32,
+	ASTNode_PRIMITIVETYPEINT64,
 	ASTNode_PRIMITIVETYPESTRING,
 	ASTNode_PRIMITIVETYPEVOIDPTR,
 	ASTNode_FUNCTIONCALL,
@@ -453,6 +456,7 @@ typedef struct Tree
 		, m_eASTNodeType(ASTNodeType::ASTNode_INVALID)
 		, m_sText("")
 		, m_sAdditionalInfo("")
+		, m_bIsPointerType(false)
 	{}
 
 	void addChild(Tree* pNode)
@@ -506,6 +510,8 @@ typedef struct Tree
 	std::string			m_sText;
 	std::string			m_sAdditionalInfo;
 
+	bool				m_bIsPointerType;
+
 	Tree*				m_pParentNode;
 	Tree*				m_pLeftNode;
 	Tree*				m_pRightNode;
@@ -538,7 +544,9 @@ typedef struct FunctionInfo
 		{
 			switch(pChild->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
 				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
 				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
 				{
@@ -568,7 +576,9 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
 				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
 				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
 				{
@@ -635,6 +645,55 @@ typedef struct FunctionInfo
 
 		return iPosition;
 	}
+
+	ASTNodeType getVariableNodeType(const char* sLocalVariableName)
+	{
+		ASTNodeType eASTNodeType = ASTNodeType::ASTNode_INVALID;
+
+		// Check for 'Locals'
+		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
+		{
+			if (pLocalVar->m_sText == sLocalVariableName)
+			{
+				eASTNodeType = pLocalVar->m_eASTNodeType;
+				break;
+			}
+		}
+
+		// Check for 'Arguments'
+		if (eASTNodeType == ASTNodeType::ASTNode_INVALID)
+		{
+			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
+			{
+				if (pLocalVar->m_sText == sLocalVariableName)
+				{
+					eASTNodeType = pLocalVar->m_eASTNodeType;
+					break;
+				}
+			}
+		}
+
+		// Check for 'Static'
+		if (eASTNodeType == ASTNodeType::ASTNode_INVALID)
+		{
+			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
+			{
+				if (pStaticVar->m_sText == sLocalVariableName)
+				{
+					eASTNodeType = pStaticVar->m_eASTNodeType;
+					break;
+				}
+			}
+		}
+
+		assert(eASTNodeType != ASTNodeType::ASTNode_INVALID);
+		return eASTNodeType;
+	}
+
+	//bool IsNodeTypeAPointerType(ASTNodeType eASTNodeType)
+	//{
+	//	if(eASTNodeType == )
+	//}
 
 	int getLocalVariableCount()
 	{

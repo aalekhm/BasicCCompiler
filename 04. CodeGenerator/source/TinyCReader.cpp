@@ -257,7 +257,11 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	for (Tree* pChild : pNode->m_vStatements)
 	{
-		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT
+		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8
+			||
+			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16
+			||
+			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32
 			||
 			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING
 			||
@@ -428,7 +432,7 @@ bool TinyCReader::functionDef() {
 }
 
 bool TinyCReader::returnType() {
-	if (GrammerUtils::match("int", OPTIONAL)) {
+	if (GrammerUtils::match("int32_t", OPTIONAL)) {
 		return true;
 	}
 	else
@@ -485,9 +489,31 @@ bool TinyCReader::functionArgumentDefListMore() {
 
 }
 
+bool TinyCReader::primitiveType() {
+	if (GrammerUtils::match("int8_t", OPTIONAL)) {
+		return true;
+	}
+	else
+		if (GrammerUtils::match("int16_t", OPTIONAL)) {
+			return true;
+		}
+		else
+			if (GrammerUtils::match("int32_t", OPTIONAL)) {
+				return true;
+			}
+			else
+				return false;
+
+	return true;
+
+}
+
 bool TinyCReader::primitiveTypeInt() {
-	if (!GrammerUtils::match("int", MANDATORY))
+	if (!primitiveType())
 		return false;
+
+	std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+
 	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 		return false;
 
@@ -496,7 +522,12 @@ bool TinyCReader::primitiveTypeInt() {
 	sFullyQualifiedArgName.append(getBlockString());
 	sFullyQualifiedArgName.append(sArgName);
 
-	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedArgName.c_str());
+	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+	if (sPrimitiveType == "int8_t")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+	else if (sPrimitiveType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16;
+	else if (sPrimitiveType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32;
+
+	Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedArgName.c_str());
 	{
 		pPrimIntNode->m_sAdditionalInfo.append(sArgName);
 
@@ -1571,8 +1602,11 @@ bool TinyCReader::assignmentNewVariable() {
 }
 
 bool TinyCReader::newInt() {
-	if (!GrammerUtils::match("int", MANDATORY))
+	if (!primitiveType())
 		return false;
+
+	std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+
 	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 		return false;
 
@@ -1584,7 +1618,12 @@ bool TinyCReader::newInt() {
 	if (!GrammerUtils::match('=', MANDATORY))
 		return false;
 
-	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedVariableName.c_str());
+	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+	if (sPrimitiveType == "int8_t")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8;
+	else if (sPrimitiveType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16;
+	else if (sPrimitiveType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32;
+
+	Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 	Tree* pTemp = nullptr;
 	{
 		pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
@@ -2160,11 +2199,11 @@ bool TinyCReader::operands() {
 		// & add it before the expression statement.
 		// The temporary variable is then inserted in the expression.
 		// Eg:
-		// 		int iRet = 10;
-		//		iRet = 10 + retFunc(); // where retFunc return type is "int".
+		// 		int32_t iRet = 10;
+		//		iRet = 10 + retFunc(); // where retFunc return type is "int32_t".
 		//		This will create a dummy code as follows:
-		//			int iRet = 10;
-		//			int iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
+		//			int32_t iRet = 10;
+		//			int32_t iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
 		//			iRet = 10 + iRet_retFunc;
 
 		Tree* pExpressionNode = m_pASTCurrentNode;
@@ -2182,7 +2221,7 @@ bool TinyCReader::operands() {
 			sFullyQualifiedTempVariableName.append("_");
 			sFullyQualifiedTempVariableName.append(sFuncName);
 
-			Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT, sFullyQualifiedTempVariableName.c_str());
+			Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEINT32, sFullyQualifiedTempVariableName.c_str());
 			{
 				pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 				pBlockNode->addChild(pPrimIntNode);
