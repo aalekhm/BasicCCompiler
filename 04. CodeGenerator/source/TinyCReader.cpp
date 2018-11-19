@@ -1898,23 +1898,8 @@ bool TinyCReader::assignmentDerefArray() {
 
 }
 
-bool TinyCReader::lValue() {
-	if (GrammerUtils::match(TokenType::Type::TK_DEREF, OPTIONAL)) {
-		return true;
-	}
-	else
-		if (GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
-			return true;
-		}
-		else
-			return false;
-
-	return true;
-
-}
-
 bool TinyCReader::assignmentRHS() {
-	if (!lValue())
+	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 		return false;
 
 	TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
@@ -1927,7 +1912,7 @@ bool TinyCReader::assignmentRHS() {
 		pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
 	}
 
-	Tree* pIdentifierLeaf = makeLeaf((eTokenType == TokenType::Type::TK_IDENTIFIER) ? ASTNodeType::ASTNode_IDENTIFIER : ASTNodeType::ASTNode_DEREF, sFullyQualifiedVariableName.c_str());
+	Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
 	{
 		pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
 		pAssignmentNode->m_pRightNode = pIdentifierLeaf;
@@ -2505,23 +2490,11 @@ bool TinyCReader::preFixInExpr() {
 			return true;
 		}
 		else
-			if (GrammerUtils::match(TokenType::Type::TK_DEREF, OPTIONAL)) {
-
-				std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
-				std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
-
-				m_vPostFix.push_back("0");	// Push a fake ArrayIndex of '0'.
-				m_vPostFix.push_back(sFullyQualifiedVariableName);
-				m_vPostFix.push_back("@");
-
+			if (rValueDeref()) {
 				return true;
 			}
 			else
-				if (rValueDeref()) {
-					return true;
-				}
-				else
-					return false;
+				return false;
 
 	return true;
 

@@ -97,7 +97,6 @@ class TinyCReader {
 		bool ptrAssign();
 		bool malloc();
 		bool assignmentDerefArray();
-		bool lValue();
 		bool assignmentRHS();
 		bool freePtrStatement();
 		bool expr();

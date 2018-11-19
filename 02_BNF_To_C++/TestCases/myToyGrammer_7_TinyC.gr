@@ -868,12 +868,7 @@
 													"</code>"
 										;
 
-<lValue>						::=		(	TK_DEREF
-											|
-											TK_IDENTIFIER
-										);
-										
-<assignmentRHS>					::=  	<lValue>		"<code>"
+<assignmentRHS>					::=  	TK_IDENTIFIER	"<code>"
 															TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
 															std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
@@ -884,7 +879,7 @@
 																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
 															}
 															
-															Tree* pIdentifierLeaf = makeLeaf((eTokenType == TokenType::Type::TK_IDENTIFIER)?ASTNodeType::ASTNode_IDENTIFIER : ASTNodeType::ASTNode_DEREF, sFullyQualifiedVariableName.c_str());
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
 															{
 																pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
 																pAssignmentNode->m_pRightNode = pIdentifierLeaf;
@@ -1149,15 +1144,6 @@
 																	m_pASTCurrentNode->m_pLeftNode->addChild(pPreIncrNode);
 																	m_vPostFix.push_back(sFullyQualifiedVariableName);
 																}
-															"</code>"
-											|
-											TK_DEREF		"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
-																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
-																
-																m_vPostFix.push_back("0");	// Push a fake ArrayIndex of '0'.
-																m_vPostFix.push_back(sFullyQualifiedVariableName);
-																m_vPostFix.push_back("@");
 															"</code>"
 											|
 											<rValueDeref>

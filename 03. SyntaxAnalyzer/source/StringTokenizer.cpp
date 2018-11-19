@@ -357,6 +357,12 @@ Token StringTokenizer::readIdentifier()
 			return tok;
 		}
 		else
+		if (ch == '[')
+		{
+			Token tok = createToken(TokenType::Type::TK_DEREFARRAY);
+			return tok;
+		}
+		else
 		if (ch == '-' && peek(1) == '-')
 		{
 			Token tok = createToken(TokenType::Type::TK_POSTFIXDECR);
@@ -406,12 +412,6 @@ Token StringTokenizer::readPointerDeref()
 		char ch = peek(0);
 		if (isalpha(ch) || ch == '_' || isdigit(ch))
 			consume(1);
-		else
-		if (ch == '[')
-		{
-			Token tok = createToken(TokenType::Type::TK_DEREFARRAY);
-			return tok;
-		}
 		else
 			break;
 	}
