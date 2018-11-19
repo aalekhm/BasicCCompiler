@@ -9,7 +9,7 @@
 #define OPTIONAL	0
 #define MANDATORY	1
 
-#define MAX_BYTECODE_SIZE	1024
+#define MAX_BYTECODE_SIZE	2048
 
 class GrammerUtils
 {

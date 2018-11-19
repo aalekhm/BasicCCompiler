@@ -293,6 +293,9 @@ void callMe()
 		ii = ii + 1;
 		print("printing AsciiMandlebrot After", ii);
 		putc(10);
+		
+		tempFunc(555, 1977);
+		putc(10);
 	}
 }
 

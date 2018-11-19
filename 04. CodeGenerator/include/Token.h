@@ -226,6 +226,10 @@ enum class OPCODE
 	CALL,
 	RET,
 	SUB_REG,
+	PUSHI,
+	PUSHR,
+	POPI,
+	POPR,
 	HLT,
 };
 
@@ -463,12 +467,12 @@ typedef struct FunctionInfo
 			iPosition = 0;
 			for (Tree* pLocalVar : m_vArguments)
 			{
-				iPosition--;
 				bFound = pLocalVar->m_sText == sLocalVariableName;
 				if (bFound)
 				{
 					break;
 				}
+				iPosition--;
 			}
 		}
 
@@ -480,6 +484,11 @@ typedef struct FunctionInfo
 	int getLocalVariableCount()
 	{
 		return m_vLocalVariables.size();
+	}
+
+	int getArgumentsCount()
+	{
+		return m_vArguments.size();
 	}
 
 	Tree*					m_pNode;
