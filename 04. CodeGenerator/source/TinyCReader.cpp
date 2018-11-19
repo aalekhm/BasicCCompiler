@@ -80,20 +80,26 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 	if (sOperator == "/")
 		eOperator = ENUM_OP_PRECEDENCE::OP_DIV;
 	else
-	if (sOperator == "")
-		eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
-	else
 	if (sOperator == "(")
 		eOperator = ENUM_OP_PRECEDENCE::OP_LPAREN;
 	else
 	if (sOperator == ")")
 		eOperator = ENUM_OP_PRECEDENCE::OP_RPAREN;
 	else
+	if (sOperator == "%")
+		eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
+	else
 	if (sOperator == "!")
 		eOperator = ENUM_OP_PRECEDENCE::OP_NOT;
 	else
-	if (sOperator == "%")
-		eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
+	if (sOperator == "NEGATE")
+		eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
+	else
+	if (sOperator == "PREDECR")
+		eOperator = ENUM_OP_PRECEDENCE::OP_PREDECR;
+	else
+	if (sOperator == "PREINCR")
+		eOperator = ENUM_OP_PRECEDENCE::OP_PREINCR;
 
 	return eOperator;
 }
@@ -103,18 +109,45 @@ void TinyCReader::checkOpPrecedenceAndPush(std::string sCurrentOperator)
 	if(m_vOperatorStack.empty()) m_vOperatorStack.push(sCurrentOperator);
 	else
 	{
-		int eCurrOp = (int)opFromString(sCurrentOperator);
-		
-		std::string sTopOfStack = m_vOperatorStack.top();
-		int eTopOfStack = (int)opFromString(sTopOfStack);
-		
-		if(eCurrOp > eTopOfStack)
-			m_vOperatorStack.push(sCurrentOperator);
+		if (sCurrentOperator == ")")
+		{
+			while (NOT m_vOperatorStack.empty())
+			{
+				std::string sOp = m_vOperatorStack.top();
+				popOperator();
+
+				if (sOp != "(")
+				{	
+					m_vPostFix.push_back(sOp);
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
 		else
 		{
-			popOperator();
-			m_vPostFix.push_back(sTopOfStack);
-			m_vOperatorStack.push(sCurrentOperator);
+			if (sCurrentOperator == "(")
+			{
+				m_vOperatorStack.push(sCurrentOperator);
+			}
+			else
+			{
+				int eCurrOp = (int)opFromString(sCurrentOperator);
+
+				std::string sTopOfStack = m_vOperatorStack.top();
+				int eTopOfStack = (int)opFromString(sTopOfStack);
+
+				if (eCurrOp > eTopOfStack)
+					m_vOperatorStack.push(sCurrentOperator);
+				else
+				{
+					popOperator();
+					m_vPostFix.push_back(sTopOfStack);
+					m_vOperatorStack.push(sCurrentOperator);
+				}
+			}
 		}
 	}
 }
@@ -1127,22 +1160,6 @@ return true;
 
 }
 
-bool TinyCReader::paren_expr() {
-if(!unary_oper()) {
-}
-else {
-}
-
-if(!GrammerUtils::match('(', MANDATORY))
-return false;
-if(!expr())
-return false;
-if(!GrammerUtils::match(')', MANDATORY))
-return false;
-return true;
-
-}
-
 bool TinyCReader::expr() {
 if(!and_expr())
 return false;
@@ -1400,6 +1417,10 @@ if(operands()) {
 return true;
 }
 else
+if(unary_expr()) {
+return true;
+}
+else
 if(paren_expr()) {
 return true;
 }
@@ -1461,18 +1482,7 @@ if(functionCall()) {
 return true;
 }
 else
-if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
-
-																sOperand = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
-																assert(!sFullyQualifiedVariableName.empty());
-																if(!sFullyQualifiedVariableName.empty())
-																{
-																	sOperand = sFullyQualifiedVariableName;
-																}
-																
-																m_vPostFix.push_back(sOperand);
-															
+if(tk_identifier()) {
 return true;
 }
 else
@@ -1501,12 +1511,48 @@ return true;
 
 }
 
-bool TinyCReader::unary_oper() {
-if(GrammerUtils::match('+', OPTIONAL)) {
-return true;
+bool TinyCReader::tk_identifier() {
+if(!preFixOper()) {
 }
-else
+else {
+}
+
+if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+return false;
+
+																std::string sOperand = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
+																assert(!sFullyQualifiedVariableName.empty());
+																if(!sFullyQualifiedVariableName.empty())
+																{
+																	sOperand = sFullyQualifiedVariableName;
+																}
+																
+																m_vPostFix.push_back(sOperand);
+															
+if(!postFixOper()) {
+}
+else {
+}
+
+return true;
+
+}
+
+bool TinyCReader::unary_expr() {
+if(!unary_oper())
+return false;
+if(!expr())
+return false;
+return true;
+
+}
+
+bool TinyCReader::unary_oper() {
 if(GrammerUtils::match('-', OPTIONAL)) {
+ 
+																checkOpPrecedenceAndPush("NEGATE");
+															
 return true;
 }
 else
@@ -1519,6 +1565,65 @@ return true;
 else
 return false;
 
+return true;
+
+}
+
+bool TinyCReader::preFixOper() {
+if(GrammerUtils::match("--", OPTIONAL)) {
+ 
+															checkOpPrecedenceAndPush("PREDECR");
+														
+return true;
+}
+else
+if(GrammerUtils::match("++", OPTIONAL)) {
+ 
+															checkOpPrecedenceAndPush("PREINCR");
+														
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::postFixOper() {
+if(GrammerUtils::match("--", OPTIONAL)) {
+ 
+															checkOpPrecedenceAndPush("POSTDECR");
+														
+return true;
+}
+else
+if(GrammerUtils::match("++", OPTIONAL)) {
+ 
+															checkOpPrecedenceAndPush("POSTINCR");
+														
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::paren_expr() {
+if(!GrammerUtils::match('(', MANDATORY))
+return false;
+
+															checkOpPrecedenceAndPush("(");
+														
+if(!expr())
+return false;
+if(!GrammerUtils::match(')', MANDATORY))
+return false;
+
+															checkOpPrecedenceAndPush(")");
+														
 return true;
 
 }

@@ -22,6 +22,7 @@ class StringTokenizer
 		void						tokenize();
 		bool						hasMoreTokens();
 		Token						nextToken();
+		Token						prevToken();
 protected:
 	private:
 									StringTokenizer() = delete;

@@ -489,9 +489,7 @@
 															m_pASTCurrentNode->addChild(pAssignmentNode);
 														"</code>"
 										;
-																				
-<paren_expr>					::=   	[<unary_oper>] '(' <expr> ')' ;
-										
+																														
 <expr>                			::=		<and_expr> { <logicalor_expr> } ;
 										
 <logicalor_expr>				::=		"||" 		"<code>" 
@@ -562,7 +560,13 @@
 										) ;
 
 <primary>             			::=   	<defaults> ;
-<defaults>						::= 	( <operands> | <paren_expr> ) ; // <unary_oper>
+<defaults>						::= 	( 	<operands> 
+											| 
+											<unary_expr>
+											|
+											<paren_expr> 
+										) ;
+										
 <operands>						::=		"<code>"
 											std::string sOperand;
 										"</code>"
@@ -611,17 +615,7 @@
 																}
 															"</code>"
 											|
-											TK_IDENTIFIER 	"<code>"
-																sOperand = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
-																assert(!sFullyQualifiedVariableName.empty());
-																if(!sFullyQualifiedVariableName.empty())
-																{
-																	sOperand = sFullyQualifiedVariableName;
-																}
-																
-																m_vPostFix.push_back(sOperand);
-															"</code>"
+											<tk_identifier>
 											| 
 											TK_INTEGER		"<code>"
 																sOperand = GrammerUtils::m_pPrevToken.getText();
@@ -636,12 +630,56 @@
 																m_vPostFix.push_back(pStr);
 															"</code>"
 										) ;
-<unary_oper>					::=		(	'+' 
-											| 
-											'-' 
+										
+<tk_identifier>					::=		[ <preFixOper> ]
+										TK_IDENTIFIER		"<code>"
+																std::string sOperand = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
+																assert(!sFullyQualifiedVariableName.empty());
+																if(!sFullyQualifiedVariableName.empty())
+																{
+																	sOperand = sFullyQualifiedVariableName;
+																}
+																
+																m_vPostFix.push_back(sOperand);
+															"</code>"
+										[ <postFixOper> ]
+										;
+										
+<unary_expr>					::=		<unary_oper> <expr>;
+<unary_oper>					::=		(	'-'				"<code>" 
+																checkOpPrecedenceAndPush("NEGATE");
+															"</code>"
 											| 
 											'!'				"<code>" 
 																checkOpPrecedenceAndPush("!");
 															"</code>"
 										);
+
+<preFixOper>				::=		(	"--"			"<code>" 
+															checkOpPrecedenceAndPush("PREDECR");
+														"</code>"
+										|
+										"++"			"<code>" 
+															checkOpPrecedenceAndPush("PREINCR");
+														"</code>"
+									);
+
+<postFixOper>				::=		(	"--"			"<code>" 
+															checkOpPrecedenceAndPush("POSTDECR");
+														"</code>"
+										|
+										"++"			"<code>" 
+															checkOpPrecedenceAndPush("POSTINCR");
+														"</code>"
+									);
+
+<paren_expr>					::=   	'(' 			"<code>"
+															checkOpPrecedenceAndPush("(");
+														"</code>"
+										<expr> 
+										')'				"<code>"
+															checkOpPrecedenceAndPush(")");
+														"</code>"
+										;
 

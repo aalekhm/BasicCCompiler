@@ -53,6 +53,11 @@ CodeMap opCodeMap[] =
 	{ "PUSHR",		OPCODE::PUSHR,		2 },
 	{ "POPI",		OPCODE::POPI,		2 },
 	{ "POPR",		OPCODE::POPR,		2 },
+	{ "NEGATE",		OPCODE::NEGATE,		1 },
+	{ "PREDECR",	OPCODE::PREDECR,	1 },
+	{ "PREINCR",	OPCODE::PREINCR,	1 },
+	{ "POSTDECR",	OPCODE::POSTDECR,	1 },
+	{ "POSTINCR",	OPCODE::POSTINCR,	1 },
 
 	{ "HLT",		OPCODE::HLT,		1 },
 };
@@ -735,12 +740,14 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 				st->tokenize();
 				while (st->hasMoreTokens())
 				{
+					Token prevTok = st->prevToken();
 					Token tok = st->nextToken();
-					TokenType::Type eTokenType = tok.getType();
-					if (eTokenType == TokenType::Type::TK_WHITESPACE || eTokenType == TokenType::Type::TK_EOI || eTokenType == TokenType::Type::TK_COMMA)
+
+					TokenType::Type eCurrTokenType = tok.getType();
+					if (eCurrTokenType == TokenType::Type::TK_WHITESPACE || eCurrTokenType == TokenType::Type::TK_EOI || eCurrTokenType == TokenType::Type::TK_COMMA)
 						continue;
 
-					switch (tok.getType())
+					switch (eCurrTokenType)
 					{
 						case TokenType::Type::TK_CHARACTER:
 						{
@@ -877,6 +884,90 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 #if (VERBOSE == 1)
 							std::cout << (iOffset - 1) << ". " << "NOT" << std::endl;
 #endif
+						break;
+						case TokenType::Type::TK_NEGATE:
+							EMIT(OPCODE::NEGATE);
+#if (VERBOSE == 1)
+							std::cout << (iOffset - 1) << ". " << "NEGATE" << std::endl;
+#endif
+						break;
+						case TokenType::Type::TK_PREDECR:
+						case TokenType::Type::TK_POSTDECR:
+						{
+							assert(prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER);
+							if (prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER)
+							{
+								//////////////////////////////////////////////////////
+								// Fetch variable value & store it onto the stack
+								EMIT(OPCODE::FETCH);
+#if (VERBOSE == 1)
+								std::cout << (iOffset - 1) << ". " << "FETCH ";
+#endif
+								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
+#endif
+								//////////////////////////////////////////////////////
+
+								//////////////////////////////////////////////////////
+								// Decrement the variable value, stored onto the stack
+								EMIT((eCurrTokenType == TokenType::Type::TK_PREDECR) ? (int)OPCODE::PREDECR : (int)OPCODE::POSTDECR);
+#if (VERBOSE == 1)
+								std::cout << (iOffset - 1) << ". " << ((eCurrTokenType == TokenType::Type::TK_PREDECR) ? "PREDECR" : "POSTDECR") << std::endl;
+#endif
+								//////////////////////////////////////////////////////
+
+								//////////////////////////////////////////////////////
+								// Store the decremented value from the stack back to the variable
+								EMIT(OPCODE::STORE);
+#if (VERBOSE == 1)
+								std::cout << (iOffset - 1) << ". " << "STORE ";
+#endif
+								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
+#endif
+							}
+						}
+						break;
+						case TokenType::Type::TK_PREINCR:
+						case TokenType::Type::TK_POSTINCR:
+						{
+							assert(prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER);
+							if (prevTok.m_eTokenType == TokenType::Type::TK_IDENTIFIER)
+							{
+								//////////////////////////////////////////////////////
+								// Fetch variable value & store it onto the stack
+								EMIT(OPCODE::FETCH);
+#if (VERBOSE == 1)
+								std::cout << (iOffset - 1) << ". " << "FETCH ";
+#endif
+								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
+#endif
+								//////////////////////////////////////////////////////
+
+								//////////////////////////////////////////////////////
+								// Decrement the variable value, stored onto the stack
+								EMIT((eCurrTokenType == TokenType::Type::TK_PREINCR) ? (int)OPCODE::PREINCR : (int)OPCODE::POSTINCR);
+#if (VERBOSE == 1)
+								std::cout << (iOffset - 1) << ". " << ((eCurrTokenType == TokenType::Type::TK_PREINCR) ? "PREINCR" : "POSTINCR") << std::endl;
+#endif
+								//////////////////////////////////////////////////////
+
+								//////////////////////////////////////////////////////
+								// Store the decremented value from the stack back to the variable
+								EMIT(OPCODE::STORE);
+#if (VERBOSE == 1)
+								std::cout << (iOffset - 1) << ". " << "STORE ";
+#endif
+								emit(m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()), pByteCode, iOffset++);
+#if (VERBOSE == 1)
+								std::cout << m_pCurrentFunction->getLocalVariablePosition(prevTok.getText()) << std::endl;
+#endif
+							}
+						}
 						break;
 					}
 				}

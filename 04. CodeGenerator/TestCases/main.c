@@ -35,7 +35,7 @@ void tempFunc(int arg0, int arg1)
 {
 	print("In tempFunc()");
 	putc(10);
-	
+		
 	int iRet = 10;
 	iRet = (10 + retFunc()) + 10;
 	print("iRet = ", iRet);
@@ -117,33 +117,77 @@ void _100Doors()
 	}
 }
 
-//void negativeTest()
-//{
-//	int a = (-1 * ((-1 * (5 * 15)) / 10));
-//	print(a, "\n");
-//	int b = -a;
-//	print(b, "\n");
-//	print(-b, "\n");
-//	print(-(1), "\n");
-//}
+void negativeTest()
+{
+	print("negativeTest : ");
+	putc(10);
+	
+	int a = (-1 * ((1 * (5 * 15)) / 10));
+	print(a);
+	putc(10);
+	
+	int b = -a + (3 * 4);
+	print("b = ", b);
+	putc(10);
+	
+	print("-b = ", -b);
+	putc(10);
+	
+	print("-(1) = ", -(1));
+	putc(10);
+	
+	
+	int i = a;
+	print("i = a = ", a);
+	putc(10);
 
-//void deep()
-//{
+	i = ++a;
+	print("i = ++a = ", a);
+	putc(10);
+	
+	i = --a;
+	print("i = --a = ", a);
+	putc(10);
+	
+	i = a++;
+	print("i = a++ = ", a);
+	putc(10);
+
+	i = a--;
+	print("i = a-- = ", a);
+	putc(10);
+}
+
+void deep()
+{
+	print("In deep");
+	putc(10);
+	
 //	print(---------------------------------+++5, "\n");
-//	print(((((((((3 + 2) * ((((((2))))))))))))), "\n");
-// 
-//	if (1) { 
-//		if (1) { 
-//			if (1) { 
-//				if (1) { 
-//					if (1) { 
-//						print(15, "\n"); 
-//					} 
-//				} 
-//			} 
-//		} 
-//	}
-//}
+	print("Deep enough = ", ((((((((3 + 2) * ((((((2))))))))))))));
+	putc(10);
+ 
+	if (1) 
+	{ 
+		if (1) 
+		{ 
+			if (1) 
+			{ 
+				if (1) 
+				{ 
+					if (1) 
+					{ 
+						print(15); 
+						putc(10);
+					} 
+				} 
+			} 
+		} 
+	}
+	
+	print("End deep");
+	putc(10);
+}
 
 void gcd()
 {
@@ -348,10 +392,14 @@ void main()
 	print("In main()");
 	putc(10);
 		
+	int a = (1 * ((1 * (5 * 15)) / 10));
+		
 	tempFunc(55, 101);
 	testPrinting();
 	simpleCount();
 	_100Doors();
+	negativeTest();
+	deep();
 	gcd();
 	factorial();
 	fibonacci();

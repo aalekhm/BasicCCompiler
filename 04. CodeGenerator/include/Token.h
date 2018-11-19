@@ -58,6 +58,10 @@ namespace TokenType
 		TK_BNFASSIGNMENT,
 		TK_BNFCODE,
 		TK_FUNCTIONCALL,
+		TK_PREDECR,
+		TK_PREINCR,
+		TK_POSTDECR,
+		TK_POSTINCR,
 		TK_UNKNOWN
 	};
 
@@ -117,6 +121,11 @@ namespace TokenType
 			case Type::TK_BNFASSIGNMENT:		return "TK_BNFASSIGNMENT";
 			case Type::TK_BNFCODE:				return "TK_BNFCODE";
 			case Type::TK_FUNCTIONCALL:			return "TK_FUNCTIONCALL";
+			case Type::TK_PREDECR:				return "TK_PREDECR";
+			case Type::TK_PREINCR:				return "TK_PREINCR";
+			case Type::TK_POSTDECR:				return "TK_POSTDECR";
+			case Type::TK_POSTINCR:				return "TK_POSTINCR";
+
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
 
@@ -233,6 +242,11 @@ enum class OPCODE
 	PUSHR,
 	POPI,
 	POPR,
+	NEGATE,
+	PREDECR,
+	PREINCR,
+	POSTDECR,
+	POSTINCR,
 	HLT,
 };
 
@@ -277,7 +291,7 @@ enum class ENUM_OP_PRECEDENCE
 {
 	OP_INVALID = 0,
 
-	OP_NOT,
+	OP_LPAREN,
 
 	OP_LOGICALOR,
 
@@ -297,9 +311,16 @@ enum class ENUM_OP_PRECEDENCE
 	OP_MUL,
 	OP_DIV = OP_MUL,
 	OP_MOD = OP_MUL,
+	
+	OP_NOT,
+	OP_PLUS = OP_NOT,
+	OP_NEGATE = OP_NOT,
+	OP_PREDECR = OP_NOT,
+	OP_PREINCR = OP_NOT,
+	OP_POSTDECR = OP_NOT,
+	OP_POSTINCR = OP_NOT,
 
-	OP_LPAREN,
-	OP_RPAREN = OP_LPAREN,
+	OP_RPAREN,
 };
 
 enum class ASTNodeType

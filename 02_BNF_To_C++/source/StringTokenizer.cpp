@@ -48,6 +48,24 @@ Token StringTokenizer::nextToken()
 	return tok;
 }
 
+Token StringTokenizer::prevToken()
+{
+	Token tok(TokenType::Type::TK_INVALID, "", -1, -1);
+	if (m_TokensIterator != m_vTokens.begin())
+	{
+		int iCount = 1;
+		tok = *(m_TokensIterator - iCount++);
+		TokenType::Type eTokenType = tok.m_eTokenType;
+		while (eTokenType == TokenType::Type::TK_WHITESPACE || eTokenType == TokenType::Type::TK_EOI || eTokenType == TokenType::Type::TK_COMMA)
+		{
+			tok = *(m_TokensIterator - iCount++);
+			eTokenType = tok.m_eTokenType;
+		}
+	}
+
+	return tok;
+}
+
 void StringTokenizer::ignoreBNFNonTerminals(bool bIgnore)
 {
 	m_bIgnoreBNFNonTerminals = bIgnore;
@@ -242,13 +260,27 @@ Token StringTokenizer::readDefault(char ch0)
 
 	if(ch0 == END_OF_INPUT)																		
 																			{ return createToken(TokenType::Type::TK_EOI); }
-	else if(ch0 == 'w' && ch1 == 'h' && peek(2) == 'i' && peek(3) == 'l' && peek(4) == 'e' && peek(5) == '(')		
+	else if(ch0 == 'w' && ch1 == 'h' && peek(2) == 'i' && peek(3) == 'l' && peek(4) == 'e' && peek(5) == '(')
 																			{ initRead(); consume(5); return createToken(TokenType::Type::TK_WHILE); }
 	else if(ch0 == 'f' && ch1 == 'o' && peek(2) == 'r' && peek(3) == '(')	{ initRead(); consume(3); return createToken(TokenType::Type::TK_FOR); }
 	else if(ch0 == 'i' && ch1 == 'f' && peek(2) == '(')						{ initRead(); consume(2); return createToken(TokenType::Type::TK_IF); }
 	else if(ch0 == 'e' && ch1 == 'l' && peek(2) == 's' && peek(3) == 'e')	{ initRead(); consume(4); return createToken(TokenType::Type::TK_ELSE); }
 	else if(ch0 == WHITESPACE_SPACE || ch0 == WHITESPACE_TAB)				{ initRead(); consume(1); return createToken(TokenType::Type::TK_WHITESPACE); }
+	else if(ch0 == 'N' && ch1 == 'E' && peek(2) == 'G' && peek(3) == 'A' && peek(4) == 'T' && peek(5) == 'E')
+																			{ initRead(); consume(6); return createToken(TokenType::Type::TK_NEGATE); }
 
+	else if(ch0 == 'P' && ch1 == 'R' && peek(2) == 'E' && peek(3) == 'D' && peek(4) == 'E' && peek(5) == 'C' && peek(6) == 'R')
+																			{ initRead(); consume(7); return createToken(TokenType::Type::TK_PREDECR); }
+
+	else if(ch0 == 'P' && ch1 == 'R' && peek(2) == 'E' && peek(3) == 'I' && peek(4) == 'N' && peek(5) == 'C' && peek(6) == 'R')
+																			{ initRead(); consume(7); return createToken(TokenType::Type::TK_PREINCR); }
+
+	else if(ch0 == 'P' && ch1 == 'O' && peek(2) == 'S' && peek(3) == 'T' && peek(4) == 'D' && peek(5) == 'E' && peek(6) == 'C' && peek(7) == 'R')
+																			{ initRead(); consume(8); return createToken(TokenType::Type::TK_POSTDECR); }
+
+	else if(ch0 == 'P' && ch1 == 'O' && peek(2) == 'S' && peek(3) == 'T' && peek(4) == 'I' && peek(5) == 'N' && peek(6) == 'C' && peek(7) == 'R')
+																			{ initRead(); consume(8); return createToken(TokenType::Type::TK_POSTINCR); }
+			
 	else if(ch0 == CARRIAGE_RETURN && ch1 == LINE_FEED)						{ initRead(); consume(2); return readEOL(); }
 	else if(ch0 == LINE_FEED)												{ return readEOL(); }
 	else if(isdigit(ch0) || (ch0 == '-' && isdigit(ch1)))					{ return readNumber(); }
