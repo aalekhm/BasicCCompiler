@@ -393,6 +393,10 @@ void VirtualMachine::eval(OPCODE eOpCode)
 				REGS.EIP = iOperand;
 		break;
 		case OPCODE::JNZ:
+			iOperand = m_pByteCode[REGS.EIP++];
+			iTemp1 = STACK[REGS.RSP--];
+			if(iTemp1 > 0)
+				REGS.EIP = iOperand;
 		break;
 		case OPCODE::PRTS:
 			iTemp1 = STACK[REGS.RSP--];

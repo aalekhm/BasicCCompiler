@@ -106,11 +106,13 @@
 											| 
 											<assignmentNewVariable> 
 											| 
-											<ifelse> 
+											<ifelseStatement> 
 											| 
-											<_while> 
+											<whileStatement> 
 											|
 											<forStatement>											
+											|
+											<switchStatement>
 											|
 											<print> 
 											| 
@@ -255,8 +257,8 @@
 															"</code>"
 										) ;
 
-<ifelse>						::= 	<_if>;
-<_if>							::=		"if"
+<ifelseStatement>				::= 	<ifStatement>;
+<ifStatement>					::=		"if"
 										'('				"<code>"
 															updateBlockString("if");
 
@@ -285,13 +287,14 @@
 										['}'] 			"<code>"
 															removeLastFromBlockString();
 														"</code>"
-										[ <_else> ]		"<code>"
+										[ <elseStatement> ]		
+														"<code>"
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pIfNode);
 														"</code>"
 										;
 										
-<_else>							::=		"else" 			"<code>"
+<elseStatement>					::=		"else" 			"<code>"
 															updateBlockString("else");
 															
 															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
@@ -315,7 +318,7 @@
 														"</code>"
 										;
 
-<_while>						::= 	"while"
+<whileStatement>				::= 	"while"
 										'('				"<code>"
 															updateBlockString("while");
 															
@@ -349,6 +352,104 @@
 														"</code>"
 										;
 
+<switchStatement>				::=		"switch"
+										'('			"<code>"
+														updateBlockString("switch");
+														
+														Tree* pTemp = nullptr;
+														Tree* pSwitchNode = makeLeaf(ASTNodeType::ASTNode_SWITCH, "switch");
+														{
+															pSwitchNode->m_pParentNode = m_pASTCurrentNode;
+															
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pSwitchNode;
+														}
+													"</code>"
+										<switchArgument>
+										')'
+										'{'
+										<oneOrMoreCasesOrDefault>
+										'}'			"<code>"
+														removeLastFromBlockString();
+														
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pSwitchNode);
+													"</code>"
+										;
+										
+<switchArgument>				::= 	(	TK_IDENTIFIER
+													"<code>"
+														std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+														assert(!sFullyQualifiedVariableName.empty());
+
+														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
+														m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
+													"</code>"
+											|
+											TK_INTEGER
+													"<code>"
+														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+														m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
+													"</code>"
+										);
+										
+<oneOrMoreCasesOrDefault>		::=		[ <oneOrMoreSwitchCases> ] [ <defaultCase> ];
+
+<oneOrMoreSwitchCases>			::=		{ <switchCase> };
+
+<switchCase>					::= 	"case"
+										TK_INTEGER
+													"<code>"
+														updateBlockString("switchcase");
+													
+														Tree* pTemp = nullptr;
+														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
+														m_pASTCurrentNode->addChild(pSwitchCaseNode);
+														{
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pSwitchCaseNode;
+														}
+													"</code>"
+										':'
+										[ '{' ]
+										<stmt_list>
+										[ '}' ]
+										[ "break" 
+													"<code>"
+														Tree* pSwitchBreakNode = makeLeaf(ASTNodeType::ASTNode_SWITCHBREAK, "break");
+														m_pASTCurrentNode->addChild(pSwitchBreakNode);		
+													"</code>"
+										';' ]
+													"<code>"
+														removeLastFromBlockString();
+														m_pASTCurrentNode = pTemp;
+													"</code>"
+										;
+
+<defaultCase>					::=		"default"
+													"<code>"
+														updateBlockString("switchcase");
+													
+														Tree* pTemp = nullptr;
+														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
+														m_pASTCurrentNode->addChild(pSwitchDefaultNode);
+														{
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pSwitchDefaultNode;
+														}
+													"</code>"
+										':'
+										[ '{' ]
+										<stmt_list>
+										[ '}' ]
+													"<code>"
+														removeLastFromBlockString();
+														m_pASTCurrentNode = pTemp;
+													"</code>"
+										"break"
+										';';
+										
 <forStatement>					::= 	"for"
 										'('				"<code>"
 															updateBlockString("for");

@@ -17,6 +17,29 @@
 
 int retNewFunc()
 {
+	print("In retNewFunc() start");
+	putc(10);
+	
+	int mmi = 11;
+	switch(mmi)
+	{
+		case 10:
+			print("In case 10");
+			putc(10);			
+		break;
+		case 11:
+			print("In case 11");
+			putc(10);			
+		case 12:
+			print("In case 12");
+			putc(10);					
+		break;
+		default:
+			print("In default case");
+			putc(10);						
+		break;
+	}
+	
 	print("In retNewFunc................");
 	putc(10);
 

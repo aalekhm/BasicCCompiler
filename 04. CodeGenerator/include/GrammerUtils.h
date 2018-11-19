@@ -69,9 +69,15 @@ class GrammerUtils
 		static void									handlePrimitiveInt(Tree* pNode, int* pByteCode, int& iOffset);
 		static void									handleAssign(Tree* pNode, int* pByteCode, int& iOffset);
 		static void									handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleIfWhile(Tree* pNode, int* pByteCode, int& iOffset);
 		static void									handleIfWhile_Prologue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
 		static void									handleIf_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole);
 		static void									handleWhile_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
+		static void									handleSwitch(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleSwitchArgument(Tree* pNode, int* pByteCode, int& iOffset);
+		static void									handleSwitchCasePrologue(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets);
+		static void									handleSwitchCases(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets, std::vector<int>& vCaseBreakJmpHoles);
+		static void									handleSwitchCaseEpilogues(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseBreakJmpHoles);
 
 		static void									handleStatements(Tree* pNode, int* pByteCode, int& iOffset);
 

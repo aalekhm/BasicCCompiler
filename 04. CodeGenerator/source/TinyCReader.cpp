@@ -493,11 +493,11 @@ bool TinyCReader::stmt() {
 					return true;
 				}
 				else
-					if (ifelse()) {
+					if (ifelseStatement()) {
 						return true;
 					}
 					else
-						if (_while()) {
+						if (whileStatement()) {
 							return true;
 						}
 						else
@@ -505,23 +505,27 @@ bool TinyCReader::stmt() {
 								return true;
 							}
 							else
-								if (print()) {
+								if (switchStatement()) {
 									return true;
 								}
 								else
-									if (putc()) {
+									if (print()) {
 										return true;
 									}
 									else
-										if (bracesstmtlist()) {
+										if (putc()) {
 											return true;
 										}
 										else
-											if (returnStatement()) {
+											if (bracesstmtlist()) {
 												return true;
 											}
 											else
-												return false;
+												if (returnStatement()) {
+													return true;
+												}
+												else
+													return false;
 
 	return true;
 
@@ -755,14 +759,14 @@ bool TinyCReader::functionArgumentItem() {
 
 }
 
-bool TinyCReader::ifelse() {
-	if (!_if())
+bool TinyCReader::ifelseStatement() {
+	if (!ifStatement())
 		return false;
 	return true;
 
 }
 
-bool TinyCReader::_if() {
+bool TinyCReader::ifStatement() {
 	if (!GrammerUtils::match("if", MANDATORY))
 		return false;
 	if (!GrammerUtils::match('(', MANDATORY))
@@ -814,7 +818,7 @@ bool TinyCReader::_if() {
 
 	removeLastFromBlockString();
 
-	if (!_else()) {
+	if (!elseStatement()) {
 	}
 	else {
 	}
@@ -827,7 +831,7 @@ bool TinyCReader::_if() {
 
 }
 
-bool TinyCReader::_else() {
+bool TinyCReader::elseStatement() {
 	if (!GrammerUtils::match("else", MANDATORY))
 		return false;
 
@@ -872,7 +876,7 @@ bool TinyCReader::_else() {
 
 }
 
-bool TinyCReader::_while() {
+bool TinyCReader::whileStatement() {
 	if (!GrammerUtils::match("while", MANDATORY))
 		return false;
 	if (!GrammerUtils::match('(', MANDATORY))
@@ -927,6 +931,201 @@ bool TinyCReader::_while() {
 	m_pASTCurrentNode = pTemp;
 	m_pASTCurrentNode->addChild(pWhileNode);
 
+	return true;
+
+}
+
+bool TinyCReader::switchStatement() {
+	if (!GrammerUtils::match("switch", MANDATORY))
+		return false;
+	if (!GrammerUtils::match('(', MANDATORY))
+		return false;
+
+	updateBlockString("switch");
+
+	Tree* pTemp = nullptr;
+	Tree* pSwitchNode = makeLeaf(ASTNodeType::ASTNode_SWITCH, "switch");
+	{
+		pSwitchNode->m_pParentNode = m_pASTCurrentNode;
+
+		pTemp = m_pASTCurrentNode;
+		m_pASTCurrentNode = pSwitchNode;
+	}
+
+	if (!switchArgument())
+		return false;
+	if (!GrammerUtils::match(')', MANDATORY))
+		return false;
+	if (!GrammerUtils::match('{', MANDATORY))
+		return false;
+	if (!oneOrMoreCasesOrDefault())
+		return false;
+	if (!GrammerUtils::match('}', MANDATORY))
+		return false;
+
+	removeLastFromBlockString();
+
+	m_pASTCurrentNode = pTemp;
+	m_pASTCurrentNode->addChild(pSwitchNode);
+
+	return true;
+
+}
+
+bool TinyCReader::switchArgument() {
+	if (GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
+
+		std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+		assert(!sFullyQualifiedVariableName.empty());
+
+		Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
+		m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
+
+		return true;
+	}
+	else
+		if (GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
+
+			Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+			m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
+
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
+bool TinyCReader::oneOrMoreCasesOrDefault() {
+	if (!oneOrMoreSwitchCases()) {
+	}
+	else {
+	}
+
+	if (!defaultCase()) {
+	}
+	else {
+	}
+
+	return true;
+
+}
+
+bool TinyCReader::oneOrMoreSwitchCases() {
+	while (true) {
+		if (switchCase()) {
+		}
+		else
+			break;
+	}
+
+	return true;
+
+}
+
+bool TinyCReader::switchCase() {
+	if (!GrammerUtils::match("case", MANDATORY))
+		return false;
+	if (!GrammerUtils::match(TokenType::Type::TK_INTEGER, MANDATORY))
+		return false;
+
+	updateBlockString("switchcase");
+
+	Tree* pTemp = nullptr;
+	Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
+	m_pASTCurrentNode->addChild(pSwitchCaseNode);
+	{
+		pTemp = m_pASTCurrentNode;
+		m_pASTCurrentNode = pSwitchCaseNode;
+	}
+
+	if (!GrammerUtils::match(':', MANDATORY))
+		return false;
+	if (!GrammerUtils::match('{', OPTIONAL)) {
+
+	}
+
+	else {
+
+	}
+
+	if (!stmt_list())
+		return false;
+	if (!GrammerUtils::match('}', OPTIONAL)) {
+
+	}
+
+	else {
+
+	}
+
+	if (!GrammerUtils::match("break", OPTIONAL)) {
+
+	}
+
+	else {
+
+
+		Tree* pSwitchBreakNode = makeLeaf(ASTNodeType::ASTNode_SWITCHBREAK, "break");
+		m_pASTCurrentNode->addChild(pSwitchBreakNode);
+
+		if (!GrammerUtils::match(';', MANDATORY))
+			return false;
+	}
+
+
+	removeLastFromBlockString();
+	m_pASTCurrentNode = pTemp;
+
+	return true;
+
+}
+
+bool TinyCReader::defaultCase() {
+	if (!GrammerUtils::match("default", MANDATORY))
+		return false;
+
+	updateBlockString("switchcase");
+
+	Tree* pTemp = nullptr;
+	Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
+	m_pASTCurrentNode->addChild(pSwitchDefaultNode);
+	{
+		pTemp = m_pASTCurrentNode;
+		m_pASTCurrentNode = pSwitchDefaultNode;
+	}
+
+	if (!GrammerUtils::match(':', MANDATORY))
+		return false;
+	if (!GrammerUtils::match('{', OPTIONAL)) {
+
+	}
+
+	else {
+
+	}
+
+	if (!stmt_list())
+		return false;
+	if (!GrammerUtils::match('}', OPTIONAL)) {
+
+	}
+
+	else {
+
+	}
+
+
+	removeLastFromBlockString();
+	m_pASTCurrentNode = pTemp;
+
+	if (!GrammerUtils::match("break", MANDATORY))
+		return false;
+	if (!GrammerUtils::match(';', MANDATORY))
+		return false;
 	return true;
 
 }

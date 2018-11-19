@@ -330,6 +330,30 @@ void GrammerUtils::printAST(Tree* pNode)
 			iTabCount++;
 		}
 		break;
+		case ASTNodeType::ASTNode_SWITCH:
+		{
+			std::cout << "switch(" << pNode->m_pLeftNode->m_sText << ") {" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHCASE:
+		{
+			std::cout << "case " << pNode->m_sText << ":" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHDEFAULT:
+		{
+			std::cout << "default:" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHBREAK:
+		{
+			std::cout << "break;";
+			bProcessChildren = false;
+		}
+		break;
 		case ASTNodeType::ASTNode_PRINT:
 		{
 			std::cout << "print(";
@@ -443,6 +467,29 @@ void GrammerUtils::printAST(Tree* pNode)
 			printTabs(); std::cout << "}";
 		}
 		break;
+		case ASTNodeType::ASTNode_SWITCH:
+		{
+			if (iTabCount >= 0)
+				iTabCount--;
+
+			printTabs(); std::cout << "}";
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHCASE:
+		{
+			if (iTabCount >= 0)
+				iTabCount--;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHDEFAULT:
+		{
+			printTabs();
+			std::cout << "break;" << std::endl;
+
+			if (iTabCount >= 0)
+				iTabCount--;
+		}
+		break;
 	}
 
 	std::cout << std::endl;
@@ -475,9 +522,10 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 
 			// Call to main(), offset populated later.
 			EMIT(OPCODE::CALL);
-#if (VERBOSE == 1)
-			std::cout << (iOffset - 1) << ". " << "CALL ";
-#endif
+			#if (VERBOSE == 1)
+				std::cout << (iOffset - 1) << ". " << "CALL ";
+			#endif
+
 			iJumpMainOffsetHole = iOffset++;
 		}
 
@@ -501,9 +549,9 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 			FunctionInfo* pMainFuncInfo = (FunctionInfo*)itrFuncMain->second;
 
 			emit(pMainFuncInfo->m_iStartOffsetInCode, m_iByteCode, iJumpMainOffsetHole);
-#if (VERBOSE == 1)
-			std::cout << pMainFuncInfo->m_iStartOffsetInCode << std::endl;
-#endif
+			#if (VERBOSE == 1)
+				std::cout << pMainFuncInfo->m_iStartOffsetInCode << std::endl;
+			#endif
 		}
 		//////////////////////////////////////////////////////////////////////////////
 
@@ -545,6 +593,14 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 					}
 				}
 				break;
+				case ASTNodeType::ASTNode_SWITCH:
+				{
+					for (Tree* pSwitchCaseNode : pNode->m_vStatements)
+					{
+						populateStrings(pSwitchCaseNode, sVector);
+					}
+				}
+				break;
 			}
 		}
 	}
@@ -577,7 +633,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 {
 	if (pNode != nullptr)
 	{
-		int i_IfWhile_JCondition_Hole = 0, i_While_Loop_Hole = 0, i_ElseEnd_JMP_Offset = 0;
+		bool bProcessStatements = true;
 
 		// Prologues
 		switch (pNode->m_eASTNodeType)
@@ -652,13 +708,23 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			case ASTNodeType::ASTNode_IF:
 			case ASTNodeType::ASTNode_WHILE:
 			{
-				handleIfWhile_Prologue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
+				handleIfWhile(pNode, pByteCode, iOffset);
+				bProcessStatements = false;
+			}
+			break;
+			case ASTNodeType::ASTNode_SWITCH:
+			{
+				handleSwitch(pNode, pByteCode, iOffset);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleSwitch()"
 			}
 			break;
 		}
 
-		// Intermediates
-		handleStatements(pNode, pByteCode, iOffset);
+		if (bProcessStatements)
+		{
+			// Intermediates
+			handleStatements(pNode, pByteCode, iOffset);
+		}
 
 		// Epilogues
 		switch (pNode->m_eASTNodeType)
@@ -666,16 +732,6 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 			case ASTNodeType::ASTNode_RETURNSTMT:
 			{
 				handleReturnStatement(pNode, pByteCode, iOffset);
-			}
-			break;
-			case ASTNodeType::ASTNode_IF:
-			{
-				handleIf_Epilogue(pNode, pByteCode, iOffset, i_ElseEnd_JMP_Offset, i_IfWhile_JCondition_Hole);
-			}
-			break;
-			case ASTNodeType::ASTNode_WHILE:
-			{
-				handleWhile_Epilogue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
 			}
 			break;
 		}
@@ -1191,18 +1247,53 @@ void GrammerUtils::handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffs
 	EMIT_1(OPCODE::POPR, EREGISTERS::RAX);
 }
 
+void GrammerUtils::handleIfWhile(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	int i_IfWhile_JCondition_Hole = 0, i_While_Loop_Hole = 0, i_ElseEnd_JMP_Offset = 0;
+
+	// Prologues
+	{
+		handleIfWhile_Prologue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
+	}
+
+	// Intermediates
+	{
+		handleStatements(pNode, pByteCode, iOffset);
+	}
+
+	// Epilogues
+	{	
+		switch (pNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_IF:
+			{
+				handleIf_Epilogue(pNode, pByteCode, iOffset, i_ElseEnd_JMP_Offset, i_IfWhile_JCondition_Hole);
+			}
+			break;
+			case ASTNodeType::ASTNode_WHILE:
+			{
+				handleWhile_Epilogue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
+			}
+			break;
+		}
+	}
+}
+
 void GrammerUtils::handleIfWhile_Prologue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
 {
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
-	i_While_Loop_Hole = iOffset;
+	{
+		i_While_Loop_Hole = iOffset;
 
-	populateCode(pExpressionNode, pByteCode, iOffset);
+		handleExpression(pExpressionNode, pByteCode, iOffset);
 
-	EMIT(OPCODE::JZ);
-	#if (VERBOSE == 1)
-		std::cout << (iOffset - 1) << ". " << "JZ" << std::endl;
-	#endif
-	i_IfWhile_JCondition_Hole = iOffset++;
+		EMIT(OPCODE::JZ);
+		#if (VERBOSE == 1)
+			std::cout << (iOffset - 1) << ". " << "JZ" << std::endl;
+		#endif
+
+		i_IfWhile_JCondition_Hole = iOffset++;
+	}
 }
 
 void GrammerUtils::handleIf_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole)
@@ -1242,6 +1333,122 @@ void GrammerUtils::handleWhile_Epilogue(Tree* pNode, int* pByteCode, int& iOffse
 		std::cout << "------" << "i_While_Loop_Hole [" << (iOffset - 1) << "] = " << i_While_Loop_Hole << std::endl;
 		std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
 	#endif
+}
+
+void GrammerUtils::handleSwitch(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	std::vector<int> vCaseStartOffsets;
+	std::vector<int> vCaseBreakJmpHoles;
+
+	handleSwitchCasePrologue(pNode, pByteCode, iOffset, vCaseStartOffsets);
+	handleSwitchCases(pNode, pByteCode, iOffset, vCaseStartOffsets, vCaseBreakJmpHoles);
+	handleSwitchCaseEpilogues(pNode, pByteCode, iOffset, vCaseBreakJmpHoles);
+}
+
+void GrammerUtils::handleSwitchArgument(Tree* pNode, int* pByteCode, int& iOffset)
+{
+	switch (pNode->m_eASTNodeType)
+	{
+		case ASTNodeType::ASTNode_IDENTIFIER:
+		{
+			handleIdentifier(pNode, pByteCode, iOffset);
+		}
+		break;
+		case ASTNodeType::ASTNode_INTEGER:
+		{
+			handleInteger(pNode, pByteCode, iOffset);
+		}
+		break;
+	}
+}
+
+void GrammerUtils::handleSwitchCasePrologue(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets)
+{
+	for (Tree* pSwitchCaseNode : pNode->m_vStatements)
+	{
+		switch (pSwitchCaseNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_SWITCHCASE:
+			{
+				handleSwitchArgument(pNode->m_pLeftNode, pByteCode, iOffset);
+
+				handleInteger(pSwitchCaseNode, pByteCode, iOffset);
+				EMIT_1(OPCODE::JMP_EQ, 0);
+
+				EMIT(OPCODE::JNZ);
+				#if (VERBOSE == 1)
+					std::cout << (iOffset - 1) << ". " << "JNZ" << std::endl;
+				#endif
+
+				vCaseStartOffsets.push_back(iOffset++);
+			}
+			break;
+			case ASTNodeType::ASTNode_SWITCHDEFAULT:
+			{
+				EMIT(OPCODE::JMP);
+				#if (VERBOSE == 1)
+					std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
+				#endif
+				vCaseStartOffsets.push_back(iOffset++);
+			}
+			break;
+		}
+	}
+}
+
+void GrammerUtils::handleSwitchCases(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets, std::vector<int>& vCaseBreakJmpHoles)
+{
+	int iCase = 0;
+	for (Tree* pSwitchCaseNode : pNode->m_vStatements)
+	{
+		switch (pSwitchCaseNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_SWITCHCASE:
+			{
+				emit(iOffset, m_iByteCode, vCaseStartOffsets[iCase++]);
+				handleStatements(pSwitchCaseNode, pByteCode, iOffset);
+
+				for (Tree* pChildNode : pSwitchCaseNode->m_vStatements)
+				{
+					if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_SWITCHBREAK)
+					{
+						EMIT(OPCODE::JMP);
+						#if (VERBOSE == 1)
+							std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
+						#endif
+
+						vCaseBreakJmpHoles.push_back(iOffset++);
+					}
+				}
+			}
+			break;
+			case ASTNodeType::ASTNode_SWITCHDEFAULT:
+			{
+				emit(iOffset, m_iByteCode, vCaseStartOffsets[iCase++]);
+				handleStatements(pSwitchCaseNode, pByteCode, iOffset);
+
+				for (Tree* pChildNode : pSwitchCaseNode->m_vStatements)
+				{
+					if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_SWITCHBREAK)
+					{
+						EMIT(OPCODE::JMP);
+						#if (VERBOSE == 1)
+							std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
+						#endif
+					}
+				}
+			}
+			break;
+		}
+	}
+}
+
+void GrammerUtils::handleSwitchCaseEpilogues(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseBreakJmpHoles)
+{
+	for (int iBreakJumpHole : vCaseBreakJmpHoles)
+	{
+		emit(iOffset, m_iByteCode, iBreakJumpHole);
+	}
 }
 
 void GrammerUtils::handleStatements(Tree* pNode, int* pByteCode, int& iOffset)
