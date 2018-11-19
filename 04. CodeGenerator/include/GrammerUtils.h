@@ -60,7 +60,7 @@ class GrammerUtils
 		static void									handleIdentifier(Tree* pNode);
 		static void									handleString(Tree* pNode);
 		static void									handlePrimitiveInt(Tree* pNode);
-		static void									handlePrimitiveVoidPtrEpilogue(Tree* pNode);
+		static void									handlePrimitivePtrEpilogue(Tree* pNode);
 		static void									handleAssign(Tree* pNode);
 		static void									handleReturnStatement(Tree* pNode);
 		static void									handleIfWhile(Tree* pNode);
@@ -79,6 +79,8 @@ class GrammerUtils
 		static void									handleStatements(Tree* pNode);
 
 		static void									populateCode(Tree* pNode);
+
+		static void									cast(ASTNodeType eASTNodeType);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);
 		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2);

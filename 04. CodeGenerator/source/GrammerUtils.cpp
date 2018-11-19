@@ -219,8 +219,20 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 	switch (pNode->m_eASTNodeType)
 	{
 		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
 		{
-			std::cout << "static void* " << pNode->m_sText << ";";
+			std::cout << "static ";
+			switch (pNode->m_eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:	std::cout << "void";		break;
+				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:	std::cout << "int8_t";		break;
+				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:	std::cout << "int16_t";		break;
+				case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:	std::cout << "int32_t";		break;
+			}
+
+			std::cout << "* " << pNode->m_sText << ";";
 		}
 		break;
 		case ASTNodeType::ASTNode_FUNCTIONDEF:
@@ -267,7 +279,6 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8)		std::cout << "int8_t ";
 			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16)	std::cout << "int16_t ";
 			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32)	std::cout << "int32_t ";
-			else if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING)	std::cout << "string ";
 
 			std::cout << pNode->m_sText;
 			std::cout << " = ";
@@ -301,9 +312,19 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		}
 		break;
 		case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
 		{
-			std::cout << "void* " << pNode->m_sText;
-			std::cout << " = ";
+			switch (pNode->m_eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:		std::cout << "void";	break;
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:		std::cout << "int8_t";	break;
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:	std::cout << "int16_t";	break;
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:	std::cout << "int32_t";	break;
+			}
+
+			std::cout << "* " << pNode->m_sText << " = ";
 
 			for (Tree* pChild : pNode->m_vStatements)
 			{
@@ -728,6 +749,9 @@ void GrammerUtils::populateCode(Tree* pNode)
 		switch (pNode->m_eASTNodeType)
 		{
 			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
 			{
 				handleStatics(pNode);
 			}
@@ -843,8 +867,11 @@ void GrammerUtils::populateCode(Tree* pNode)
 			}
 			break;
 			case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
 			{
-				handlePrimitiveVoidPtrEpilogue(pNode);
+				handlePrimitivePtrEpilogue(pNode);
 			}
 			break;
 		}
@@ -1141,7 +1168,16 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 
 			/////////////////////////////////////////////////
 			// 2. Push integer 1.
-			EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? 1 : -1);
+			{
+				int8_t iIncrementValue = 1;
+				if (m_pCurrentFunction->IsVariableAPointerType(pPreFixNode->m_sText.c_str()))
+				{
+					ASTNodeType _eASTNodeType = m_pCurrentFunction->getVariableNodeType(pPreFixNode->m_sText.c_str());
+					iIncrementValue = m_pCurrentFunction->sizeOf(_eASTNodeType);
+				}
+
+				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? iIncrementValue : -iIncrementValue);
+			}
 
 			/////////////////////////////////////////////////
 			// 3. Add the 2 operands
@@ -1286,6 +1322,12 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 			// 2. Push integer 1.
 			{
 				int8_t iIncrementValue = 1;
+				if (m_pCurrentFunction->IsVariableAPointerType(pPostFixNode->m_sText.c_str()))
+				{
+					ASTNodeType _eASTNodeType = m_pCurrentFunction->getVariableNodeType(pPostFixNode->m_sText.c_str());
+					iIncrementValue = m_pCurrentFunction->sizeOf(_eASTNodeType);
+				}
+
 				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? iIncrementValue : -iIncrementValue);
 			}
 
@@ -1342,28 +1384,12 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 		else
 			populateCode(pExpressionNode);
 
-		// Cast the expresseion with relevant cast
-		switch (pNode->m_eASTNodeType)
-		{
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:	// & 0xFF
-				EMIT_1(OPCODE::PUSHI, 0xFF);
-				EMIT_1(OPCODE::BITWISEAND, 0);
-			break;
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:	// & 0xFFFF
-				EMIT_1(OPCODE::PUSHI, 0xFFFF);
-				EMIT_1(OPCODE::BITWISEAND, 0);
-			break;
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:	// & 0xFFFFFFFF
-				EMIT_1(OPCODE::PUSHI, 0xFFFFFFFF);
-				EMIT_1(OPCODE::BITWISEAND, 0);
-			break;
-		}
-
+		cast(pNode->m_eASTNodeType);
 		EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 	}
 }
 
-void GrammerUtils::handlePrimitiveVoidPtrEpilogue(Tree* pNode)
+void GrammerUtils::handlePrimitivePtrEpilogue(Tree* pNode)
 {
 	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 }
@@ -1684,6 +1710,26 @@ void GrammerUtils::handleStatements(Tree* pNode)
 			}
 			break;
 		}
+	}
+}
+
+void GrammerUtils::cast(ASTNodeType eASTNodeType)
+{
+	// Cast the expresseion with relevant cast
+	switch (eASTNodeType)
+	{
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:	// & 0xFF
+			EMIT_1(OPCODE::PUSHI, 0xFF);
+			EMIT_1(OPCODE::BITWISEAND, 0);
+		break;
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:	// & 0xFFFF
+			EMIT_1(OPCODE::PUSHI, 0xFFFF);
+			EMIT_1(OPCODE::BITWISEAND, 0);
+		break;
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:	// & 0xFFFFFFFF
+			EMIT_1(OPCODE::PUSHI, 0xFFFFFFFF);
+			EMIT_1(OPCODE::BITWISEAND, 0);
+		break;
 	}
 }
 

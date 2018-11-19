@@ -429,6 +429,9 @@ enum class ASTNodeType
 	ASTNode_PRIMITIVETYPEINT64,
 	ASTNode_PRIMITIVETYPESTRING,
 	ASTNode_PRIMITIVETYPEVOIDPTR,
+	ASTNode_PRIMITIVETYPEINT8PTR,
+	ASTNode_PRIMITIVETYPEINT16PTR,
+	ASTNode_PRIMITIVETYPEINT32PTR,
 	ASTNode_FUNCTIONCALL,
 	ASTNode_RETURNSTMT,
 	ASTNode_FUNCTIONCALLEND,
@@ -445,6 +448,9 @@ enum class ASTNodeType
 	ASTNode_MALLOC,
 	ASTNode_FREE,
 	ASTNode_PRIMITIVETYPESTATICVOIDPTR,
+	ASTNode_PRIMITIVETYPESTATICINT8PTR,
+	ASTNode_PRIMITIVETYPESTATICINT16PTR,
+	ASTNode_PRIMITIVETYPESTATICINT32PTR,
 };
 
 typedef struct Tree
@@ -549,6 +555,9 @@ typedef struct FunctionInfo
 				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
 				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
 				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
 				{
 					m_vLocalVariables.push_back(pChild);
 				}
@@ -581,6 +590,9 @@ typedef struct FunctionInfo
 				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
 				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
 				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
 				{
 					m_vArguments.push_back(pChild);
 				}
@@ -690,10 +702,53 @@ typedef struct FunctionInfo
 		return eASTNodeType;
 	}
 
-	//bool IsNodeTypeAPointerType(ASTNodeType eASTNodeType)
-	//{
-	//	if(eASTNodeType == )
-	//}
+	bool IsVariableAPointerType(const char* sLocalVariableName)
+	{
+		bool bIsPointerType = false, bFound = false;
+
+		// Check for 'Locals'
+		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
+		{
+			if (pLocalVar->m_sText == sLocalVariableName)
+			{
+				bIsPointerType = pLocalVar->m_bIsPointerType;
+				bFound = true;
+				break;
+			}
+		}
+
+		// Check for 'Arguments'
+		if (!bFound)
+		{
+			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
+			{
+				if (pLocalVar->m_sText == sLocalVariableName)
+				{
+					bIsPointerType = pLocalVar->m_bIsPointerType;
+					bFound = true;
+					break;
+				}
+			}
+		}
+
+		// Check for 'Static'
+		if (!bFound)
+		{
+			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
+			{
+				if (pStaticVar->m_sText == sLocalVariableName)
+				{
+					bIsPointerType = pStaticVar->m_bIsPointerType;
+					bFound = true;
+					break;
+				}
+			}
+		}
+
+		assert(bFound);
+
+		return bIsPointerType;
+	}
 
 	int getLocalVariableCount()
 	{
@@ -718,6 +773,27 @@ typedef struct FunctionInfo
 
 		if(bIsNew)
 			m_vStaticVariables.push_back(pNode);
+	}
+
+	int32_t sizeOf(ASTNodeType eASTNodeType)
+	{
+		switch (eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+				return sizeof(int8_t);
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+				return sizeof(int16_t);
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
+			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
+				return sizeof(int32_t);
+			default:
+				return 1;
+		}
 	}
 
 	Tree*							m_pNode;

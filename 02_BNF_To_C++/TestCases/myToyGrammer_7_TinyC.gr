@@ -8,13 +8,34 @@
 <staticDeclarations>			::=		"static"
 										( <staticVoidPtr> );
 
-<staticVoidPtr>					::=		"void"
+<primPointerTypes>				::=		(	"void"
+											|
+											"int8_t"
+											|
+											"int16_t"
+											|
+											"int32_t"
+										);
+										
+<staticVoidPtr>					::=		<primPointerTypes>	"<code>"
+																std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+															"</code>"
 										'*'
 										TK_IDENTIFIER		"<code>"
 																std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
-																Tree* pStaticVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR, sStaticVariableName.c_str());																
-																m_pASTCurrentNode->addChild(pStaticVoidPtrNode);
-																FunctionInfo::addStaticVariable(pStaticVoidPtrNode);
+																
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_INVALID;
+																if(sPointerType == "void")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR;
+																else if(sPointerType == "int8_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR;
+																else if(sPointerType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR;
+																else if(sPointerType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR;
+
+																assert(eASTNodeType != ASTNodeType::ASTNode_INVALID);
+																
+																Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
+																pStaticPtrNode->m_bIsPointerType = true;
+																m_pASTCurrentNode->addChild(pStaticPtrNode);
+																FunctionInfo::addStaticVariable(pStaticPtrNode);
 															"</code>"
 										';';
 
@@ -556,7 +577,7 @@
 										
 <oneOrMoreInitExprs>			::= 	<initExpr> { ',' <initExpr> };
 
-<initExpr>						::=		(	<newInt>
+<initExpr>						::=		(	<newPtrOrInt>
 											|
 											<assignmentRHS>
 										);
@@ -658,9 +679,50 @@
 															"</code>"
 										;
 
-<assignmentNewVariable>			::=		( <newInt> | <newString> | <newVoidPtr> );
+<assignmentNewVariable>			::=		( <newPtrOrInt> | <newString> );
 
-<newInt>						::= 	<primitiveType>		"<code>"
+<newPtrOrInt>					::= 	<primPointerTypes> <primPtrOrInt>;
+										
+<primPtrOrInt>					::=		(	<primPtr>
+											|
+											<primInt>
+										);
+
+<primPtr>						::=							"<code>"
+																std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+															"</code>"
+												'*'
+												TK_IDENTIFIER		
+															"<code>"
+																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedVariableName;
+																sFullyQualifiedVariableName.append(getBlockString());
+																sFullyQualifiedVariableName.append(sVariableName);
+															"</code>"
+												'='			"<code>" 
+																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR;
+																if(sPointerType == "void")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR;
+																else if(sPointerType == "int8_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR;
+																else if(sPointerType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR;
+																else if(sPointerType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR;
+																
+																Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+																Tree* pTemp = nullptr;
+																{
+																	pTemp = m_pASTCurrentNode;
+																	pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
+																	pPrimPtrNode->m_bIsPointerType = true;
+																	pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pPrimPtrNode;
+																}																
+															"</code>"
+												<ptrAssign>	"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pPrimPtrNode);
+															"</code>"
+												;
+												
+<primInt>						::= 						"<code>"
 																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
 										TK_IDENTIFIER 		"<code>"
@@ -724,30 +786,7 @@
 															"</code>"
 										;
 
-<newVoidPtr>					::=		"void" '*'
-										TK_IDENTIFIER		"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedVariableName;
-																sFullyQualifiedVariableName.append(getBlockString());
-																sFullyQualifiedVariableName.append(sVariableName);
-															"</code>"
-										'='					"<code>" 
-																Tree* pPrimVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR, sFullyQualifiedVariableName.c_str());
-																Tree* pTemp = nullptr;
-																{
-																	pTemp = m_pASTCurrentNode;
-																	pPrimVoidPtrNode->m_sAdditionalInfo.append(sVariableName);
-																	pPrimVoidPtrNode->m_pParentNode = m_pASTCurrentNode;
-																	m_pASTCurrentNode = pPrimVoidPtrNode;
-																}																
-															"</code>"
-										<voidPtrAssign>		"<code>"
-																m_pASTCurrentNode = pTemp;
-																m_pASTCurrentNode->addChild(pPrimVoidPtrNode);
-															"</code>"
-										;
-
-<voidPtrAssign>					::=		( <malloc> );
+<ptrAssign>						::=		( <malloc> );
 									
 <malloc>						::=		"malloc"			"<code>"
 																Tree* pMallocNode = makeLeaf(ASTNodeType::ASTNode_MALLOC, "");
@@ -829,7 +868,7 @@
 														"</code>"
 										')';
 
-<expr>                			::=		(	<voidPtrAssign>
+<expr>                			::=		(	<ptrAssign>
 											|
 											<startExpr>
 										);

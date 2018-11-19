@@ -266,6 +266,12 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING
 				||
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR
+				||
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR
+				||
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR
+				||
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR
 		) {
 			if (pChild->m_sAdditionalInfo == sVariable)
 			{
@@ -277,13 +283,10 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
 	{
-		if (pStaticVar->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR)
+		if (pStaticVar->m_sText == sVariable)
 		{
-			if (pStaticVar->m_sText == sVariable)
-			{
-				sFullyQualifiedName = pStaticVar->m_sText;
-				break;
-			}
+			sFullyQualifiedName = pStaticVar->m_sText;
+			break;
 		}
 	}
 

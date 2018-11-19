@@ -266,7 +266,13 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING
 			||
 			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR
-			) {
+			||
+			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR
+			||
+			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR
+			||
+			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR
+		) {
 			if (pChild->m_sAdditionalInfo == sVariable)
 			{
 				sFullyQualifiedName = pChild->m_sText;
@@ -277,13 +283,10 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
 	{
-		if (pStaticVar->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR)
+		if (pStaticVar->m_sText == sVariable)
 		{
-			if (pStaticVar->m_sText == sVariable)
-			{
-				sFullyQualifiedName = pStaticVar->m_sText;
-				break;
-			}
+			sFullyQualifiedName = pStaticVar->m_sText;
+			break;
 		}
 	}
 
@@ -343,18 +346,54 @@ bool TinyCReader::staticDeclarations() {
 
 }
 
+bool TinyCReader::primPointerTypes() {
+	if (GrammerUtils::match("void", OPTIONAL)) {
+		return true;
+	}
+	else
+		if (GrammerUtils::match("int8_t", OPTIONAL)) {
+			return true;
+		}
+		else
+			if (GrammerUtils::match("int16_t", OPTIONAL)) {
+				return true;
+			}
+			else
+				if (GrammerUtils::match("int32_t", OPTIONAL)) {
+					return true;
+				}
+				else
+					return false;
+
+	return true;
+
+}
+
 bool TinyCReader::staticVoidPtr() {
-	if (!GrammerUtils::match("void", MANDATORY))
+	if (!primPointerTypes())
 		return false;
+
+	std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+
 	if (!GrammerUtils::match('*', MANDATORY))
 		return false;
 	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 		return false;
 
 	std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
-	Tree* pStaticVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR, sStaticVariableName.c_str());
-	m_pASTCurrentNode->addChild(pStaticVoidPtrNode);
-	FunctionInfo::addStaticVariable(pStaticVoidPtrNode);
+
+	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_INVALID;
+	if (sPointerType == "void")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR;
+	else if (sPointerType == "int8_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR;
+	else if (sPointerType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR;
+	else if (sPointerType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR;
+
+	assert(eASTNodeType != ASTNodeType::ASTNode_INVALID);
+
+	Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
+	pStaticPtrNode->m_bIsPointerType = true;
+	m_pASTCurrentNode->addChild(pStaticPtrNode);
+	FunctionInfo::addStaticVariable(pStaticPtrNode);
 
 	if (!GrammerUtils::match(';', MANDATORY))
 		return false;
@@ -1366,7 +1405,7 @@ bool TinyCReader::oneOrMoreInitExprs() {
 }
 
 bool TinyCReader::initExpr() {
-	if (newInt()) {
+	if (newPtrOrInt()) {
 		return true;
 	}
 	else
@@ -1583,7 +1622,7 @@ bool TinyCReader::bracesstmtlist() {
 }
 
 bool TinyCReader::assignmentNewVariable() {
-	if (newInt()) {
+	if (newPtrOrInt()) {
 		return true;
 	}
 	else
@@ -1591,19 +1630,80 @@ bool TinyCReader::assignmentNewVariable() {
 			return true;
 		}
 		else
-			if (newVoidPtr()) {
-				return true;
-			}
-			else
-				return false;
+			return false;
 
 	return true;
 
 }
 
-bool TinyCReader::newInt() {
-	if (!primitiveType())
+bool TinyCReader::newPtrOrInt() {
+	if (!primPointerTypes())
 		return false;
+	if (!primPtrOrInt())
+		return false;
+	return true;
+
+}
+
+bool TinyCReader::primPtrOrInt() {
+	if (primPtr()) {
+		return true;
+	}
+	else
+		if (primInt()) {
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
+bool TinyCReader::primPtr() {
+
+	std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+
+	if (!GrammerUtils::match('*', MANDATORY))
+		return false;
+	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+		return false;
+
+	std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+	std::string sFullyQualifiedVariableName;
+	sFullyQualifiedVariableName.append(getBlockString());
+	sFullyQualifiedVariableName.append(sVariableName);
+
+	if (!GrammerUtils::match('=', MANDATORY))
+		return false;
+
+	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR;
+	if (sPointerType == "void")			eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR;
+	else if (sPointerType == "int8_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR;
+	else if (sPointerType == "int16_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR;
+	else if (sPointerType == "int32_t")	eASTNodeType = ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR;
+
+	Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+	Tree* pTemp = nullptr;
+	{
+		pTemp = m_pASTCurrentNode;
+		pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
+		pPrimPtrNode->m_bIsPointerType = true;
+		pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
+		m_pASTCurrentNode = pPrimPtrNode;
+	}
+
+	if (!ptrAssign())
+		return false;
+
+	m_pASTCurrentNode = pTemp;
+	m_pASTCurrentNode->addChild(pPrimPtrNode);
+
+	return true;
+
+}
+
+bool TinyCReader::primInt() {
 
 	std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
 
@@ -1686,42 +1786,7 @@ bool TinyCReader::newString() {
 
 }
 
-bool TinyCReader::newVoidPtr() {
-	if (!GrammerUtils::match("void", MANDATORY))
-		return false;
-	if (!GrammerUtils::match('*', MANDATORY))
-		return false;
-	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
-		return false;
-
-	std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-	std::string sFullyQualifiedVariableName;
-	sFullyQualifiedVariableName.append(getBlockString());
-	sFullyQualifiedVariableName.append(sVariableName);
-
-	if (!GrammerUtils::match('=', MANDATORY))
-		return false;
-
-	Tree* pPrimVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR, sFullyQualifiedVariableName.c_str());
-	Tree* pTemp = nullptr;
-	{
-		pTemp = m_pASTCurrentNode;
-		pPrimVoidPtrNode->m_sAdditionalInfo.append(sVariableName);
-		pPrimVoidPtrNode->m_pParentNode = m_pASTCurrentNode;
-		m_pASTCurrentNode = pPrimVoidPtrNode;
-	}
-
-	if (!voidPtrAssign())
-		return false;
-
-	m_pASTCurrentNode = pTemp;
-	m_pASTCurrentNode->addChild(pPrimVoidPtrNode);
-
-	return true;
-
-}
-
-bool TinyCReader::voidPtrAssign() {
+bool TinyCReader::ptrAssign() {
 	if (malloc()) {
 		return true;
 	}
@@ -1850,7 +1915,7 @@ bool TinyCReader::freePtrStatement() {
 }
 
 bool TinyCReader::expr() {
-	if (voidPtrAssign()) {
+	if (ptrAssign()) {
 		return true;
 	}
 	else

@@ -15,16 +15,18 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
-static void* pStaticPtr_0;
 static void* pStaticPtr_1;
 static void* pStaticPtr_2;
 static void* pStaticPtr_3;
+
+static int32_t* pStaticPtr_0_Start;
 int32_t retNewFunc()
 {
 	print("In retNewFunc................");
 	putc(10);
 
 	int8_t ch = 'A';
+	ch = 'B';
 	print("int8_t = ", ch);
 	putc(10);
 	
@@ -41,20 +43,29 @@ int32_t retNewFunc()
 	print("Value @ pNew = ", @pNew);
 	putc(10);	
 	
-	pStaticPtr_0++;
-	
-	pStaticPtr_0 = malloc(j * 19);
-	print("pNew Allocated @", @pStaticPtr_0);
+	////////////////////////////////////////////////
+	int32_t* pPtr_0 = malloc(j * 19);
+	print("pNew Allocated @", @pPtr_0);
 	putc(10);
 	
-	@pStaticPtr_0 = 1982;
-	print("Value of pStaticPtr_0 = ", @pStaticPtr_0);
+	pStaticPtr_0_Start = pPtr_0;
+	
+	@pPtr_0 = 1982;
+	pPtr_0++;
+	@pPtr_0 = 1983;
+	pPtr_0--;
+	print("Value of pPtr_0[0] = ", @pPtr_0);
+	putc(10);
+	pPtr_0++;
+	print("Value of pPtr_0[1] = ", @pPtr_0);
 	putc(10);
 	
-	@pStaticPtr_0 = @pNew;
-	print("Assigned @pStaticPtr_0 = @pNew ==> ", @pStaticPtr_0);
+	@pPtr_0 = @pNew;
+	print("Assigned @pPtr_0 = @pNew ==> ", @pPtr_0);
 	putc(10);
 	
+	pPtr_0 = pStaticPtr_0_Start;
+	////////////////////////////////////////////////
 	int32_t iCount = @pStaticPtr_3;
 	iCount++;
 	@pStaticPtr_3 = iCount;
@@ -103,7 +114,7 @@ int32_t retNewFunc()
 	}
 	
 	free(pNew);
-	free(pStaticPtr_0);
+	free(pPtr_0);
 	
 	int32_t iReturnValue = 1977;
 	
