@@ -78,4 +78,6 @@ class GrammerUtils
 		static void									populateCode(Tree* pNode, int* pByteCode, int& iOffset);
 		static void									emit(int iCode, int* pByteCode, int iOffset);
 
+		static void									emit(OPCODE eOPCODE, int iOperand, int* pByteCode, int& iOffset);
+		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2, int* pByteCode, int& iOffset);
 };

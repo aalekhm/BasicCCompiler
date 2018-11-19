@@ -259,6 +259,12 @@ enum class EREGISTERS
 	RMAX
 };
 
+struct RegisterMap
+{
+	const char*		sRegister;
+	EREGISTERS		eEREGISTER;
+};
+
 typedef struct REGISTERS
 {
 	__int64		RAX;	// Accumulator
