@@ -3,19 +3,18 @@
 
 int main(int argc, char* argv[])
 {
-	int i = 0;
-	if (i < 10)
+	int j = 0;
+	++j;
+
+	int m = 0;
+	m = ++j + ++j + ++j;
+
+	std::cout << "m = " << m << std::endl;
+	int iCount = 1;
+	for (int i = 5, j = 1; i < 6; ++i, ++iCount)
 	{
-		i = 11;
-		int i = 12;
+		std::cout << "ForLoop i = " << i << " ,val of j = " << j << " ,iCount = " << iCount << std::endl;
 	}
-
-	i = 2;
-	int j = ++i + (2 + i);
-
-	std::vector<int> v(3, 100);
-	
-	v.insert(v.begin() + 1, 10);
 
 	exit(EXIT_SUCCESS);
 }

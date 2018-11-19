@@ -26,7 +26,10 @@ int retNewFunc()
 	int m = 0;
 	m = ++j + ++j + ++j;
 	
-	for(int i = 0, j = 1, int iCount = 1; i < 10; i++, ++iCount)
+	print("m = ", m);
+	putc(10);
+	
+	for(int i = 0, j = 1, int iCount = 1; i < 10; ++i, ++iCount)
 	{
 		print("ForLoop i = ", i, " ,val of j = ", j, " ,iCount = ", iCount);
 		putc(10);

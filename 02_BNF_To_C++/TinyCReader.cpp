@@ -1089,23 +1089,7 @@ return true;
 }
 
 bool TinyCReader::loopExpr() {
-if(preFixIncrDecr()) {
-
-																	// If it's a pre-fixed expression, we shoule be adding it to the beginning of the whileNode list.
-																	// i.e 1st removing it from the 'moreLoop' expression list
-																	// & then adding it at the start of the 'whileNode' list.
-																	
-																	Tree* pWhileNode = m_pASTCurrentNode->m_pParentNode;
-																	Tree* pPreFixNode = m_pASTCurrentNode->getLastStatement();
-																	{
-																		pPreFixNode->removeFromParent();
-																		pWhileNode->insertAt(0, pPreFixNode);
-																	}
-																
-return true;
-}
-else
-if(postFixIncrDecr()) {
+if(prePostFixedIncrDecr()) {
 return true;
 }
 else

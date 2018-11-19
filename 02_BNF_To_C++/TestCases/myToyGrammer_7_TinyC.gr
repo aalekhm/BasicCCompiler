@@ -427,20 +427,7 @@
 										);
 
 <oneOrMoreLoopExprs>			::=		<loopExpr> { ',' <loopExpr> };
-<loopExpr>						::=		( 	<preFixIncrDecr>	"<code>"
-																	// If it's a pre-fixed expression, we shoule be adding it to the beginning of the whileNode list.
-																	// i.e 1st removing it from the 'moreLoop' expression list
-																	// & then adding it at the start of the 'whileNode' list.
-																	
-																	Tree* pWhileNode = m_pASTCurrentNode->m_pParentNode;
-																	Tree* pPreFixNode = m_pASTCurrentNode->getLastStatement();
-																	{
-																		pPreFixNode->removeFromParent();
-																		pWhileNode->insertAt(0, pPreFixNode);
-																	}
-																"</code>"
-											|
-											<postFixIncrDecr>
+<loopExpr>						::=		( 	<prePostFixedIncrDecr>
 											|
 											<assignmentRHS>
 										);
