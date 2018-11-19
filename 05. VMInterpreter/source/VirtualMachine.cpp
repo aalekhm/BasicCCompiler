@@ -12,6 +12,14 @@ enum class PRIMIIVETYPE
 	INT_64
 };
 
+enum class E_VARIABLETYPE
+{
+	INVALID = -1,
+	ARGUMENT,
+	LOCAL,
+	STATIC
+};
+
 struct CodeMap
 {
 	const char*		sOpCode;
@@ -54,6 +62,8 @@ struct CodeMap
 	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8 },
 	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8 },
 	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8 },
+	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8 },
+	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32 },
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
@@ -185,11 +195,47 @@ void VirtualMachine::eval(OPCODE eOpCode)
 	{
 		case OPCODE::FETCH:
 			iOperand = READ_OPERAND(eOpCode);
-			STACK[--REGS.RSP] = STACK[REGS.RBP - iOperand];
+			{
+				int16_t iVariablePos = (iOperand & 0x0000FFFF);
+				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
+
+				// Local Var or Function Argument ==> saved on the STACK
+				if (eVariableType == E_VARIABLETYPE::ARGUMENT
+					||
+					eVariableType == E_VARIABLETYPE::LOCAL
+				) {
+					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+						iVariablePos *= -1;
+
+					STACK[--REGS.RSP] = STACK[REGS.RBP - iVariablePos];
+				}
+				else // STATIC variable saved on the HEAP
+				{
+
+				}
+			}
 		break;
 		case OPCODE::STORE:
 			iOperand = READ_OPERAND(eOpCode);
-			STACK[REGS.RBP - iOperand] = STACK[REGS.RSP++];
+			{
+				int16_t iVariablePos = (iOperand & 0x0000FFFF);
+				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
+
+				// Local Var or Function Argument ==> saved on the STACK
+				if (eVariableType == E_VARIABLETYPE::ARGUMENT
+					||
+					eVariableType == E_VARIABLETYPE::LOCAL
+				) {
+					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+						iVariablePos *= -1;
+
+					STACK[REGS.RBP - iVariablePos] = STACK[REGS.RSP++];
+				}
+				else // STATIC variable saved on the HEAP
+				{
+
+				}
+			}
 		break;
 		case OPCODE::PUSH:
 		case OPCODE::PUSHI:
@@ -450,6 +496,33 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::PRTI:
 			iTemp1 = STACK[REGS.RSP++];
 			printf("%d", iTemp1);
+		break;
+		case OPCODE::MALLOC:
+			iTemp1 = STACK[REGS.RSP++];
+			printf("Allocated %d bytes @ 12345\n", iTemp1);
+
+			STACK[--REGS.RSP] = 12345;
+		break;
+		case OPCODE::FREE:
+			iOperand = READ_OPERAND(eOpCode);
+			{
+				int16_t iVariablePos = (iOperand & 0x0000FFFF);
+				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
+
+				// Local Var or Function Argument ==> saved on the STACK
+				if (eVariableType == E_VARIABLETYPE::ARGUMENT
+					||
+					eVariableType == E_VARIABLETYPE::LOCAL
+				) {
+					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+						iVariablePos *= -1;
+				}
+				else // STATIC variable saved on the HEAP
+				{
+
+				}
+			}
+			printf("Free memory allocated by variable @ %d\n", iOperand);
 		break;
 		case OPCODE::HLT:
 			m_bRunning = false;

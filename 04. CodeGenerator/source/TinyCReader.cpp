@@ -239,10 +239,24 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEINT
 			||
 			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTRING
+			||
+			pChild->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR
 			) {
 			if (pChild->m_sAdditionalInfo == sVariable)
 			{
 				sFullyQualifiedName = pChild->m_sText;
+				break;
+			}
+		}
+	}
+
+	for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
+	{
+		if (pStaticVar->m_eASTNodeType == ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR)
+		{
+			if (pStaticVar->m_sText == sVariable)
+			{
+				sFullyQualifiedName = pStaticVar->m_sText;
 				break;
 			}
 		}
@@ -265,20 +279,60 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 
 bool TinyCReader::def() {
-	if (!functionList())
-		return false;
-	return true;
-
-}
-
-bool TinyCReader::functionList() {
 	while (true) {
-		if (functionDef()) {
+		if (functionList()) {
 		}
 		else
 			break;
 	}
 
+	return true;
+
+}
+
+bool TinyCReader::functionList() {
+	if (staticDeclarations()) {
+		return true;
+	}
+	else
+		if (functionDef()) {
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
+bool TinyCReader::staticDeclarations() {
+	if (staticVoidPtr()) {
+		return true;
+	}
+	else
+		return false;
+
+	return true;
+
+}
+
+bool TinyCReader::staticVoidPtr() {
+	if (!GrammerUtils::match("static", MANDATORY))
+		return false;
+	if (!GrammerUtils::match("void", MANDATORY))
+		return false;
+	if (!GrammerUtils::match('*', MANDATORY))
+		return false;
+	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+		return false;
+
+	std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
+	Tree* pStaticVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR, sStaticVariableName.c_str());
+	m_pASTCurrentNode->addChild(pStaticVoidPtrNode);
+	FunctionInfo::addStaticVariable(pStaticVoidPtrNode);
+
+	if (!GrammerUtils::match(';', MANDATORY))
+		return false;
 	return true;
 
 }
@@ -525,7 +579,11 @@ bool TinyCReader::stmt() {
 													return true;
 												}
 												else
-													return false;
+													if (freePtrStatement()) {
+														return true;
+													}
+													else
+														return false;
 
 	return true;
 
@@ -1481,7 +1539,11 @@ bool TinyCReader::assignmentNewVariable() {
 			return true;
 		}
 		else
-			return false;
+			if (newVoidPtr()) {
+				return true;
+			}
+			else
+				return false;
 
 	return true;
 
@@ -1516,7 +1578,6 @@ bool TinyCReader::newInt() {
 		pTemp = m_pASTCurrentNode;
 		m_pASTCurrentNode = pExpressionLeftLeaf;
 	}
-
 
 	if (!expr())
 		return false;
@@ -1561,6 +1622,88 @@ bool TinyCReader::newString() {
 
 	m_pASTCurrentNode->addChild(pPrimStringNode);
 
+	return true;
+
+}
+
+bool TinyCReader::newVoidPtr() {
+	if (!GrammerUtils::match("void", MANDATORY))
+		return false;
+	if (!GrammerUtils::match('*', MANDATORY))
+		return false;
+	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+		return false;
+
+	std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+	std::string sFullyQualifiedVariableName;
+	sFullyQualifiedVariableName.append(getBlockString());
+	sFullyQualifiedVariableName.append(sVariableName);
+
+	if (!GrammerUtils::match('=', MANDATORY))
+		return false;
+
+	Tree* pPrimVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR, sFullyQualifiedVariableName.c_str());
+	Tree* pTemp = nullptr;
+	{
+		pTemp = m_pASTCurrentNode;
+		pPrimVoidPtrNode->m_sAdditionalInfo.append(sVariableName);
+		pPrimVoidPtrNode->m_pParentNode = m_pASTCurrentNode;
+		m_pASTCurrentNode = pPrimVoidPtrNode;
+	}
+
+	if (!voidPtrAssign())
+		return false;
+
+	m_pASTCurrentNode = pTemp;
+	m_pASTCurrentNode->addChild(pPrimVoidPtrNode);
+
+	return true;
+
+}
+
+bool TinyCReader::voidPtrAssign() {
+	if (malloc()) {
+		return true;
+	}
+	else
+		return false;
+
+	return true;
+
+}
+
+bool TinyCReader::malloc() {
+	if (!GrammerUtils::match("malloc", MANDATORY))
+		return false;
+
+	Tree* pMallocNode = makeLeaf(ASTNodeType::ASTNode_MALLOC, "");
+	{
+		pMallocNode->m_pParentNode = m_pASTCurrentNode;
+	}
+
+	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+	Tree* pTemp = nullptr;
+	{
+		pMallocNode->m_pLeftNode = pExpressionLeftLeaf;
+		pExpressionLeftLeaf->m_pParentNode = pMallocNode;
+
+		pTemp = m_pASTCurrentNode;
+		m_pASTCurrentNode = pExpressionLeftLeaf;
+	}
+
+
+	if (!GrammerUtils::match('(', MANDATORY))
+		return false;
+	if (!expr())
+		return false;
+
+	m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+
+	m_pASTCurrentNode = pTemp;
+	m_pASTCurrentNode->addChild(pMallocNode);
+
+	if (!GrammerUtils::match(')', MANDATORY))
+		return false;
 	return true;
 
 }
@@ -1610,15 +1753,44 @@ bool TinyCReader::assignmentRHS() {
 
 }
 
-bool TinyCReader::expr() {
-	if (!and_expr())
+bool TinyCReader::freePtrStatement() {
+	if (!GrammerUtils::match("free", MANDATORY))
 		return false;
-	while (true) {
-		if (logicalor_expr()) {
+	if (!GrammerUtils::match('(', MANDATORY))
+		return false;
+	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+		return false;
+
+	std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+	std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+	assert(!sFullyQualifiedVariableName.empty());
+
+	Tree* pFreePtrLeaf = makeLeaf(ASTNodeType::ASTNode_FREE, sFullyQualifiedVariableName.c_str());
+	m_pASTCurrentNode->addChild(pFreePtrLeaf);
+
+	if (!GrammerUtils::match(')', MANDATORY))
+		return false;
+	return true;
+
+}
+
+bool TinyCReader::expr() {
+	if (voidPtrAssign()) {
+		return true;
+	}
+	else
+		if (and_expr()) {
+			while (true) {
+				if (logicalor_expr()) {
+				}
+				else
+					break;
+			}
+
+			return true;
 		}
 		else
-			break;
-	}
+			return false;
 
 	return true;
 
@@ -1856,13 +2028,6 @@ bool TinyCReader::mul_div_mod() {
 }
 
 bool TinyCReader::primary() {
-	if (!defaults())
-		return false;
-	return true;
-
-}
-
-bool TinyCReader::defaults() {
 	if (operands()) {
 		return true;
 	}

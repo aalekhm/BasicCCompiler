@@ -37,6 +37,8 @@ enum class OPCODE
 	POPI,
 	POPR,
 	NEGATE,
+	MALLOC,
+	FREE,
 
 	HLT,
 };

@@ -10,6 +10,8 @@ class TinyCReader {
 		TinyCReader();
 
 		void addKeywords() {
+			GrammerUtils::m_vKeywords.push_back("static");
+			GrammerUtils::m_vKeywords.push_back("void");
 			GrammerUtils::m_vKeywords.push_back("int");
 			GrammerUtils::m_vKeywords.push_back("void");
 			GrammerUtils::m_vKeywords.push_back("int");
@@ -28,6 +30,9 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("putc");
 			GrammerUtils::m_vKeywords.push_back("int");
 			GrammerUtils::m_vKeywords.push_back("string");
+			GrammerUtils::m_vKeywords.push_back("void");
+			GrammerUtils::m_vKeywords.push_back("malloc");
+			GrammerUtils::m_vKeywords.push_back("free");
 			GrammerUtils::m_vKeywords.push_back("||");
 			GrammerUtils::m_vKeywords.push_back("&&");
 			GrammerUtils::m_vKeywords.push_back("==");
@@ -38,6 +43,8 @@ class TinyCReader {
 
 		bool def();
 		bool functionList();
+		bool staticDeclarations();
+		bool staticVoidPtr();
 		bool functionDef();
 		bool returnType();
 		bool functionArgumentDefList();
@@ -77,7 +84,11 @@ class TinyCReader {
 		bool assignmentNewVariable();
 		bool newInt();
 		bool newString();
+		bool newVoidPtr();
+		bool voidPtrAssign();
+		bool malloc();
 		bool assignmentRHS();
+		bool freePtrStatement();
 		bool expr();
 		bool logicalor_expr();
 		bool and_expr();
@@ -95,7 +106,6 @@ class TinyCReader {
 		bool multiplication_expr_optional();
 		bool mul_div_mod();
 		bool primary();
-		bool defaults();
 		bool operands();
 		bool tk_identifier();
 		bool unary_expr();

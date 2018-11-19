@@ -34,7 +34,7 @@ class GrammerUtils
 		static std::vector<std::string>				m_vKeywords;
 
 		static int									iTabCount;
-		static void									printAST(Tree* pNode);
+		static void									printAST(Tree* pNode, bool bPrintTabs = true);
 		static void									printTabs();
 
 		static void									generateCode(Tree* pRootNode);
@@ -61,6 +61,7 @@ class GrammerUtils
 		static void									handleIdentifier(Tree* pNode);
 		static void									handleString(Tree* pNode);
 		static void									handlePrimitiveInt(Tree* pNode);
+		static void									handlePrimitiveVoidPtrEpilogue(Tree* pNode);
 		static void									handleAssign(Tree* pNode);
 		static void									handleReturnStatement(Tree* pNode);
 		static void									handleIfWhile(Tree* pNode);
@@ -72,6 +73,9 @@ class GrammerUtils
 		static void									handleSwitchCasePrologue(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets);
 		static void									handleSwitchCases(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets, std::vector<uint32_t>& vCaseBreakJmpHoles);
 		static void									handleSwitchCaseEpilogues(Tree* pNode, std::vector<uint32_t>& vCaseBreakJmpHoles);
+		static void									handleMalloc(Tree* pNode);
+		static void									handleFree(Tree* pNode);
+		static void									handleStatics(Tree* pNode);
 
 		static void									handleStatements(Tree* pNode);
 

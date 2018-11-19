@@ -1,6 +1,23 @@
 
-<def>							::= 	<functionList>;
-<functionList>					::=		{ <functionDef> } ;
+<def>							::= 	{ <functionList> };
+<functionList>					::=		( 	<staticDeclarations>
+											|
+											<functionDef> 
+										) ;
+										
+<staticDeclarations>			::=		( <staticVoidPtr> );
+
+<staticVoidPtr>					::=		"static"
+										"void"
+										'*'
+										TK_IDENTIFIER		"<code>"
+																std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
+																Tree* pStaticVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR, sStaticVariableName.c_str());																
+																m_pASTCurrentNode->addChild(pStaticVoidPtrNode);
+																FunctionInfo::addStaticVariable(pStaticVoidPtrNode);
+															"</code>"
+										';';
+
 <functionDef>					::=		<returnType>		"<code>"
 																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
@@ -121,6 +138,8 @@
 											<bracesstmtlist> 
 											| 
 											<returnStatement>
+											|
+											<freePtrStatement>
 										);
 										
 <prePostFixedIncrDecr>			::=		(	<preFixIncrDecr>
@@ -624,7 +643,7 @@
 															"</code>"
 										;
 
-<assignmentNewVariable>			::=		( <newInt> | <newString> );
+<assignmentNewVariable>			::=		( <newInt> | <newString> | <newVoidPtr> );
 
 <newInt>						::= 	"int" 
 										TK_IDENTIFIER 		"<code>"
@@ -649,7 +668,6 @@
 																	pTemp = m_pASTCurrentNode;
 																	m_pASTCurrentNode = pExpressionLeftLeaf;
 																}
-
 															"</code>"
 										<expr>				"<code>"
 																m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
@@ -684,6 +702,57 @@
 															"</code>"
 										;
 
+<newVoidPtr>					::=		"void" '*'
+										TK_IDENTIFIER		"<code>"
+																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedVariableName;
+																sFullyQualifiedVariableName.append(getBlockString());
+																sFullyQualifiedVariableName.append(sVariableName);
+															"</code>"
+										'='					"<code>" 
+																Tree* pPrimVoidPtrNode = makeLeaf(ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR, sFullyQualifiedVariableName.c_str());
+																Tree* pTemp = nullptr;
+																{
+																	pTemp = m_pASTCurrentNode;
+																	pPrimVoidPtrNode->m_sAdditionalInfo.append(sVariableName);
+																	pPrimVoidPtrNode->m_pParentNode = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pPrimVoidPtrNode;
+																}																
+															"</code>"
+										<voidPtrAssign>		"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pPrimVoidPtrNode);
+															"</code>"
+										;
+
+<voidPtrAssign>					::=		( <malloc> );
+									
+<malloc>						::=		"malloc"			"<code>"
+																Tree* pMallocNode = makeLeaf(ASTNodeType::ASTNode_MALLOC, "");
+																{
+																	pMallocNode->m_pParentNode = m_pASTCurrentNode;
+																}
+																
+																Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																Tree* pTemp = nullptr;
+																{
+																	pMallocNode->m_pLeftNode = pExpressionLeftLeaf;
+																	pExpressionLeftLeaf->m_pParentNode = pMallocNode;
+																	
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pExpressionLeftLeaf;
+																}
+
+															"</code>"
+										'('
+											<expr>			"<code>"
+																m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+																
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pMallocNode);
+															"</code>"
+										')';
+										
 <assignmentRHS>					::=  	TK_IDENTIFIER
 										"<code>"
 											std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
@@ -721,8 +790,23 @@
 															m_pASTCurrentNode->addChild(pAssignmentNode);
 														"</code>"
 										;
-																														
-<expr>                			::=		<and_expr> { <logicalor_expr> } ;
+										
+<freePtrStatement>				::=		"free"
+										'('
+										TK_IDENTIFIER	"<code>"
+															std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															assert(!sFullyQualifiedVariableName.empty());
+
+															Tree* pFreePtrLeaf = makeLeaf(ASTNodeType::ASTNode_FREE, sFullyQualifiedVariableName.c_str());
+															m_pASTCurrentNode->addChild(pFreePtrLeaf);
+														"</code>"
+										')';
+
+<expr>                			::=		(	<voidPtrAssign>
+											|
+											<and_expr> { <logicalor_expr> } 
+										);
 										
 <logicalor_expr>				::=		"||" 		"<code>" 
 														checkOpPrecedenceAndPush("||");
@@ -791,12 +875,11 @@
 													"</code>"
 										) ;
 
-<primary>             			::=   	<defaults> ;
-<defaults>						::= 	( 	<operands> 
+<primary>             			::=   	( 	<operands>
 											| 
 											<unary_expr>
 											|
-											<paren_expr> 
+											<paren_expr>
 										) ;
 										
 <operands>						::=		"<code>"

@@ -15,5 +15,7 @@ int main(int argc, char* argv[])
 	TinyCReader* pTinyCReader = new TinyCReader();
 	pTinyCReader->read(sFilename.c_str());
 
+	system("copyMainDotO.bat");
+
 	exit(EXIT_SUCCESS);
 }

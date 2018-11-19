@@ -18,6 +18,8 @@ FunctionInfo*							GrammerUtils::m_pCurrentFunction;
 ByteArrayOutputStream*					GrammerUtils::m_pBAOS;
 ByteArrayInputStream*					GrammerUtils::m_pBAIS;
 
+std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
+
 #define VERBOSE	1
 #define EMIT_1(__ICODE__, __OPERAND__)					emit(__ICODE__, (int)__OPERAND__);
 #define EMIT_2(__ICODE__, __OPERAND1__, __OPERAND2__)	emit(__ICODE__, (int)__OPERAND1__, (int)__OPERAND2__);
@@ -69,6 +71,9 @@ CodeMap opCodeMap[] =
 	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8},
 	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8},
 	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8},
+
+	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8},
+	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
 };
@@ -192,15 +197,24 @@ void GrammerUtils::printTabs()
 	}
 }
 
-void GrammerUtils::printAST(Tree* pNode)
+void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 {
 	Tree* pLeftNode = pNode->m_pLeftNode;
 	Tree* pRightNode = pNode->m_pRightNode;
 	bool bProcessChildren = true;
 
-	printTabs();
+	if(bPrintTabs)
+	{
+		printTabs();
+	}
+
 	switch (pNode->m_eASTNodeType)
 	{
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:
+		{
+			std::cout << "static void* " << pNode->m_sText << ";";
+		}
+		break;
 		case ASTNodeType::ASTNode_FUNCTIONDEF:
 		{
 			Tree* pReturnTypeNode = pNode->m_pLeftNode;
@@ -260,6 +274,29 @@ void GrammerUtils::printAST(Tree* pNode)
 			std::cout << ";";
 		}
 		break;
+		case ASTNodeType::ASTNode_MALLOC:
+		{
+			std::cout << "malloc(";
+
+			Tree* pExpressionNode = pNode->m_pLeftNode;
+			std::cout << pExpressionNode->m_sText;
+
+			std::cout << ");";
+		}
+		break;
+		case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
+		{
+			std::cout << "void* " << pNode->m_sText;
+			std::cout << " = ";
+
+			for (Tree* pChild : pNode->m_vStatements)
+			{
+				printAST(pChild, false);
+			}
+
+			bProcessChildren = false;
+		}
+		break;
 		case ASTNodeType::ASTNode_PREDECR:
 		case ASTNodeType::ASTNode_PREINCR:
 		{
@@ -298,7 +335,16 @@ void GrammerUtils::printAST(Tree* pNode)
 				}
 			}
 
-			std::cout << pIdentifierNode->m_sText << " = " << pExpressionNode->m_sText << ";" << std::endl;
+			if (pExpressionNode->m_vStatements.size() > 0)
+			{
+				std::cout << pIdentifierNode->m_sText << " = ";
+				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
+				{
+					printAST(pChildNode, false);
+				}
+			}
+			else
+				std::cout << pIdentifierNode->m_sText << " = " << pExpressionNode->m_sText << ";" << std::endl;
 
 			// PostFix
 			if (pExpressionNode->m_pRightNode != nullptr)
@@ -413,6 +459,14 @@ void GrammerUtils::printAST(Tree* pNode)
 			{
 				std::cout << pChildNode->m_sText << ", ";
 			}
+			std::cout << ";";
+
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_FREE:
+		{
+			std::cout << "free(" << pNode->m_sText.c_str() << ")";
 			std::cout << ";";
 
 			bProcessChildren = false;
@@ -654,6 +708,11 @@ void GrammerUtils::populateCode(Tree* pNode)
 		// Prologues
 		switch (pNode->m_eASTNodeType)
 		{
+			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICVOIDPTR:
+			{
+				handleStatics(pNode);
+			}
+			break;
 			case ASTNodeType::ASTNode_FUNCTIONDEF:
 			{
 				handleFunctionDef(pNode);
@@ -734,6 +793,18 @@ void GrammerUtils::populateCode(Tree* pNode)
 				bProcessStatements = false;					// Since we are processing the child statements in "handleSwitch()"
 			}
 			break;
+			case ASTNodeType::ASTNode_MALLOC:
+			{
+				handleMalloc(pNode);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleMalloc()"
+			}
+			break;
+			case ASTNodeType::ASTNode_FREE:
+			{
+				handleFree(pNode);
+				bProcessStatements = false;					// No childrens.
+			}
+			break;
 		}
 
 		if (bProcessStatements)
@@ -748,6 +819,11 @@ void GrammerUtils::populateCode(Tree* pNode)
 			case ASTNodeType::ASTNode_RETURNSTMT:
 			{
 				handleReturnStatement(pNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
+			{
+				handlePrimitiveVoidPtrEpilogue(pNode);
 			}
 			break;
 		}
@@ -795,6 +871,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::STORE:
 		case OPCODE::FETCH:
 		case OPCODE::PUSHI:
+		case OPCODE::FREE:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
@@ -813,14 +890,6 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 #endif
 			EMIT_BYTE(eOPCODE);
 			EMIT_BYTE(iOperand);
-		}
-		break;
-		case OPCODE::RET:
-		{
-#if (VERBOSE == 1)
-			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl << std::endl;
-#endif
-			EMIT_BYTE(eOPCODE);
 		}
 		break;
 		case OPCODE::CALL:
@@ -851,6 +920,8 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::PRTC:
 		case OPCODE::PRTI:
 		case OPCODE::PRTS:
+		case OPCODE::MALLOC:
+		case OPCODE::RET:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
@@ -1237,6 +1308,11 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 }
 
+void GrammerUtils::handlePrimitiveVoidPtrEpilogue(Tree* pNode)
+{
+	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+}
+
 void GrammerUtils::handleAssign(Tree* pNode)
 {
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
@@ -1475,6 +1551,25 @@ void GrammerUtils::handleSwitchCaseEpilogues(Tree* pNode, std::vector<uint32_t>&
 	{
 		EMIT_INT_ATPOS(CURRENT_OFFSET, iBreakJumpHole);
 	}
+}
+
+void GrammerUtils::handleMalloc(Tree* pNode)
+{
+	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
+	populateCode(pExpressionNode);					// The amount of bytes to allocate will be calculated at runtime & pushed onto the STACK.
+
+	EMIT_1(OPCODE::MALLOC, 0);						// MALLOC will pull the amount of bytes to allocate from the STACK & reserve memory on heap.
+													// The address of allocated memory location will be pushed onto the STACK.
+}
+
+void GrammerUtils::handleFree(Tree* pNode)
+{
+	EMIT_1(OPCODE::FREE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+}
+
+void GrammerUtils::handleStatics(Tree* pNode)
+{
+	FunctionInfo::addStaticVariable(pNode);
 }
 
 void GrammerUtils::handleStatements(Tree* pNode)

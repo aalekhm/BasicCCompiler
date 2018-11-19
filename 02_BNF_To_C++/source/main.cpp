@@ -11,5 +11,7 @@ int main(int argc, char* argv[])
 	BNFToCpp* pBNFToCpp = new BNFToCpp();
 	pBNFToCpp->process(argv[1], argv[2]);
 
+	system("copyTinyCReader.bat");
+
 	exit(EXIT_SUCCESS);
 }

@@ -15,8 +15,19 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+static void* pStaticPtr;
+
 int retNewFunc()
 {
+	int j = 32;
+	void* pNew = malloc(j * 10);
+	print("pNew Allocated @", pNew);
+	putc(10);
+	
+	pStaticPtr = malloc(j * 20);
+	print("pNew Allocated @", pStaticPtr);
+	putc(10);	
+	
 	print("In retNewFunc() start");
 	putc(10);
 	
@@ -58,7 +69,12 @@ int retNewFunc()
 		putc(10);
 	}
 	
-	return 1977;
+	free(pNew);
+	free(pStaticPtr);
+	
+	int iReturnValue = 1977;
+	
+	return iReturnValue;
 }
 
 int retFunc()

@@ -132,7 +132,7 @@ namespace TokenType
 
 	inline TokenType::Type fromString(std::string sTokenType)
 	{
-		if(sTokenType == "TK_MUL")						return Type::TK_MUL;
+			 if(sTokenType == "TK_MUL")					return Type::TK_MUL;
 		else if(sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
 		else if(sTokenType == "TK_DIV")					return Type::TK_DIV;
 		else if(sTokenType == "TK_DIVEQ")				return Type::TK_DIVEQ;
@@ -155,7 +155,7 @@ namespace TokenType
 		else if(sTokenType == "TK_BITWISEAND")			return Type::TK_BITWISEAND;
 		else if(sTokenType == "TK_BITWISEOR")			return Type::TK_BITWISEOR;
 		else if(sTokenType == "TK_IF")					return Type::TK_IF;
-		else if(sTokenType == "TK_ELSE")					return Type::TK_ELSE;
+		else if(sTokenType == "TK_ELSE")				return Type::TK_ELSE;
 		else if(sTokenType == "TK_FOR")					return Type::TK_FOR;
 		else if(sTokenType == "TK_WHILE")				return Type::TK_WHILE;
 		else if(sTokenType == "TK_PRINT")				return Type::TK_PRINT;
@@ -245,6 +245,8 @@ enum class OPCODE
 	POPI,
 	POPR,
 	NEGATE,
+	MALLOC,
+	FREE,
 	HLT,
 };
 
@@ -388,6 +390,7 @@ enum class ASTNodeType
 	ASTNode_FUNCTIONEND,
 	ASTNode_PRIMITIVETYPEINT,
 	ASTNode_PRIMITIVETYPESTRING,
+	ASTNode_PRIMITIVETYPEVOIDPTR,
 	ASTNode_FUNCTIONCALL,
 	ASTNode_RETURNSTMT,
 	ASTNode_FUNCTIONCALLEND,
@@ -400,7 +403,10 @@ enum class ASTNodeType
 	ASTNode_SWITCH,
 	ASTNode_SWITCHCASE,
 	ASTNode_SWITCHDEFAULT,
-	ASTNode_SWITCHBREAK
+	ASTNode_SWITCHBREAK,
+	ASTNode_MALLOC,
+	ASTNode_FREE,
+	ASTNode_PRIMITIVETYPESTATICVOIDPTR,
 };
 
 typedef struct Tree
@@ -470,6 +476,14 @@ typedef struct Tree
 	Tree*				m_pRightNode;
 } Tree;
 
+enum class E_VARIABLETYPE
+{
+	INVALID = -1,
+	ARGUMENT,
+	LOCAL,
+	STATIC
+};
+
 typedef struct FunctionInfo
 {
 	FunctionInfo(Tree* pNode, int iOffset)
@@ -491,6 +505,7 @@ typedef struct FunctionInfo
 			{
 				case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
 				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
 				{
 					m_vLocalVariables.push_back(pChild);
 				}
@@ -520,6 +535,7 @@ typedef struct FunctionInfo
 			{
 				case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
 				case ASTNodeType::ASTNode_PRIMITIVETYPESTRING:
+				case ASTNodeType::ASTNode_PRIMITIVETYPEVOIDPTR:
 				{
 					m_vArguments.push_back(pChild);
 				}
@@ -530,33 +546,57 @@ typedef struct FunctionInfo
 
 	int getLocalVariablePosition(const char* sLocalVariableName)
 	{
-		bool bFound = false;
-		int iPosition = 0;
-		for (Tree* pLocalVar : m_vLocalVariables)
+		short iShortPosition = 0;
+		E_VARIABLETYPE eVariableType = E_VARIABLETYPE::INVALID;
+
+		// Check for 'Locals'
+		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
 		{
-			iPosition++;
-			bFound = pLocalVar->m_sText == sLocalVariableName;
-			if(bFound)
+			iShortPosition++;
+			if(pLocalVar->m_sText == sLocalVariableName)
 			{
+				eVariableType = E_VARIABLETYPE::LOCAL;
 				break;
 			}
 		}
-
-		if (!bFound)
+		
+		// Check for 'Arguments'
+		if (eVariableType == E_VARIABLETYPE::INVALID)
 		{
-			iPosition = 0;
-			for (Tree* pLocalVar : m_vArguments)
+			iShortPosition = 0;
+			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
 			{
-				bFound = pLocalVar->m_sText == sLocalVariableName;
-				if (bFound)
+				if (pLocalVar->m_sText == sLocalVariableName)
 				{
+					eVariableType = E_VARIABLETYPE::ARGUMENT;
 					break;
 				}
-				iPosition--;
+				iShortPosition++;
 			}
 		}
 
-		assert(bFound);
+		// Check for 'Static'
+		if (eVariableType == E_VARIABLETYPE::INVALID)
+		{
+			iShortPosition = 0;
+			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
+			{	
+				if (pStaticVar->m_sText == sLocalVariableName)
+				{
+					eVariableType = E_VARIABLETYPE::STATIC;
+					break;
+				}
+				iShortPosition++;
+			}
+		}
+
+		assert(eVariableType != E_VARIABLETYPE::INVALID);
+
+		int iPosition = 0;
+
+		iPosition = (int32_t)eVariableType;
+		iPosition <<= sizeof(int16_t) * 8;
+		iPosition |= (iShortPosition & 0x0000FFFF);
 
 		return iPosition;
 	}
@@ -571,13 +611,30 @@ typedef struct FunctionInfo
 		return m_vArguments.size();
 	}
 
-	Tree*					m_pNode;
-	int						m_iStartOffsetInCode;
-	std::string				m_sFunctionName;
+	static void addStaticVariable(Tree* pNode)
+	{
+		bool bIsNew = true;
+		for (Tree* pStaticVar : m_vStaticVariables)
+		{
+			if(pNode->m_sText == pStaticVar->m_sText) {
+				bIsNew = false;
+				break;
+			}
+		}
 
-	Tree*					m_pFunctionReturnType;
-	Tree*					m_pFunctionArguments;
+		if(bIsNew)
+			m_vStaticVariables.push_back(pNode);
+	}
 
-	std::vector<Tree*>		m_vLocalVariables;
-	std::vector<Tree*>		m_vArguments;
+	Tree*							m_pNode;
+	int								m_iStartOffsetInCode;
+	std::string						m_sFunctionName;
+
+	Tree*							m_pFunctionReturnType;
+	Tree*							m_pFunctionArguments;
+
+	std::vector<Tree*>				m_vLocalVariables;
+	std::vector<Tree*>				m_vArguments;
+
+	static std::vector<Tree*>		m_vStaticVariables;
 } FunctionInfo;

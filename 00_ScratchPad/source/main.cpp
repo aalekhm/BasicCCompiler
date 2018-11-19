@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <assert.h>
+#include "Singleton.h"
 
 enum class ENDIANNESS
 {
@@ -174,6 +175,11 @@ class ByteArrayOuputStream
 };
 
 #define BUFF_SIZE 512
+
+class A : public Singleton<A>
+{
+
+};
 
 int main(int argc, char* argv[])
 {
