@@ -48,7 +48,7 @@ enum class OPCODE
 
 #define CS_START_OFFSET				0
 #define DS_START_OFFSET				CS_START_OFFSET + MAX_BYTECODE_SIZE
-#define SS_START_OFFSET				DS_START_OFFSET + MAX_DATA_SIZE
+#define SS_START_OFFSET				MAX_RAM_SIZE - 1
 
 #define READ_OPERAND(__eOpCode__)	readOperandFor(__eOpCode__)
 
@@ -119,21 +119,21 @@ enum class EREGISTERS
 
 typedef struct REGISTERS
 {
-	__int64		RAX;	// Accumulator
-	__int64		RCX;	// Counter
-	__int64		RDX;	// Data
-	__int64		RBX;	// Base
-	__int64		RSP;	// Stack Pointer
-	__int64		RBP;	// Stack Base Pointer
-	__int64		RSI;	// Source
-	__int64		RDI;	// Destination
+	int64_t		RAX;	// Accumulator
+	int64_t		RCX;	// Counter
+	int64_t		RDX;	// Data
+	int64_t		RBX;	// Base
+	int64_t		RSP;	// Stack Pointer
+	int64_t		RBP;	// Stack Base Pointer
+	int64_t		RSI;	// Source
+	int64_t		RDI;	// Destination
 
-	__int32		CS;		// Code Segment Register
-	__int32		DS;		// Data Segment Register
-	__int32		SS;		// Stack Segment Register
+	int32_t		CS;		// Code Segment Register
+	int32_t		DS;		// Data Segment Register
+	int32_t		SS;		// Stack Segment Register
 
-	__int32		EFLAGS;
-	__int32		EIP;
+	int32_t		EFLAGS;
+	int32_t		EIP;
 } REGISTERS;
 
 class VirtualMachine
