@@ -279,16 +279,14 @@ std::string RandomAccessFile::readLine()
 
 		if (iLineLength > 0)
 		{
-			char* pLine = new char[iLineLength + strlen("\r\n") + 1];
-			::memset(pLine, 0, sizeof(pLine));
-			pLine[iLineLength] = '\0';
+			void* pLine = calloc(iLineLength, sizeof(pLine));
 
 			fseek(m_pFileObj, iPrevFilePointer, SEEK_SET);
 
 			int iRead = fread(pLine, sizeof(char), iLineLength, m_pFileObj);
 			fseek(m_pFileObj, m_iFileOffset, SEEK_SET);
 
-			std::string sLine = pLine;
+			std::string sLine = (char*)pLine;
 			delete[] pLine;
 
 			return sLine;

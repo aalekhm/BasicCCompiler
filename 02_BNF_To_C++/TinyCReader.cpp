@@ -908,7 +908,7 @@ if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 																assert(!sFullyQualifiedVariableName.empty());
 
-																Tree* pIdentifierNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName);
+																Tree* pIdentifierNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
 																m_pASTCurrentNode->addChild(pIdentifierNode);
 															
 return true;
