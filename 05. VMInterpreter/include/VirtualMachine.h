@@ -41,8 +41,16 @@ enum class OPCODE
 	HLT,
 };
 
-#define MAX_BYTECODE_SIZE	1024
-#define MAX_STACK_SIZE		256
+#define MAX_BYTECODE_SIZE			4096
+#define MAX_DATA_SIZE				1536
+#define MAX_STACK_SIZE				256
+#define MAX_RAM_SIZE				6144
+
+#define CS_START_OFFSET				0
+#define DS_START_OFFSET				CS_START_OFFSET + MAX_BYTECODE_SIZE
+#define SS_START_OFFSET				DS_START_OFFSET + MAX_DATA_SIZE
+
+#define READ_OPERAND(__eOpCode__)	readOperandFor(__eOpCode__)
 
 enum EFLAGS_BIT
 {
@@ -120,6 +128,10 @@ typedef struct REGISTERS
 	__int64		RSI;	// Source
 	__int64		RDI;	// Destination
 
+	__int32		CS;		// Code Segment Register
+	__int32		DS;		// Data Segment Register
+	__int32		SS;		// Stack Segment Register
+
 	__int32		EFLAGS;
 	__int32		EIP;
 } REGISTERS;
@@ -133,19 +145,23 @@ class VirtualMachine
 		void						run(const char* sMachineCodeFile);
 	protected:
 		void						reset();
+		int							loadBSS(const char* iByteCode, int startOffset, int iBuffLength);
+		int							loadCode(const char* iByteCode, int startOffset, int iBuffLength);
+		void						load(const char* iByteCode, int iBuffLength);
 		void						execute(const char* iByteCode);
 		OPCODE						fetch();
 		void						eval(OPCODE eOpCode);
+		int64_t						readOperandFor(OPCODE eOpCode);
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();
 
 		REGISTERS					REGS;
-		int							STACK[MAX_STACK_SIZE];
-		int*						m_pByteCode;
 
-		std::vector<std::string>	m_vStrings;
-		int*						m_pVariables;
+		int8_t*						CODE;
+		int32_t*					STACK;
 
 		bool						m_bRunning;
+
+		int8_t						RAM[MAX_RAM_SIZE];
 };

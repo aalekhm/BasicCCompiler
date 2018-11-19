@@ -114,6 +114,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\ByteArrayInputStream.h" />
+    <ClInclude Include="include\ByteArrayOutputStream.h" />
+    <ClInclude Include="include\ByteArrayStream.h" />
     <ClInclude Include="include\GrammerUtils.h" />
     <ClInclude Include="include\NonTerminal.h" />
     <ClInclude Include="include\RandomAccessFile.h" />
@@ -122,6 +125,9 @@
     <ClInclude Include="include\Token.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="source\ByteArrayInputStream.cpp" />
+    <ClCompile Include="source\ByteArrayOutputStream.cpp" />
+    <ClCompile Include="source\ByteArrayStream.cpp" />
     <ClCompile Include="source\GrammerUtils.cpp" />
     <ClCompile Include="source\main.cpp" />
     <ClCompile Include="source\NonTerminal.cpp" />

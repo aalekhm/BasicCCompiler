@@ -3,54 +3,62 @@
 
 VirtualMachine*	VirtualMachine::m_pVMInstance = nullptr;
 
+enum class PRIMIIVETYPE
+{
+	INT_8,
+	INT_16,
+	INT_32,
+	INT_64
+};
+
 struct CodeMap
 {
 	const char*		sOpCode;
 	OPCODE			eOpCode;
 	int				iOpcodeOperandCount;
+	PRIMIIVETYPE	ePRIMIIVETYPE;
 } opCodeMap[] =
 {
-	{ "NOP",		OPCODE::NOP,		1 },
-	{ "FETCH",		OPCODE::FETCH,		2 },
-	{ "STORE",		OPCODE::STORE,		2 },
-	{ "PUSH",		OPCODE::PUSH,		2 },
-	{ "POP",		OPCODE::POP,		2 },
-	{ "MUL",		OPCODE::MUL,		1 },
-	{ "DIV",		OPCODE::DIV,		1 },
-	{ "MOD",		OPCODE::MOD,		1 },
-	{ "ADD",		OPCODE::ADD,		1 },
-	{ "SUB",		OPCODE::SUB,		1 },
-	{ "JMP_LT",		OPCODE::JMP_LT,		1 },
-	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1 },
-	{ "JMP_GT",		OPCODE::JMP_GT,		1 },
-	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1 },
-	{ "JMP_EQ",		OPCODE::JMP_EQ,		1 },
-	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1 },
-	{ "LOGICALOR",	OPCODE::LOGICALOR,	1 },
-	{ "LOGICALAND",	OPCODE::LOGICALAND,	1 },
-	{ "NOT",		OPCODE::_NOT,		1 },
-	{ "JMP",		OPCODE::JMP,		2 },
-	{ "JZ",			OPCODE::JZ,			2 },
-	{ "JNZ",		OPCODE::JNZ,		2 },
-	{ "PRTS",		OPCODE::PRTS,		1 },
-	{ "PRTC",		OPCODE::PRTC,		1 },
-	{ "PRTI",		OPCODE::PRTI,		1 },
-	{ "CALL",		OPCODE::CALL,		2 },
-	{ "RET",		OPCODE::RET,		1 },
-	{ "SUB_REG",	OPCODE::SUB_REG,	3 },
-	{ "PUSHI",		OPCODE::PUSHI,		2 },
-	{ "PUSHR",		OPCODE::PUSHR,		2 },
-	{ "POPI",		OPCODE::POPI,		2 },
-	{ "POPR",		OPCODE::POPR,		2 },
-	{ "NEGATE",		OPCODE::NEGATE,		1 },
+	{ "NOP",		OPCODE::NOP,		1,  PRIMIIVETYPE::INT_8 },
+	{ "FETCH",		OPCODE::FETCH,		2,  PRIMIIVETYPE::INT_32 },
+	{ "STORE",		OPCODE::STORE,		2,  PRIMIIVETYPE::INT_32 },
+	{ "PUSH",		OPCODE::PUSH,		2,  PRIMIIVETYPE::INT_32 },
+	{ "POP",		OPCODE::POP,		2,  PRIMIIVETYPE::INT_32 },
+	{ "MUL",		OPCODE::MUL,		1,  PRIMIIVETYPE::INT_8 },
+	{ "DIV",		OPCODE::DIV,		1,  PRIMIIVETYPE::INT_8 },
+	{ "MOD",		OPCODE::MOD,		1,  PRIMIIVETYPE::INT_8 },
+	{ "ADD",		OPCODE::ADD,		1,  PRIMIIVETYPE::INT_8 },
+	{ "SUB",		OPCODE::SUB,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_LT",		OPCODE::JMP_LT,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_GT",		OPCODE::JMP_GT,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_EQ",		OPCODE::JMP_EQ,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1,  PRIMIIVETYPE::INT_8 },
+	{ "LOGICALOR",	OPCODE::LOGICALOR,	1,  PRIMIIVETYPE::INT_8 },
+	{ "LOGICALAND",	OPCODE::LOGICALAND,	1,  PRIMIIVETYPE::INT_8 },
+	{ "NOT",		OPCODE::_NOT,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP",		OPCODE::JMP,		2,  PRIMIIVETYPE::INT_32 },
+	{ "JZ",			OPCODE::JZ,			2,  PRIMIIVETYPE::INT_32 },
+	{ "JNZ",		OPCODE::JNZ,		2,  PRIMIIVETYPE::INT_32 },
+	{ "PRTS",		OPCODE::PRTS,		1,  PRIMIIVETYPE::INT_8 },
+	{ "PRTC",		OPCODE::PRTC,		1,  PRIMIIVETYPE::INT_8 },
+	{ "PRTI",		OPCODE::PRTI,		1,  PRIMIIVETYPE::INT_8 },
+	{ "CALL",		OPCODE::CALL,		2,  PRIMIIVETYPE::INT_32 },
+	{ "RET",		OPCODE::RET,		1,  PRIMIIVETYPE::INT_8 },
+	{ "SUB_REG",	OPCODE::SUB_REG,	3,  PRIMIIVETYPE::INT_8 },
 
-	{ "HLT",		OPCODE::HLT,		1 },
+	{ "PUSHI",		OPCODE::PUSHI,		2,  PRIMIIVETYPE::INT_32 },
+	{ "PUSHR",		OPCODE::PUSHR,		2,  PRIMIIVETYPE::INT_8 },
+	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8 },
+	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8 },
+	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8 },
+
+	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
 
 VirtualMachine::VirtualMachine()
-{
-
-}
+{ }
 
 VirtualMachine::~VirtualMachine()
 {
@@ -83,6 +91,7 @@ void VirtualMachine::run(const char* sMachineCodeFile)
 			if (iBytesRead > 0)
 			{
 				reset();
+				load(sBuff, iLength);
 				execute(sBuff);
 			}
 
@@ -96,40 +105,67 @@ void VirtualMachine::run(const char* sMachineCodeFile)
 void VirtualMachine::reset()
 {
 	memset(&REGS, 0, sizeof(REGS));
-	memset(&STACK, 0, sizeof(int) * MAX_STACK_SIZE);
+	memset(&RAM, 0, sizeof(char) * MAX_RAM_SIZE);
 
-	m_pByteCode = nullptr;
+	REGS.EIP = 0;
+	REGS.RSP = -1;
+	REGS.RBP = -1;
+
+	REGS.CS = CS_START_OFFSET;
+	REGS.SS = SS_START_OFFSET;
+	REGS.DS = DS_START_OFFSET;
+
 	m_bRunning = false;
+}
 
-	if (m_pVariables != nullptr)
+int VirtualMachine::loadBSS(const char* iByteCode, int startOffset, int iBuffLength)
+{
+	int iOffset = startOffset;
+	int iStringCount = iByteCode[iOffset++];
+
+	int iStringStartOffset = DS_START_OFFSET + (iStringCount * sizeof(int32_t));
+	int32_t* pStringLocOffset = (int32_t*)&RAM[DS_START_OFFSET];
+	for (int i = 0; i < iStringCount; i++)
 	{
-		delete[] m_pVariables;
+		int iStringSize = iByteCode[iOffset++];
+
+		*pStringLocOffset++ = iStringStartOffset;
+
+		memcpy(&RAM[iStringStartOffset], iByteCode + iOffset, sizeof(char) * iStringSize);
+		RAM[iStringStartOffset + sizeof(char) * iStringSize + 1] = 0;
+
+		iStringStartOffset += iStringSize + 1;
+		iOffset += iStringSize;
 	}
-	m_vStrings.clear();
+
+	return iOffset;
+}
+
+int VirtualMachine::loadCode(const char* iByteCode, int startOffset, int iBuffLength)
+{
+	int iOffset = startOffset;
+	int iCodeSize = iBuffLength - iOffset;
+
+	memcpy(CODE, iByteCode + iOffset, sizeof(char) * iCodeSize);
+
+	iOffset += iCodeSize;
+
+	return iOffset;
+}
+
+void VirtualMachine::load(const char* iByteCode, int iBuffLength)
+{
+	CODE = (int8_t*)&RAM[CS_START_OFFSET];
+	STACK = (int32_t*)&RAM[SS_START_OFFSET];
+
+	int iEndOffset = 0;
+	iEndOffset = loadBSS(iByteCode, 0, iBuffLength);
+	iEndOffset = loadCode(iByteCode, iEndOffset, iBuffLength);
 }
 
 void VirtualMachine::execute(const char* iByteCode)
 {
 	m_bRunning = true;
-
-	int iOffset = 0;
-
-	int iStringCount = iByteCode[iOffset++];
-	for (int i = 0; i < iStringCount; i++)
-	{
-		int iStringSize = iByteCode[iOffset++];
-		char sString[255] = { 0 };
-		memcpy(sString, iByteCode + iOffset, sizeof(char) * iStringSize);
-		m_vStrings.push_back(sString);
-
-		iOffset += iStringSize;
-	}
-
-	m_pByteCode = (int*)(iByteCode + iOffset);
-	REGS.EIP = 0;
-	REGS.RSP = -1;
-	REGS.RBP = -1;
-
 	while (m_bRunning)
 	{
 		eval(fetch());
@@ -138,7 +174,7 @@ void VirtualMachine::execute(const char* iByteCode)
 
 OPCODE VirtualMachine::fetch()
 {
-	return (OPCODE)m_pByteCode[REGS.EIP++];
+	return (OPCODE)CODE[REGS.EIP++];
 }
 
 void VirtualMachine::eval(OPCODE eOpCode)
@@ -147,20 +183,20 @@ void VirtualMachine::eval(OPCODE eOpCode)
 	switch (eOpCode)
 	{
 		case OPCODE::FETCH:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			STACK[++REGS.RSP] = STACK[REGS.RBP + iOperand];
 		break;
 		case OPCODE::STORE:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			STACK[REGS.RBP + iOperand] = STACK[REGS.RSP--];
 		break;
 		case OPCODE::PUSH:
 		case OPCODE::PUSHI:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			STACK[++REGS.RSP] = iOperand;
 		break;
 		case OPCODE::PUSHR:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			switch (iOperand)
 			{
 				case (int)EREGISTERS::RAX:	// Accumulator
@@ -193,7 +229,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::POPI:
 		break;
 		case OPCODE::POPR:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			switch (iOperand)
 			{
 				case (int)EREGISTERS::RAX:	// Accumulator
@@ -223,18 +259,16 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			}
 		break;
 		case OPCODE::CALL:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			REGS.RBP = REGS.RSP;					// ESP is now the new EBP.
 			REGS.EIP = iOperand;					// Jump to the call address.
 		break;
 		case OPCODE::RET:
 			REGS.EIP = STACK[REGS.RSP--];			// Pop the Return address off the stack.
-
-			//STACK[++REGS.RSP] = REGS.RAX;			// PUSH EAX onto the stack.
 		break;
 		case OPCODE::SUB_REG:
-			iOperand = m_pByteCode[REGS.EIP++];
-			iOperand2 = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
+			iOperand2 = READ_OPERAND(eOpCode);
 
 			switch (iOperand)
 			{
@@ -383,24 +417,30 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			STACK[++REGS.RSP] = -iTemp1;
 		break;
 		case OPCODE::JMP:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			REGS.EIP = iOperand;
 		break;
 		case OPCODE::JZ:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			iTemp1 = STACK[REGS.RSP--];
 			if(iTemp1 == 0)
 				REGS.EIP = iOperand;
 		break;
 		case OPCODE::JNZ:
-			iOperand = m_pByteCode[REGS.EIP++];
+			iOperand = READ_OPERAND(eOpCode);
 			iTemp1 = STACK[REGS.RSP--];
 			if(iTemp1 > 0)
 				REGS.EIP = iOperand;
 		break;
 		case OPCODE::PRTS:
+		{
 			iTemp1 = STACK[REGS.RSP--];
-			printf("%s", m_vStrings[iTemp1].c_str());
+
+			int32_t* pDS = (int32_t*)&RAM[DS_START_OFFSET];
+
+			int32_t iStringOffset = *(pDS + iTemp1);
+			printf("%s", &RAM[iStringOffset]);
+		}
 		break;
 		case OPCODE::PRTC:
 			iTemp1 = STACK[REGS.RSP--];
@@ -412,6 +452,46 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		break;
 		case OPCODE::HLT:
 			m_bRunning = false;
+		break;
+	}
+}
+
+int64_t VirtualMachine::readOperandFor(OPCODE eOpCode)
+{
+	CodeMap pMachineInstruction = opCodeMap[(int)eOpCode];
+	switch (pMachineInstruction.ePRIMIIVETYPE)
+	{
+		case PRIMIIVETYPE::INT_8:
+		{
+			int8_t iByte = *((int8_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+			REGS.EIP += sizeof(int8_t);
+
+			return iByte;
+		}
+		break;
+		case PRIMIIVETYPE::INT_16:
+		{
+			int16_t iShort = *((int16_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+			REGS.EIP += sizeof(int16_t);
+
+			return iShort;
+		}
+		break;
+		case PRIMIIVETYPE::INT_32:
+		{
+			int32_t iInt = *((int32_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+			REGS.EIP += sizeof(int32_t);
+
+			return iInt;
+		}
+		break;
+		case PRIMIIVETYPE::INT_64:
+		{
+			int64_t iLong = *((int64_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+			REGS.EIP += sizeof(int64_t);
+
+			return iLong;
+		}
 		break;
 	}
 }

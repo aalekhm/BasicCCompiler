@@ -9,7 +9,10 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	2048
+#define MAX_BYTECODE_SIZE	4096
+
+class ByteArrayOutputStream;
+class ByteArrayInputStream;
 
 class GrammerUtils
 {
@@ -42,48 +45,54 @@ class GrammerUtils
 		static int									getStringPosition(const char* sString);
 
 		static void									printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings);
-		static void									printAssembly(int* iByteCode, int iOffset, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings);
+		static void									printAssembly(int8_t* iByteCode, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings);
+	private:
+		static void									handleFunctionDef(Tree* pNode);
+		static void									handleFunctionStart(Tree* pNode);
+		static void									handleFunctionEnd(Tree* pNode);
+		static void									handleFunctionCall(Tree* pNode);
+
+		static void									handlePreFixExpression(Tree* pNode);
+		static void									handleExpression(Tree* pNode);
+		static void									handlePostFixExpression(Tree* pNode);
+
+		static void									handleCharacter(Tree* pNode);
+		static void									handleInteger(Tree* pNode);
+		static void									handleIdentifier(Tree* pNode);
+		static void									handleString(Tree* pNode);
+		static void									handlePrimitiveInt(Tree* pNode);
+		static void									handleAssign(Tree* pNode);
+		static void									handleReturnStatement(Tree* pNode);
+		static void									handleIfWhile(Tree* pNode);
+		static void									handleIfWhile_Prologue(Tree* pNode, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
+		static void									handleIf_Epilogue(Tree* pNode, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole);
+		static void									handleWhile_Epilogue(Tree* pNode, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
+		static void									handleSwitch(Tree* pNode);
+		static void									handleSwitchArgument(Tree* pNode);
+		static void									handleSwitchCasePrologue(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets);
+		static void									handleSwitchCases(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets, std::vector<uint32_t>& vCaseBreakJmpHoles);
+		static void									handleSwitchCaseEpilogues(Tree* pNode, std::vector<uint32_t>& vCaseBreakJmpHoles);
+
+		static void									handleStatements(Tree* pNode);
+
+		static void									populateCode(Tree* pNode);
+
+		static void									emit(OPCODE eOPCODE, int iOperand);
+		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2);
+
+		static void									emitByte(int8_t iCode);
+		static void									emitInt(int32_t iCode);
+
+		static void									emitIntAtPos(int32_t iCode, uint32_t iOffset);
 
 		static std::vector<std::string>				m_vVariables;
 		static std::vector<std::string>				m_vStrings;
 
 		static std::map<std::string, FunctionInfo*>	m_MapFunctionInfos;
 		static FunctionInfo*						m_pCurrentFunction;
-		
-		static int									m_iByteCode[MAX_BYTECODE_SIZE];
-		static int									m_iJumpHole;
-	private:
-		static void									handleFunctionDef(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleFunctionStart(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleFunctionEnd(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset);
 
-		static void									handlePreFixExpression(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleExpression(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handlePostFixExpression(Tree* pNode, int* pByteCode, int& iOffset);
+		static int8_t								m_iByteCode[MAX_BYTECODE_SIZE];
 
-		static void									handleCharacter(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleInteger(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleIdentifier(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleString(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handlePrimitiveInt(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleAssign(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleIfWhile(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleIfWhile_Prologue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
-		static void									handleIf_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole);
-		static void									handleWhile_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole);
-		static void									handleSwitch(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleSwitchArgument(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									handleSwitchCasePrologue(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets);
-		static void									handleSwitchCases(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets, std::vector<int>& vCaseBreakJmpHoles);
-		static void									handleSwitchCaseEpilogues(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseBreakJmpHoles);
-
-		static void									handleStatements(Tree* pNode, int* pByteCode, int& iOffset);
-
-		static void									populateCode(Tree* pNode, int* pByteCode, int& iOffset);
-		static void									emit(int iCode, int* pByteCode, int iOffset);
-
-		static void									emit(OPCODE eOPCODE, int iOperand, int* pByteCode, int& iOffset);
-		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2, int* pByteCode, int& iOffset);
+		static ByteArrayOutputStream*				m_pBAOS;
+		static ByteArrayInputStream*				m_pBAIS;
 };

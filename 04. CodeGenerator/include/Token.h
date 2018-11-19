@@ -248,11 +248,20 @@ enum class OPCODE
 	HLT,
 };
 
+enum class PRIMIIVETYPE
+{
+	INT_8,
+	INT_16,
+	INT_32,
+	INT_64
+};
+
 struct CodeMap
 {
 	const char*		sOpCode;
 	OPCODE			eOpCode;
 	int				iOpcodeOperandCount;
+	PRIMIIVETYPE	ePRIMIIVETYPE;
 };
 
 enum class EREGISTERS

@@ -1,4 +1,6 @@
 #include "GrammerUtils.h"
+#include "ByteArrayOutputStream.h"
+#include "ByteArrayInputStream.h"
 #include <assert.h>
 
 Token									GrammerUtils::m_pToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
@@ -10,55 +12,65 @@ StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
 int										GrammerUtils::iTabCount = 0;
 std::vector<std::string>				GrammerUtils::m_vVariables;
 std::vector<std::string>				GrammerUtils::m_vStrings;
-int										GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
+int8_t									GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
 std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapFunctionInfos;
 FunctionInfo*							GrammerUtils::m_pCurrentFunction;
+ByteArrayOutputStream*					GrammerUtils::m_pBAOS;
+ByteArrayInputStream*					GrammerUtils::m_pBAIS;
 
-#define VERBOSE							1
-#define EMIT_1(__ICODE__, __OPERAND__)					emit(__ICODE__, (int)__OPERAND__, m_iByteCode, iOffset);
-#define EMIT_2(__ICODE__, __OPERAND1__, __OPERAND2__)	emit(__ICODE__, (int)__OPERAND1__, (int)__OPERAND2__, m_iByteCode, iOffset);
+#define VERBOSE	1
+#define EMIT_1(__ICODE__, __OPERAND__)					emit(__ICODE__, (int)__OPERAND__);
+#define EMIT_2(__ICODE__, __OPERAND1__, __OPERAND2__)	emit(__ICODE__, (int)__OPERAND1__, (int)__OPERAND2__);
 
-#define EMIT(__ICODE__)					emit((int)__ICODE__, m_iByteCode, iOffset++);
-#define EMIT_NOOFFSETINCR(__ICODE__)	emit((int)__ICODE__, m_iByteCode, iOffset);
+#define EMIT(__ICODE__)									emit((int)__ICODE__);
+#define EMIT_NOOFFSETINCR(__ICODE__)					emit((int)__ICODE__);
+
+#define EMIT_BYTE(__ICODE__)							emitByte((int8_t)__ICODE__);
+#define EMIT_INT(__ICODE__)								emitInt((int32_t)__ICODE__);
+
+#define EMIT_INT_ATPOS(__ICODE__, __IOFFSET__)			emitIntAtPos((int32_t)__ICODE__, __IOFFSET__);
+
+#define CURRENT_OFFSET									m_pBAOS->getCurrentOffset()
+#define CURRENT_OFFSET_READ								m_pBAIS->getCurrentOffset()
 
 CodeMap opCodeMap[] =
 {
-	{ "NOP",		OPCODE::NOP,		1 },
-	{ "FETCH",		OPCODE::FETCH,		2 },
-	{ "STORE",		OPCODE::STORE,		2 },
-	{ "PUSH",		OPCODE::PUSH,		2 },
-	{ "POP",		OPCODE::POP,		2 },
-	{ "MUL",		OPCODE::MUL,		1 },
-	{ "DIV",		OPCODE::DIV,		1 },
-	{ "MOD",		OPCODE::MOD,		1 },
-	{ "ADD",		OPCODE::ADD,		1 },
-	{ "SUB",		OPCODE::SUB,		1 },
-	{ "JMP_LT",		OPCODE::JMP_LT,		1 },
-	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1 },
-	{ "JMP_GT",		OPCODE::JMP_GT,		1 },
-	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1 },
-	{ "JMP_EQ",		OPCODE::JMP_EQ,		1 },
-	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1 },
-	{ "LOGICALOR",	OPCODE::LOGICALOR,	1 },
-	{ "LOGICALAND",	OPCODE::LOGICALAND,	1 },
-	{ "NOT",		OPCODE::_NOT,		1 },
-	{ "JMP",		OPCODE::JMP,		2 },
-	{ "JZ",			OPCODE::JZ,			2 },
-	{ "JNZ",		OPCODE::JNZ,		2 },
-	{ "PRTS",		OPCODE::PRTS,		1 },
-	{ "PRTC",		OPCODE::PRTC,		1 },
-	{ "PRTI",		OPCODE::PRTI,		1 },
-	{ "CALL",		OPCODE::CALL,		2 },
-	{ "RET",		OPCODE::RET,		1 },
-	{ "SUB_REG",	OPCODE::SUB_REG,	3 },
+	{ "NOP",		OPCODE::NOP,		1,  PRIMIIVETYPE::INT_8},
+	{ "FETCH",		OPCODE::FETCH,		2,  PRIMIIVETYPE::INT_32},
+	{ "STORE",		OPCODE::STORE,		2,  PRIMIIVETYPE::INT_32},
+	{ "PUSH",		OPCODE::PUSH,		2,  PRIMIIVETYPE::INT_32},
+	{ "POP",		OPCODE::POP,		2,  PRIMIIVETYPE::INT_32},
+	{ "MUL",		OPCODE::MUL,		1,  PRIMIIVETYPE::INT_8},
+	{ "DIV",		OPCODE::DIV,		1,  PRIMIIVETYPE::INT_8},
+	{ "MOD",		OPCODE::MOD,		1,  PRIMIIVETYPE::INT_8},
+	{ "ADD",		OPCODE::ADD,		1,  PRIMIIVETYPE::INT_8},
+	{ "SUB",		OPCODE::SUB,		1,  PRIMIIVETYPE::INT_8},
+	{ "JMP_LT",		OPCODE::JMP_LT,		1,  PRIMIIVETYPE::INT_8},
+	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1,  PRIMIIVETYPE::INT_8},
+	{ "JMP_GT",		OPCODE::JMP_GT,		1,  PRIMIIVETYPE::INT_8},
+	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1,  PRIMIIVETYPE::INT_8},
+	{ "JMP_EQ",		OPCODE::JMP_EQ,		1,  PRIMIIVETYPE::INT_8},
+	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1,  PRIMIIVETYPE::INT_8},
+	{ "LOGICALOR",	OPCODE::LOGICALOR,	1,  PRIMIIVETYPE::INT_8},
+	{ "LOGICALAND",	OPCODE::LOGICALAND,	1,  PRIMIIVETYPE::INT_8},
+	{ "NOT",		OPCODE::_NOT,		1,  PRIMIIVETYPE::INT_8},
+	{ "JMP",		OPCODE::JMP,		2,  PRIMIIVETYPE::INT_32},
+	{ "JZ",			OPCODE::JZ,			2,  PRIMIIVETYPE::INT_32},
+	{ "JNZ",		OPCODE::JNZ,		2,  PRIMIIVETYPE::INT_32},
+	{ "PRTS",		OPCODE::PRTS,		1,  PRIMIIVETYPE::INT_8},
+	{ "PRTC",		OPCODE::PRTC,		1,  PRIMIIVETYPE::INT_8},
+	{ "PRTI",		OPCODE::PRTI,		1,  PRIMIIVETYPE::INT_8},
+	{ "CALL",		OPCODE::CALL,		2,  PRIMIIVETYPE::INT_32},
+	{ "RET",		OPCODE::RET,		1,  PRIMIIVETYPE::INT_8},
+	{ "SUB_REG",	OPCODE::SUB_REG,	3,  PRIMIIVETYPE::INT_8},
 
-	{ "PUSHI",		OPCODE::PUSHI,		2 },
-	{ "PUSHR",		OPCODE::PUSHR,		2 },
-	{ "POPI",		OPCODE::POPI,		2 },
-	{ "POPR",		OPCODE::POPR,		2 },
-	{ "NEGATE",		OPCODE::NEGATE,		1 },
+	{ "PUSHI",		OPCODE::PUSHI,		2,  PRIMIIVETYPE::INT_32},
+	{ "PUSHR",		OPCODE::PUSHR,		2,  PRIMIIVETYPE::INT_8},
+	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8},
+	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8},
+	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8},
 
-	{ "HLT",		OPCODE::HLT,		1 },
+	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
 };
 
 RegisterMap registerMap[]
@@ -497,6 +509,9 @@ void GrammerUtils::printAST(Tree* pNode)
 
 void GrammerUtils::generateCode(Tree* pRootNode)
 {
+	m_pBAOS = new ByteArrayOutputStream(m_iByteCode, MAX_BYTECODE_SIZE);
+	m_pBAIS = new ByteArrayInputStream(m_iByteCode, MAX_BYTECODE_SIZE);
+
 	printAST(pRootNode);
 
 	populateStrings(pRootNode, m_vStrings);
@@ -506,38 +521,40 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 	{
 		//////////////////////////////////////////////////////////////////////////////
 		// Call to main()
-		int iJumpMainOffsetHole = 0;
-		int iMainRetAddressHole = 0;
+		uint32_t iJumpMainOffsetHole = 0;
+		uint32_t iMainRetAddressHole = 0;
 		{
 			// RET
-			EMIT(OPCODE::PUSHI);
-			iMainRetAddressHole = iOffset++;
+			EMIT_BYTE(OPCODE::PUSHI);
+			iMainRetAddressHole = CURRENT_OFFSET;
+			EMIT_INT(0);
 
 			// EBP
-			EMIT(OPCODE::PUSHR);
-			EMIT(EREGISTERS::RBP);
+			EMIT_BYTE(OPCODE::PUSHR);
+			EMIT_BYTE(EREGISTERS::RBP);
 
 			// Currently main() does not take any arguments.
 			// Else push arguments here...
 
 			// Call to main(), offset populated later.
-			EMIT(OPCODE::CALL);
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << "CALL ";
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << "CALL ";
+#endif
+			EMIT_BYTE(OPCODE::CALL);
 
-			iJumpMainOffsetHole = iOffset++;
+			iJumpMainOffsetHole = CURRENT_OFFSET;
+			EMIT_INT(0);
 		}
 
 		//////////////////////////////////////////////////////////////////////////////
-		populateCode(pRootNode, m_iByteCode, iOffset);
+		populateCode(pRootNode);
 		//////////////////////////////////////////////////////////////////////////////
 
 		//////////////////////////////////////////////////////////////////////////////
-		EMIT_NOOFFSETINCR(OPCODE::HLT);
-		std::cout << iOffset << ". " << "HLT" << std::endl;
+		EMIT_INT_ATPOS(CURRENT_OFFSET, iMainRetAddressHole);//emit(iOffset, iMainRetAddressHole);
 
-		emit(iOffset, m_iByteCode, iMainRetAddressHole);
+		std::cout << CURRENT_OFFSET << ". " << "HLT" << std::endl;
+		EMIT_BYTE(OPCODE::HLT);
 		//////////////////////////////////////////////////////////////////////////////
 
 		//////////////////////////////////////////////////////////////////////////////
@@ -548,15 +565,14 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 		{
 			FunctionInfo* pMainFuncInfo = (FunctionInfo*)itrFuncMain->second;
 
-			emit(pMainFuncInfo->m_iStartOffsetInCode, m_iByteCode, iJumpMainOffsetHole);
-			#if (VERBOSE == 1)
-				std::cout << pMainFuncInfo->m_iStartOffsetInCode << std::endl;
-			#endif
+			EMIT_INT_ATPOS(pMainFuncInfo->m_iStartOffsetInCode, iJumpMainOffsetHole);
+#if (VERBOSE == 1)
+			std::cout << pMainFuncInfo->m_iStartOffsetInCode << std::endl;
+#endif
 		}
 		//////////////////////////////////////////////////////////////////////////////
 
-		iOffset = 0;
-		printAssembly(m_iByteCode, iOffset, m_vVariables, m_vStrings);
+		printAssembly(m_iByteCode, m_vVariables, m_vStrings);
 	}
 }
 
@@ -629,7 +645,7 @@ void GrammerUtils::addString(std::string& sText, std::vector<std::string>& vVect
 		vVector.push_back(sText);
 }
 
-void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::populateCode(Tree* pNode)
 {
 	if (pNode != nullptr)
 	{
@@ -640,81 +656,81 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 		{
 			case ASTNodeType::ASTNode_FUNCTIONDEF:
 			{
-				handleFunctionDef(pNode, pByteCode, iOffset);
+				handleFunctionDef(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONSTART:
 			{
-				handleFunctionStart(pNode, pByteCode, iOffset);
+				handleFunctionStart(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONEND:
 			{
-				handleFunctionEnd(pNode, pByteCode, iOffset);
+				handleFunctionEnd(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONCALLEND:
 			{
-				handleFunctionCall(pNode, pByteCode, iOffset);
+				handleFunctionCall(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_PREDECR:
 			case ASTNodeType::ASTNode_PREINCR:
 			{
-				handlePreFixExpression(pNode, pByteCode, iOffset);
+				handlePreFixExpression(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_POSTDECR:
 			case ASTNodeType::ASTNode_POSTINCR:
 			{
-				handlePostFixExpression(pNode, pByteCode, iOffset);
+				handlePostFixExpression(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_CHARACTER:
 			{
-				handleCharacter(pNode, pByteCode, iOffset);
+				handleCharacter(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_INTEGER:
 			{
-				handleInteger(pNode, pByteCode, iOffset);
+				handleInteger(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_IDENTIFIER:
 			{
-				handleIdentifier(pNode, pByteCode, iOffset);
+				handleIdentifier(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_STRING:
 			{
-				handleString(pNode, pByteCode, iOffset);
+				handleString(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_EXPRESSION:
 			{
-				handleExpression(pNode, pByteCode, iOffset);
+				handleExpression(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_PRIMITIVETYPEINT:
 			{
-				handlePrimitiveInt(pNode, pByteCode, iOffset);
+				handlePrimitiveInt(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_ASSIGN:
 			{
-				handleAssign(pNode, pByteCode, iOffset);
+				handleAssign(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_IF:
 			case ASTNodeType::ASTNode_WHILE:
 			{
-				handleIfWhile(pNode, pByteCode, iOffset);
+				handleIfWhile(pNode);
 				bProcessStatements = false;
 			}
 			break;
 			case ASTNodeType::ASTNode_SWITCH:
 			{
-				handleSwitch(pNode, pByteCode, iOffset);
+				handleSwitch(pNode);
 				bProcessStatements = false;					// Since we are processing the child statements in "handleSwitch()"
 			}
 			break;
@@ -723,7 +739,7 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 		if (bProcessStatements)
 		{
 			// Intermediates
-			handleStatements(pNode, pByteCode, iOffset);
+			handleStatements(pNode);
 		}
 
 		// Epilogues
@@ -731,42 +747,48 @@ void GrammerUtils::populateCode(Tree* pNode, int* pByteCode, int& iOffset)
 		{
 			case ASTNodeType::ASTNode_RETURNSTMT:
 			{
-				handleReturnStatement(pNode, pByteCode, iOffset);
+				handleReturnStatement(pNode);
 			}
 			break;
 		}
 	}
 }
 
-void GrammerUtils::emit(int iCode, int* pByteCode, int iOffset)
+void GrammerUtils::emitByte(int8_t iCode)
 {
-	if (iOffset < MAX_BYTECODE_SIZE)
-	{
-		pByteCode[iOffset] = iCode;
-	}
+	m_pBAOS->writeByte(iCode);
 }
 
-void GrammerUtils::emit(OPCODE eOPCODE, int iOperand1, int iOperand2, int* pByteCode, int& iOffset)
+void GrammerUtils::emitInt(int32_t iCode)
+{
+	m_pBAOS->writeInt(iCode);
+}
+
+void GrammerUtils::emitIntAtPos(int32_t iCode, uint32_t iOffset)
+{
+	m_pBAOS->writeIntAtPos(iCode, iOffset);
+}
+
+void GrammerUtils::emit(OPCODE eOPCODE, int iOperand1, int iOperand2)
 {
 	switch (eOPCODE)
 	{
 		case OPCODE::SUB_REG:
 		{
-			EMIT(eOPCODE);
-			EMIT(iOperand1);
-			EMIT(iOperand2);
-
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 3) << ". " << opCodeMap[(int)eOPCODE].sOpCode;
-				std::cout << " " << registerMap[iOperand1].sRegister;
-				std::cout << " " << iOperand2 << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode;
+			std::cout << " " << registerMap[iOperand1].sRegister;
+			std::cout << " " << iOperand2 << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
+			EMIT_BYTE(iOperand1);
+			EMIT_BYTE(iOperand2);
 		}
 		break;
 	}
 }
 
-void GrammerUtils::emit(OPCODE eOPCODE, int iOperand, int* pByteCode, int& iOffset)
+void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 {
 	switch (eOPCODE)
 	{
@@ -774,45 +796,41 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand, int* pByteCode, int& iOffs
 		case OPCODE::FETCH:
 		case OPCODE::PUSHI:
 		{
-			EMIT(eOPCODE);
-			EMIT(iOperand);
-
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
-				std::cout << iOperand << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+			std::cout << iOperand << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
+			EMIT_INT(iOperand);
 		}
 		break;
 		case OPCODE::PUSHR:
 		case OPCODE::POPR:
 		{
-			EMIT(eOPCODE);
-			EMIT(iOperand);
-
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
-				std::cout << registerMap[iOperand].sRegister << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+			std::cout << registerMap[iOperand].sRegister << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
+			EMIT_BYTE(iOperand);
 		}
 		break;
 		case OPCODE::RET:
 		{
-			EMIT(eOPCODE);
-
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
 		}
 		break;
 		case OPCODE::CALL:
 		{
-			EMIT(eOPCODE);
-			EMIT(iOperand);
-
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
-				std::cout << iOperand << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+			std::cout << iOperand << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
+			EMIT_INT(iOperand);
 		}
 		break;
 		case OPCODE::ADD:
@@ -834,11 +852,10 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand, int* pByteCode, int& iOffs
 		case OPCODE::PRTI:
 		case OPCODE::PRTS:
 		{
-			EMIT(eOPCODE);
-
-			#if (VERBOSE == 1)
-				std::cout << (iOffset - 1) << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
 		}
 		break;
 	}
@@ -878,20 +895,20 @@ int	GrammerUtils::getStringPosition(const char* sString)
 	}
 }
 
-void GrammerUtils::handleFunctionDef(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleFunctionDef(Tree* pNode)
 {
 	std::string sFuncName = pNode->m_sText;
 	Tree* pReturnTypeNode = pNode->m_pLeftNode;
 	Tree* pArgListNode = pNode->m_pRightNode;
 
-	m_pCurrentFunction = new FunctionInfo(pNode, iOffset);
+	m_pCurrentFunction = new FunctionInfo(pNode, CURRENT_OFFSET);
 	if (m_pCurrentFunction != nullptr)
 	{
 		m_MapFunctionInfos[sFuncName] = m_pCurrentFunction;
 	}
 }
 
-void GrammerUtils::handleFunctionStart(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleFunctionStart(Tree* pNode)
 {
 	std::cout << m_pCurrentFunction->m_sFunctionName << ":" << std::endl;
 
@@ -899,7 +916,7 @@ void GrammerUtils::handleFunctionStart(Tree* pNode, int* pByteCode, int& iOffset
 	EMIT_2(OPCODE::SUB_REG, EREGISTERS::RSP, -m_pCurrentFunction->getLocalVariableCount());
 }
 
-void GrammerUtils::handleFunctionEnd(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleFunctionEnd(Tree* pNode)
 {
 	// Stack Frame: Add local variable count from ESP.
 	EMIT_2(OPCODE::SUB_REG, EREGISTERS::RSP, m_pCurrentFunction->getLocalVariableCount());
@@ -920,7 +937,7 @@ void GrammerUtils::handleFunctionEnd(Tree* pNode, int* pByteCode, int& iOffset)
 	}
 }
 
-void GrammerUtils::handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleFunctionCall(Tree* pNode)
 {
 	// Callee function name
 	std::string sFuncCallee = pNode->m_sText;
@@ -961,7 +978,7 @@ void GrammerUtils::handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset)
 			ARG0		<--	EBP		EBP											|
 			...						...											|
 			ARGN		<--|		EBP - N										|	    /\
-			|--		Function arguments. Last Arg 1st(R to L).	|		||
+			|--		Function arguments. Last Arg 1st(R to L).					|		||
 			EBP			<-- Old EBP												|		||
 			RET			<-- Call Return Address									|	- Low Mem
 			//////////////////////////////////////////////////////
@@ -969,8 +986,9 @@ void GrammerUtils::handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset)
 
 			//////////////////////////////////////////////////////
 			// RET
-			EMIT(OPCODE::PUSHI);
-			int iReturnAddressOffsetHole = iOffset++;
+			EMIT_BYTE(OPCODE::PUSHI);
+			int iReturnAddressOffsetHole = CURRENT_OFFSET;
+			EMIT_INT(0);
 
 			// EBP
 			EMIT_1(OPCODE::PUSHR, EREGISTERS::RBP);
@@ -986,7 +1004,7 @@ void GrammerUtils::handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset)
 					Tree* pArgNode = *rItr;
 					if (pArgNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
 					{
-						populateCode(pArgNode, pByteCode, iOffset);
+						populateCode(pArgNode);
 					}
 				}
 			}
@@ -999,16 +1017,16 @@ void GrammerUtils::handleFunctionCall(Tree* pNode, int* pByteCode, int& iOffset)
 
 			//////////////////////////////////////////////////////
 			// Patch the return address
-			emit(iOffset, m_iByteCode, iReturnAddressOffsetHole);
+			EMIT_INT_ATPOS(CURRENT_OFFSET, iReturnAddressOffsetHole);
 
 			#if (VERBOSE == 1)
-				std::cout << "------" << "iReturnAddressOffsetHole [" << iReturnAddressOffsetHole << "] = " << iOffset << std::endl;
+				std::cout << "------" << "iReturnAddressOffsetHole [" << iReturnAddressOffsetHole << "] = " << CURRENT_OFFSET << std::endl;
 			#endif
 		}
 	}
 }
 
-void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 {
 	if (pPreFixNode != nullptr)
 	{
@@ -1020,7 +1038,7 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode, int* pByteCode, int
 			{
 				for (Tree* pChild : pPreFixNode->m_vStatements)
 				{
-					handlePreFixExpression(pChild, pByteCode, iOffset);
+					handlePreFixExpression(pChild);
 				}
 			}
 			break;
@@ -1053,7 +1071,7 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode, int* pByteCode, int
 	}
 }
 
-void GrammerUtils::handleExpression(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleExpression(Tree* pNode)
 {
 	std::string sRValuePostFixExpression = pNode->m_sText;
 	StringTokenizer* st = StringTokenizer::create(sRValuePostFixExpression.c_str());
@@ -1130,7 +1148,7 @@ void GrammerUtils::handleExpression(Tree* pNode, int* pByteCode, int& iOffset)
 	}
 }
 
-void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 {
 	if (pPostFixNode != nullptr)
 	{
@@ -1142,7 +1160,7 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode, int* pByteCode, i
 			{
 				for (Tree* pChild : pPostFixNode->m_vStatements)
 				{
-					handlePostFixExpression(pChild, pByteCode, iOffset);
+					handlePostFixExpression(pChild);
 				}
 			}
 			break;
@@ -1175,7 +1193,7 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode, int* pByteCode, i
 	}
 }
 
-void GrammerUtils::handleCharacter(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleCharacter(Tree* pNode)
 {
 	char pStr[255] = { 0 };
 	sprintf_s(pStr, "%d", pNode->m_sText.c_str()[0]);
@@ -1184,22 +1202,22 @@ void GrammerUtils::handleCharacter(Tree* pNode, int* pByteCode, int& iOffset)
 	EMIT_1(OPCODE::PUSHI, ch);
 }
 
-void GrammerUtils::handleInteger(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleInteger(Tree* pNode)
 {
 	EMIT_1(OPCODE::PUSHI, atoi(pNode->m_sText.c_str()));
 }
 
-void GrammerUtils::handleIdentifier(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleIdentifier(Tree* pNode)
 {
 	EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 }
 
-void GrammerUtils::handleString(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleString(Tree* pNode)
 {
 	EMIT_1(OPCODE::PUSHI, getStringPosition(pNode->m_sText.c_str()));
 }
 
-void GrammerUtils::handlePrimitiveInt(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 {
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
@@ -1208,38 +1226,38 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode, int* pByteCode, int& iOffset)
 	{
 		for (Tree* pChild : pExpressionNode->m_vStatements)
 		{
-			populateCode(pChild, pByteCode, iOffset);
+			populateCode(pChild);
 		}
 
 		EMIT_1(OPCODE::PUSHR, EREGISTERS::RAX);
 	}
 	else
-		populateCode(pExpressionNode, pByteCode, iOffset);
+		populateCode(pExpressionNode);
 
 	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 }
 
-void GrammerUtils::handleAssign(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleAssign(Tree* pNode)
 {
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
 
 	// Compute PreFixExpr
 	{
-		handlePreFixExpression(pExpressionNode->m_pLeftNode, pByteCode, iOffset);
+		handlePreFixExpression(pExpressionNode->m_pLeftNode);
 	}
 
-	populateCode(pExpressionNode, pByteCode, iOffset);
+	populateCode(pExpressionNode);
 
 	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 
 	// Compute PostFixExpr
 	{
-		handlePostFixExpression(pExpressionNode->m_pRightNode, pByteCode, iOffset);
+		handlePostFixExpression(pExpressionNode->m_pRightNode);
 	}
 }
 
-void GrammerUtils::handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleReturnStatement(Tree* pNode)
 {
 	///////////////////////////////////////////////////////////////
 	// The expression result is already pushed onto the stack !
@@ -1247,18 +1265,18 @@ void GrammerUtils::handleReturnStatement(Tree* pNode, int* pByteCode, int& iOffs
 	EMIT_1(OPCODE::POPR, EREGISTERS::RAX);
 }
 
-void GrammerUtils::handleIfWhile(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleIfWhile(Tree* pNode)
 {
 	int i_IfWhile_JCondition_Hole = 0, i_While_Loop_Hole = 0, i_ElseEnd_JMP_Offset = 0;
 
 	// Prologues
 	{
-		handleIfWhile_Prologue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
+		handleIfWhile_Prologue(pNode, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
 	}
 
 	// Intermediates
 	{
-		handleStatements(pNode, pByteCode, iOffset);
+		handleStatements(pNode);
 	}
 
 	// Epilogues
@@ -1267,102 +1285,106 @@ void GrammerUtils::handleIfWhile(Tree* pNode, int* pByteCode, int& iOffset)
 		{
 			case ASTNodeType::ASTNode_IF:
 			{
-				handleIf_Epilogue(pNode, pByteCode, iOffset, i_ElseEnd_JMP_Offset, i_IfWhile_JCondition_Hole);
+				handleIf_Epilogue(pNode, i_ElseEnd_JMP_Offset, i_IfWhile_JCondition_Hole);
 			}
 			break;
 			case ASTNodeType::ASTNode_WHILE:
 			{
-				handleWhile_Epilogue(pNode, pByteCode, iOffset, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
+				handleWhile_Epilogue(pNode, i_While_Loop_Hole, i_IfWhile_JCondition_Hole);
 			}
 			break;
 		}
 	}
 }
 
-void GrammerUtils::handleIfWhile_Prologue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
+void GrammerUtils::handleIfWhile_Prologue(Tree* pNode, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
 {
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
 	{
-		i_While_Loop_Hole = iOffset;
+		i_While_Loop_Hole = CURRENT_OFFSET;
 
-		handleExpression(pExpressionNode, pByteCode, iOffset);
+		handleExpression(pExpressionNode);
 
-		EMIT(OPCODE::JZ);
+		EMIT_BYTE(OPCODE::JZ);
 		#if (VERBOSE == 1)
-			std::cout << (iOffset - 1) << ". " << "JZ" << std::endl;
+			std::cout << CURRENT_OFFSET << ". " << "JZ" << std::endl;
 		#endif
 
-		i_IfWhile_JCondition_Hole = iOffset++;
+		i_IfWhile_JCondition_Hole = CURRENT_OFFSET;
+		EMIT_INT(0);
 	}
 }
 
-void GrammerUtils::handleIf_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole)
+void GrammerUtils::handleIf_Epilogue(Tree* pNode, int& i_ElseEnd_JMP_Offset, int& i_IfWhile_JCondition_Hole)
 {
 	Tree* pElseNode = pNode->m_pRightNode;
-	EMIT(OPCODE::JMP);
-	#if (VERBOSE == 1)
-		std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-	#endif
-	i_ElseEnd_JMP_Offset = iOffset++;
 
-	emit(iOffset, m_iByteCode, i_IfWhile_JCondition_Hole);
+#if (VERBOSE == 1)
+	std::cout << CURRENT_OFFSET << ". " << "JMP" << std::endl;
+#endif
+	EMIT_BYTE(OPCODE::JMP);
+	i_ElseEnd_JMP_Offset = CURRENT_OFFSET;
+	EMIT_INT(0);
+
+	EMIT_INT_ATPOS(CURRENT_OFFSET, i_IfWhile_JCondition_Hole);
 	#if (VERBOSE == 1)
-		std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
+		std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << CURRENT_OFFSET << std::endl;
 	#endif
+
 	if (pElseNode != nullptr)
 	{
-		populateCode(pElseNode, pByteCode, iOffset);
+		populateCode(pElseNode);
 	}
 
-	emit(iOffset, m_iByteCode, i_ElseEnd_JMP_Offset);
+	EMIT_INT_ATPOS(CURRENT_OFFSET, i_ElseEnd_JMP_Offset);
 	#if (VERBOSE == 1)
-		std::cout << "------" << "i_ElseEnd_JMP_Offset [" << i_ElseEnd_JMP_Offset << "] = " << iOffset << std::endl;
+		std::cout << "------" << "i_ElseEnd_JMP_Offset [" << i_ElseEnd_JMP_Offset << "] = " << CURRENT_OFFSET << std::endl;
 	#endif
 }
 
-void GrammerUtils::handleWhile_Epilogue(Tree* pNode, int* pByteCode, int& iOffset, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
+void GrammerUtils::handleWhile_Epilogue(Tree* pNode, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
 {
-	EMIT(OPCODE::JMP);
-	#if (VERBOSE == 1)
-		std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-	#endif
+#if (VERBOSE == 1)
+	std::cout << CURRENT_OFFSET << ". " << "JMP" << std::endl;
+#endif
+	EMIT_BYTE(OPCODE::JMP);
 
-	emit(i_While_Loop_Hole, m_iByteCode, iOffset++);
-	emit(iOffset, m_iByteCode, i_IfWhile_JCondition_Hole);
-	#if (VERBOSE == 1)
-		std::cout << "------" << "i_While_Loop_Hole [" << (iOffset - 1) << "] = " << i_While_Loop_Hole << std::endl;
-		std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << iOffset << std::endl;
-	#endif
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_While_Loop_Hole [" << CURRENT_OFFSET << "] = " << i_While_Loop_Hole << std::endl;
+	std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << CURRENT_OFFSET << std::endl;
+#endif
+	EMIT_INT(i_While_Loop_Hole);
+	EMIT_INT_ATPOS(CURRENT_OFFSET, i_IfWhile_JCondition_Hole);
 }
 
-void GrammerUtils::handleSwitch(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleSwitch(Tree* pNode)
 {
-	std::vector<int> vCaseStartOffsets;
-	std::vector<int> vCaseBreakJmpHoles;
+	std::vector<uint32_t> vCaseStartOffsets;
+	std::vector<uint32_t> vCaseBreakJmpHoles;
 
-	handleSwitchCasePrologue(pNode, pByteCode, iOffset, vCaseStartOffsets);
-	handleSwitchCases(pNode, pByteCode, iOffset, vCaseStartOffsets, vCaseBreakJmpHoles);
-	handleSwitchCaseEpilogues(pNode, pByteCode, iOffset, vCaseBreakJmpHoles);
+	handleSwitchCasePrologue(pNode, vCaseStartOffsets);
+	handleSwitchCases(pNode, vCaseStartOffsets, vCaseBreakJmpHoles);
+	handleSwitchCaseEpilogues(pNode, vCaseBreakJmpHoles);
 }
 
-void GrammerUtils::handleSwitchArgument(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleSwitchArgument(Tree* pNode)
 {
 	switch (pNode->m_eASTNodeType)
 	{
 		case ASTNodeType::ASTNode_IDENTIFIER:
 		{
-			handleIdentifier(pNode, pByteCode, iOffset);
+			handleIdentifier(pNode);
 		}
 		break;
 		case ASTNodeType::ASTNode_INTEGER:
 		{
-			handleInteger(pNode, pByteCode, iOffset);
+			handleInteger(pNode);
 		}
 		break;
 	}
 }
 
-void GrammerUtils::handleSwitchCasePrologue(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets)
+void GrammerUtils::handleSwitchCasePrologue(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets)
 {
 	for (Tree* pSwitchCaseNode : pNode->m_vStatements)
 	{
@@ -1370,33 +1392,36 @@ void GrammerUtils::handleSwitchCasePrologue(Tree* pNode, int* pByteCode, int& iO
 		{
 			case ASTNodeType::ASTNode_SWITCHCASE:
 			{
-				handleSwitchArgument(pNode->m_pLeftNode, pByteCode, iOffset);
+				handleSwitchArgument(pNode->m_pLeftNode);
 
-				handleInteger(pSwitchCaseNode, pByteCode, iOffset);
+				handleInteger(pSwitchCaseNode);
 				EMIT_1(OPCODE::JMP_EQ, 0);
 
-				EMIT(OPCODE::JNZ);
-				#if (VERBOSE == 1)
-					std::cout << (iOffset - 1) << ". " << "JNZ" << std::endl;
-				#endif
+#if (VERBOSE == 1)
+				std::cout << CURRENT_OFFSET << ". " << "JNZ" << std::endl;
+#endif
+				EMIT_BYTE(OPCODE::JNZ);
 
-				vCaseStartOffsets.push_back(iOffset++);
+				vCaseStartOffsets.push_back(CURRENT_OFFSET);
+				EMIT_INT(0);
 			}
 			break;
 			case ASTNodeType::ASTNode_SWITCHDEFAULT:
 			{
-				EMIT(OPCODE::JMP);
-				#if (VERBOSE == 1)
-					std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-				#endif
-				vCaseStartOffsets.push_back(iOffset++);
+#if (VERBOSE == 1)
+				std::cout << CURRENT_OFFSET << ". " << "JMP" << std::endl;
+#endif
+				EMIT_BYTE(OPCODE::JMP);
+
+				vCaseStartOffsets.push_back(CURRENT_OFFSET);
+				EMIT_INT(0);
 			}
 			break;
 		}
 	}
 }
 
-void GrammerUtils::handleSwitchCases(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseStartOffsets, std::vector<int>& vCaseBreakJmpHoles)
+void GrammerUtils::handleSwitchCases(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets, std::vector<uint32_t>& vCaseBreakJmpHoles)
 {
 	int iCase = 0;
 	for (Tree* pSwitchCaseNode : pNode->m_vStatements)
@@ -1405,36 +1430,37 @@ void GrammerUtils::handleSwitchCases(Tree* pNode, int* pByteCode, int& iOffset, 
 		{
 			case ASTNodeType::ASTNode_SWITCHCASE:
 			{
-				emit(iOffset, m_iByteCode, vCaseStartOffsets[iCase++]);
-				handleStatements(pSwitchCaseNode, pByteCode, iOffset);
+				EMIT_INT_ATPOS(CURRENT_OFFSET, vCaseStartOffsets[iCase++]);
+				handleStatements(pSwitchCaseNode);
 
 				for (Tree* pChildNode : pSwitchCaseNode->m_vStatements)
 				{
 					if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_SWITCHBREAK)
 					{
-						EMIT(OPCODE::JMP);
-						#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-						#endif
+#if (VERBOSE == 1)
+						std::cout << CURRENT_OFFSET << ". " << "JMP" << std::endl;
+#endif
+						EMIT_BYTE(OPCODE::JMP);
 
-						vCaseBreakJmpHoles.push_back(iOffset++);
+						vCaseBreakJmpHoles.push_back(CURRENT_OFFSET);
+						EMIT_INT(0);
 					}
 				}
 			}
 			break;
 			case ASTNodeType::ASTNode_SWITCHDEFAULT:
 			{
-				emit(iOffset, m_iByteCode, vCaseStartOffsets[iCase++]);
-				handleStatements(pSwitchCaseNode, pByteCode, iOffset);
+				EMIT_INT_ATPOS(CURRENT_OFFSET, vCaseStartOffsets[iCase++]);
+				handleStatements(pSwitchCaseNode);
 
 				for (Tree* pChildNode : pSwitchCaseNode->m_vStatements)
 				{
 					if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_SWITCHBREAK)
 					{
-						EMIT(OPCODE::JMP);
-						#if (VERBOSE == 1)
-							std::cout << (iOffset - 1) << ". " << "JMP" << std::endl;
-						#endif
+#if (VERBOSE == 1)
+						std::cout << CURRENT_OFFSET << ". " << "JMP" << std::endl;
+#endif
+						EMIT_BYTE(OPCODE::JMP);
 					}
 				}
 			}
@@ -1443,15 +1469,15 @@ void GrammerUtils::handleSwitchCases(Tree* pNode, int* pByteCode, int& iOffset, 
 	}
 }
 
-void GrammerUtils::handleSwitchCaseEpilogues(Tree* pNode, int* pByteCode, int& iOffset, std::vector<int>& vCaseBreakJmpHoles)
+void GrammerUtils::handleSwitchCaseEpilogues(Tree* pNode, std::vector<uint32_t>& vCaseBreakJmpHoles)
 {
 	for (int iBreakJumpHole : vCaseBreakJmpHoles)
 	{
-		emit(iOffset, m_iByteCode, iBreakJumpHole);
+		EMIT_INT_ATPOS(CURRENT_OFFSET, iBreakJumpHole);
 	}
 }
 
-void GrammerUtils::handleStatements(Tree* pNode, int* pByteCode, int& iOffset)
+void GrammerUtils::handleStatements(Tree* pNode)
 {
 	std::vector<Tree*> vStatements = pNode->m_vStatements;
 	for (Tree* pChildNode : vStatements)
@@ -1467,7 +1493,7 @@ void GrammerUtils::handleStatements(Tree* pNode, int* pByteCode, int& iOffset)
 		////////////////////////////////////////////////////////////////////////////
 
 		ASTNodeType eASTNodeType = pNode->m_eASTNodeType;
-		populateCode(pChildNode, pByteCode, iOffset);
+		populateCode(pChildNode);
 
 		switch (eASTNodeType)
 		{
@@ -1509,7 +1535,7 @@ void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>
 	}
 }
 
-void GrammerUtils::printAssembly(int* iByteCode, int iOffset, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings)
+void GrammerUtils::printAssembly(int8_t* iByteCode, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings)
 {
 	RandomAccessFile* pRaf = new RandomAccessFile();
 	bool bCanWrite = pRaf->openForWrite("main.o");
@@ -1519,36 +1545,70 @@ void GrammerUtils::printAssembly(int* iByteCode, int iOffset, std::vector<std::s
 		printHeaders(pRaf, vVariables, vStrings);
 	}
 
-	OPCODE eOpcode = OPCODE::NOP;
+	m_pBAIS->reset();
+	OPCODE eOpCode = OPCODE::NOP;
 	while (true)
 	{
-		eOpcode = (OPCODE)iByteCode[iOffset];
-		CodeMap pMachineInstruction = opCodeMap[(int)eOpcode];
+		std::cout << CURRENT_OFFSET_READ;
+
+		eOpCode = (OPCODE)m_pBAIS->readByte();
+		if(bCanWrite)
+			pRaf->writeByte((int)eOpCode);
+
+		CodeMap pMachineInstruction = opCodeMap[(int)eOpCode];
 
 		// Print to stdout
 		{
-			std::cout << iOffset << ". " << pMachineInstruction.sOpCode;
+			std::cout << ". " << pMachineInstruction.sOpCode;
 
 			for(int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
 			{
-				std::cout << " " << iByteCode[iOffset + i];
+				std::cout << " ";
+				switch (pMachineInstruction.ePRIMIIVETYPE)
+				{
+					case PRIMIIVETYPE::INT_8:
+					{
+						int8_t iByte = m_pBAIS->readByte();
+
+						std::cout << (int32_t)iByte;
+						if (bCanWrite)
+							pRaf->writeByte(iByte);
+					}
+					break;
+					case PRIMIIVETYPE::INT_16:
+					{
+						int16_t iShort = m_pBAIS->readShort();
+
+						std::cout << (int32_t)iShort;
+						if (bCanWrite)
+							pRaf->writeShort(iShort);
+					}
+					break;
+					case PRIMIIVETYPE::INT_32:
+					{
+						int32_t iInt = m_pBAIS->readInt();
+
+						std::cout << iInt;
+						if (bCanWrite)
+							pRaf->writeInt(iInt);
+					}
+					break;
+					case PRIMIIVETYPE::INT_64:
+					{
+						int64_t iLong = m_pBAIS->readLong();
+
+						std::cout << iLong;
+						if (bCanWrite)
+							pRaf->writeLong(iLong);
+					}
+					break;
+				}
 			}
+
 			std::cout << std::endl;
 		}
 
-		// Print to file
-		if(bCanWrite)
-		{
-			pRaf->writeInt((int)pMachineInstruction.eOpCode);
-			for (int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
-			{
-				pRaf->writeInt(iByteCode[iOffset + i]);
-			}
-		}
-
-		iOffset += pMachineInstruction.iOpcodeOperandCount;
-
-		if (eOpcode == OPCODE::HLT)
+		if (eOpCode == OPCODE::HLT)
 			break;
 	}
 

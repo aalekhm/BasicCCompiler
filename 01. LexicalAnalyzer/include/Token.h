@@ -59,6 +59,7 @@ namespace TokenType
 		TK_PREFIXINCR,
 		TK_POSTFIXDECR,
 		TK_POSTFIXINCR,
+		TK_SWITCH,
 		TK_UNKNOWN
 	};
 
@@ -120,6 +121,7 @@ namespace TokenType
 			case Type::TK_PREFIXINCR:			return "TK_PREFIXINCR";
 			case Type::TK_POSTFIXDECR:			return "TK_POSTFIXDECR";
 			case Type::TK_POSTFIXINCR:			return "TK_POSTFIXINCR";
+			case Type::TK_SWITCH:				return "TK_SWITCH";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -178,10 +180,11 @@ namespace TokenType
 		else if(sTokenType == "TK_BNFASSIGNMENT")		return Type::TK_BNFASSIGNMENT;
 		else if(sTokenType == "TK_BNFCODE")				return Type::TK_BNFCODE;
 		else if(sTokenType == "TK_FUNCTIONCALL")		return Type::TK_FUNCTIONCALL;
-		else if(sTokenType == "TK_PREFIXDECR")		return Type::TK_PREFIXDECR;
-		else if(sTokenType == "TK_PREFIXINCR")		return Type::TK_PREFIXINCR;
-		else if(sTokenType == "TK_POSTFIXDECR")		return Type::TK_POSTFIXDECR;
-		else if(sTokenType == "TK_POSTFIXINCR")		return Type::TK_POSTFIXINCR;
+		else if(sTokenType == "TK_PREFIXDECR")			return Type::TK_PREFIXDECR;
+		else if(sTokenType == "TK_PREFIXINCR")			return Type::TK_PREFIXINCR;
+		else if(sTokenType == "TK_POSTFIXDECR")			return Type::TK_POSTFIXDECR;
+		else if(sTokenType == "TK_POSTFIXINCR")			return Type::TK_POSTFIXINCR;
+		else if(sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;
