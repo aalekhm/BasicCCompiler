@@ -50,50 +50,71 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 		if (sOperator == "&&")
 			eOperator = ENUM_OP_PRECEDENCE::OP_LOGICALAND;
 		else
-			if (sOperator == "==")
-				eOperator = ENUM_OP_PRECEDENCE::OP_EQ;
+			if (sOperator == "|")
+				eOperator = ENUM_OP_PRECEDENCE::OP_BITWISEOR;
 			else
-				if (sOperator == "!=")
-					eOperator = ENUM_OP_PRECEDENCE::OP_NEQ;
+				if (sOperator == "&")
+					eOperator = ENUM_OP_PRECEDENCE::OP_BITWISEAND;
 				else
-					if (sOperator == "<")
-						eOperator = ENUM_OP_PRECEDENCE::OP_LT;
+					if (sOperator == "^")
+						eOperator = ENUM_OP_PRECEDENCE::OP_BITWISEXOR;
 					else
-						if (sOperator == "<=")
-							eOperator = ENUM_OP_PRECEDENCE::OP_LTEQ;
+						if (sOperator == "~")
+							eOperator = ENUM_OP_PRECEDENCE::OP_BITWISENOT;
 						else
-							if (sOperator == ">")
-								eOperator = ENUM_OP_PRECEDENCE::OP_GT;
+							if (sOperator == "<<")
+								eOperator = ENUM_OP_PRECEDENCE::OP_BITWISELEFTSHIFT;
 							else
-								if (sOperator == ">=")
-									eOperator = ENUM_OP_PRECEDENCE::OP_GTEQ;
+								if (sOperator == ">>")
+									eOperator = ENUM_OP_PRECEDENCE::OP_BITWISERIGHTSHIFT;
 								else
-									if (sOperator == "+")
-										eOperator = ENUM_OP_PRECEDENCE::OP_ADD;
+									if (sOperator == "==")
+										eOperator = ENUM_OP_PRECEDENCE::OP_EQ;
 									else
-										if (sOperator == "-")
-											eOperator = ENUM_OP_PRECEDENCE::OP_SUB;
+										if (sOperator == "!=")
+											eOperator = ENUM_OP_PRECEDENCE::OP_NEQ;
 										else
-											if (sOperator == "*")
-												eOperator = ENUM_OP_PRECEDENCE::OP_MUL;
+											if (sOperator == "<")
+												eOperator = ENUM_OP_PRECEDENCE::OP_LT;
 											else
-												if (sOperator == "/")
-													eOperator = ENUM_OP_PRECEDENCE::OP_DIV;
+												if (sOperator == "<=")
+													eOperator = ENUM_OP_PRECEDENCE::OP_LTEQ;
 												else
-													if (sOperator == "(")
-														eOperator = ENUM_OP_PRECEDENCE::OP_LPAREN;
+													if (sOperator == ">")
+														eOperator = ENUM_OP_PRECEDENCE::OP_GT;
 													else
-														if (sOperator == ")")
-															eOperator = ENUM_OP_PRECEDENCE::OP_RPAREN;
+														if (sOperator == ">=")
+															eOperator = ENUM_OP_PRECEDENCE::OP_GTEQ;
 														else
-															if (sOperator == "%")
-																eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
+															if (sOperator == "+")
+																eOperator = ENUM_OP_PRECEDENCE::OP_ADD;
 															else
-																if (sOperator == "!")
-																	eOperator = ENUM_OP_PRECEDENCE::OP_NOT;
+																if (sOperator == "-")
+																	eOperator = ENUM_OP_PRECEDENCE::OP_SUB;
 																else
-																	if (sOperator == "NEGATE")
-																		eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
+																	if (sOperator == "*")
+																		eOperator = ENUM_OP_PRECEDENCE::OP_MUL;
+																	else
+																		if (sOperator == "/")
+																			eOperator = ENUM_OP_PRECEDENCE::OP_DIV;
+																		else
+																			if (sOperator == "(")
+																				eOperator = ENUM_OP_PRECEDENCE::OP_LPAREN;
+																			else
+																				if (sOperator == ")")
+																					eOperator = ENUM_OP_PRECEDENCE::OP_RPAREN;
+																				else
+																					if (sOperator == "%")
+																						eOperator = ENUM_OP_PRECEDENCE::OP_MOD;
+																					else
+																						if (sOperator == "!")
+																							eOperator = ENUM_OP_PRECEDENCE::OP_NOT;
+																						else
+																							if (sOperator == "NEGATE")
+																								eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
+																							else
+																								if (sOperator == "@")
+																									eOperator = ENUM_OP_PRECEDENCE::OP_DEREF;
 
 	return eOperator;
 }
@@ -306,6 +327,8 @@ bool TinyCReader::functionList() {
 }
 
 bool TinyCReader::staticDeclarations() {
+	if (!GrammerUtils::match("static", MANDATORY))
+		return false;
 	if (staticVoidPtr()) {
 		return true;
 	}
@@ -317,8 +340,6 @@ bool TinyCReader::staticDeclarations() {
 }
 
 bool TinyCReader::staticVoidPtr() {
-	if (!GrammerUtils::match("static", MANDATORY))
-		return false;
 	if (!GrammerUtils::match("void", MANDATORY))
 		return false;
 	if (!GrammerUtils::match('*', MANDATORY))
@@ -1708,30 +1729,45 @@ bool TinyCReader::malloc() {
 
 }
 
+bool TinyCReader::lValue() {
+	if (GrammerUtils::match(TokenType::Type::TK_DEREF, OPTIONAL)) {
+		return true;
+	}
+	else
+		if (GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
 bool TinyCReader::assignmentRHS() {
-	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+	if (!lValue())
 		return false;
 
-	std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-
-	if (!GrammerUtils::match('=', MANDATORY))
-		return false;
-
+	TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
+	std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 	std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 	assert(!sFullyQualifiedVariableName.empty());
 
 	Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
-	Tree* pTemp = nullptr;
 	{
 		pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
 	}
 
-	Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
+	Tree* pIdentifierLeaf = makeLeaf((eTokenType == TokenType::Type::TK_IDENTIFIER) ? ASTNodeType::ASTNode_IDENTIFIER : ASTNodeType::ASTNode_DEREF, sFullyQualifiedVariableName.c_str());
 	{
 		pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
 		pAssignmentNode->m_pRightNode = pIdentifierLeaf;
 	}
 
+	if (!GrammerUtils::match('=', MANDATORY))
+		return false;
+
+	Tree* pTemp = nullptr;
 	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 	{
 		pAssignmentNode->m_pLeftNode = pExpressionLeftLeaf;
@@ -1779,13 +1815,50 @@ bool TinyCReader::expr() {
 		return true;
 	}
 	else
-		if (and_expr()) {
-			while (true) {
-				if (logicalor_expr()) {
-				}
-				else
-					break;
-			}
+		if (startExpr()) {
+			return true;
+		}
+		else
+			return false;
+
+	return true;
+
+}
+
+bool TinyCReader::startExpr() {
+	if (!equalityExpr())
+		return false;
+	while (true) {
+		if (logicalAndOrExpr()) {
+		}
+		else
+			break;
+	}
+
+	return true;
+
+}
+
+bool TinyCReader::logicalAndOrExpr() {
+	if (!logicalAndOr())
+		return false;
+	if (!equalityExpr())
+		return false;
+	return true;
+
+}
+
+bool TinyCReader::logicalAndOr() {
+	if (GrammerUtils::match("&&", OPTIONAL)) {
+
+		checkOpPrecedenceAndPush("&&");
+
+		return true;
+	}
+	else
+		if (GrammerUtils::match("||", OPTIONAL)) {
+
+			checkOpPrecedenceAndPush("||");
 
 			return true;
 		}
@@ -1796,23 +1869,11 @@ bool TinyCReader::expr() {
 
 }
 
-bool TinyCReader::logicalor_expr() {
-	if (!GrammerUtils::match("||", MANDATORY))
-		return false;
-
-	checkOpPrecedenceAndPush("||");
-
-	if (!and_expr())
-		return false;
-	return true;
-
-}
-
-bool TinyCReader::and_expr() {
-	if (!equality_expr())
+bool TinyCReader::equalityExpr() {
+	if (!relationalExpr())
 		return false;
 	while (true) {
-		if (logicaland_expr()) {
+		if (eqNeqExpr()) {
 		}
 		else
 			break;
@@ -1822,40 +1883,16 @@ bool TinyCReader::and_expr() {
 
 }
 
-bool TinyCReader::logicaland_expr() {
-	if (!GrammerUtils::match("&&", MANDATORY))
+bool TinyCReader::eqNeqExpr() {
+	if (!eqNeq())
 		return false;
-
-	checkOpPrecedenceAndPush("&&");
-
-	if (!equality_expr())
+	if (!relationalExpr())
 		return false;
 	return true;
 
 }
 
-bool TinyCReader::equality_expr() {
-	if (!relational_expr())
-		return false;
-	if (!equality_expr_optional()) {
-	}
-	else {
-	}
-
-	return true;
-
-}
-
-bool TinyCReader::equality_expr_optional() {
-	if (!equality())
-		return false;
-	if (!relational_expr())
-		return false;
-	return true;
-
-}
-
-bool TinyCReader::equality() {
+bool TinyCReader::eqNeq() {
 	if (GrammerUtils::match("==", OPTIONAL)) {
 
 		checkOpPrecedenceAndPush("==");
@@ -1876,28 +1913,30 @@ bool TinyCReader::equality() {
 
 }
 
-bool TinyCReader::relational_expr() {
-	if (!addition_expr())
+bool TinyCReader::relationalExpr() {
+	if (!addSubExpr())
 		return false;
-	if (!relational_expr_optional()) {
-	}
-	else {
+	while (true) {
+		if (lteqGteqExpr()) {
+		}
+		else
+			break;
 	}
 
 	return true;
 
 }
 
-bool TinyCReader::relational_expr_optional() {
-	if (!relational())
+bool TinyCReader::lteqGteqExpr() {
+	if (!lteqGteq())
 		return false;
-	if (!addition_expr())
+	if (!addSubExpr())
 		return false;
 	return true;
 
 }
 
-bool TinyCReader::relational() {
+bool TinyCReader::lteqGteq() {
 	if (GrammerUtils::match('<', OPTIONAL)) {
 
 		checkOpPrecedenceAndPush("<");
@@ -1932,11 +1971,11 @@ bool TinyCReader::relational() {
 
 }
 
-bool TinyCReader::addition_expr() {
-	if (!multiplication_expr())
+bool TinyCReader::addSubExpr() {
+	if (!mulDivExpr())
 		return false;
 	while (true) {
-		if (addition_expr_optional()) {
+		if (plusMinusExpr()) {
 		}
 		else
 			break;
@@ -1946,16 +1985,16 @@ bool TinyCReader::addition_expr() {
 
 }
 
-bool TinyCReader::addition_expr_optional() {
-	if (!add_sub())
+bool TinyCReader::plusMinusExpr() {
+	if (!plusMinus())
 		return false;
-	if (!multiplication_expr())
+	if (!mulDivExpr())
 		return false;
 	return true;
 
 }
 
-bool TinyCReader::add_sub() {
+bool TinyCReader::plusMinus() {
 	if (GrammerUtils::match('+', OPTIONAL)) {
 
 		checkOpPrecedenceAndPush("+");
@@ -1976,11 +2015,11 @@ bool TinyCReader::add_sub() {
 
 }
 
-bool TinyCReader::multiplication_expr() {
-	if (!primary())
+bool TinyCReader::mulDivExpr() {
+	if (!bitwiseExpr())
 		return false;
 	while (true) {
-		if (multiplication_expr_optional()) {
+		if (mulDivModExpr()) {
 		}
 		else
 			break;
@@ -1990,16 +2029,16 @@ bool TinyCReader::multiplication_expr() {
 
 }
 
-bool TinyCReader::multiplication_expr_optional() {
-	if (!mul_div_mod())
+bool TinyCReader::mulDivModExpr() {
+	if (!mulDivMod())
 		return false;
-	if (!primary())
+	if (!bitwiseExpr())
 		return false;
 	return true;
 
 }
 
-bool TinyCReader::mul_div_mod() {
+bool TinyCReader::mulDivMod() {
 	if (GrammerUtils::match('*', OPTIONAL)) {
 
 		checkOpPrecedenceAndPush("*");
@@ -2022,6 +2061,71 @@ bool TinyCReader::mul_div_mod() {
 			}
 			else
 				return false;
+
+	return true;
+
+}
+
+bool TinyCReader::bitwiseExpr() {
+	if (!primary())
+		return false;
+	while (true) {
+		if (bitwiseOrAndXorExpr()) {
+		}
+		else
+			break;
+	}
+
+	return true;
+
+}
+
+bool TinyCReader::bitwiseOrAndXorExpr() {
+	if (!bitwiseOrAndXor())
+		return false;
+	if (!primary())
+		return false;
+	return true;
+
+}
+
+bool TinyCReader::bitwiseOrAndXor() {
+	if (GrammerUtils::match('&', OPTIONAL)) {
+
+		checkOpPrecedenceAndPush("&");
+
+		return true;
+	}
+	else
+		if (GrammerUtils::match('|', OPTIONAL)) {
+
+			checkOpPrecedenceAndPush("|");
+
+			return true;
+		}
+		else
+			if (GrammerUtils::match('^', OPTIONAL)) {
+
+				checkOpPrecedenceAndPush("^");
+
+				return true;
+			}
+			else
+				if (GrammerUtils::match("<<", OPTIONAL)) {
+
+					checkOpPrecedenceAndPush("<<");
+
+					return true;
+				}
+				else
+					if (GrammerUtils::match(">>", OPTIONAL)) {
+
+						checkOpPrecedenceAndPush(">>");
+
+						return true;
+					}
+					else
+						return false;
 
 	return true;
 
@@ -2127,7 +2231,7 @@ bool TinyCReader::operands() {
 }
 
 bool TinyCReader::tk_identifier() {
-	if (preFixIncrDecrInExpr()) {
+	if (preFixInExpr()) {
 		return true;
 	}
 	else
@@ -2180,13 +2284,20 @@ bool TinyCReader::unary_oper() {
 			return true;
 		}
 		else
-			return false;
+			if (GrammerUtils::match('~', OPTIONAL)) {
+
+				checkOpPrecedenceAndPush("~");
+
+				return true;
+			}
+			else
+				return false;
 
 	return true;
 
 }
 
-bool TinyCReader::preFixIncrDecrInExpr() {
+bool TinyCReader::preFixInExpr() {
 	if (GrammerUtils::match(TokenType::Type::TK_PREFIXDECR, OPTIONAL)) {
 
 		if (m_pASTCurrentNode->m_pLeftNode == nullptr)
@@ -2225,7 +2336,19 @@ bool TinyCReader::preFixIncrDecrInExpr() {
 			return true;
 		}
 		else
-			return false;
+			if (GrammerUtils::match(TokenType::Type::TK_DEREF, OPTIONAL)) {
+
+				std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+				std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+
+				checkOpPrecedenceAndPush("@");
+
+				m_vPostFix.push_back(sFullyQualifiedVariableName);
+
+				return true;
+			}
+			else
+				return false;
 
 	return true;
 

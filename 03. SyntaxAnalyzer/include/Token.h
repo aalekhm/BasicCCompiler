@@ -29,6 +29,10 @@ namespace TokenType
 		TK_LOGICALOR,
 		TK_BITWISEAND,
 		TK_BITWISEOR,
+		TK_BITWISEXOR,
+		TK_BITWISENOT,
+		TK_BITWISELEFTSHIFT,
+		TK_BITWISERIGHTSHIFT,
 		TK_IF,
 		TK_ELSE,
 		TK_FOR,
@@ -61,6 +65,7 @@ namespace TokenType
 		TK_POSTFIXDECR,
 		TK_POSTFIXINCR,
 		TK_SWITCH,
+		TK_DEREF,
 		TK_UNKNOWN
 	};
 
@@ -91,6 +96,10 @@ namespace TokenType
 			case Type::TK_LOGICALOR:			return "TK_LOGICALOR";
 			case Type::TK_BITWISEAND:			return "TK_BITWISEAND";
 			case Type::TK_BITWISEOR:			return "TK_BITWISEOR";
+			case Type::TK_BITWISEXOR:			return "TK_BITWISEXOR";
+			case Type::TK_BITWISENOT:			return "TK_BITWISENOT";
+			case Type::TK_BITWISELEFTSHIFT:		return "TK_BITWISELEFTSHIFT";
+			case Type::TK_BITWISERIGHTSHIFT:	return "TK_BITWISERIGHTSHIFT";
 			case Type::TK_IF:					return "TK_IF";
 			case Type::TK_ELSE:					return "TK_ELSE";
 			case Type::TK_FOR:					return "TK_FOR";
@@ -123,6 +132,7 @@ namespace TokenType
 			case Type::TK_POSTFIXDECR:			return "TK_POSTFIXDECR";
 			case Type::TK_POSTFIXINCR:			return "TK_POSTFIXINCR";
 			case Type::TK_SWITCH:				return "TK_SWITCH";
+			case Type::TK_DEREF:				return "TK_DEREF";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -154,6 +164,10 @@ namespace TokenType
 		else if(sTokenType == "TK_LOGICALOR")			return Type::TK_LOGICALOR;
 		else if(sTokenType == "TK_BITWISEAND")			return Type::TK_BITWISEAND;
 		else if(sTokenType == "TK_BITWISEOR")			return Type::TK_BITWISEOR;
+		else if(sTokenType == "TK_BITWISEXOR")			return Type::TK_BITWISEXOR;
+		else if(sTokenType == "TK_BITWISENOT")			return Type::TK_BITWISENOT;
+		else if(sTokenType == "TK_BITWISELEFTSHIFT")	return Type::TK_BITWISELEFTSHIFT;
+		else if(sTokenType == "TK_BITWISERIGHTSHIFT")	return Type::TK_BITWISERIGHTSHIFT;
 		else if(sTokenType == "TK_IF")					return Type::TK_IF;
 		else if(sTokenType == "TK_ELSE")				return Type::TK_ELSE;
 		else if(sTokenType == "TK_FOR")					return Type::TK_FOR;
@@ -186,6 +200,7 @@ namespace TokenType
 		else if(sTokenType == "TK_POSTFIXDECR")			return Type::TK_POSTFIXDECR;
 		else if(sTokenType == "TK_POSTFIXINCR")			return Type::TK_POSTFIXINCR;
 		else if(sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
+		else if(sTokenType == "TK_DEREF")				return Type::TK_DEREF;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;
@@ -230,6 +245,12 @@ enum class OPCODE
 	JMP_NEQ,
 	LOGICALOR,
 	LOGICALAND,
+	BITWISEOR,
+	BITWISEAND,
+	BITWISEXOR,
+	BITWISENOT,
+	BITWISELEFTSHIFT,
+	BITWISERIGHTSHIFT,
 	_NOT,
 	JMP,
 	JZ,
@@ -247,6 +268,8 @@ enum class OPCODE
 	NEGATE,
 	MALLOC,
 	FREE,
+	LDA,
+	STA,
 	HLT,
 };
 
@@ -309,8 +332,13 @@ enum class ENUM_OP_PRECEDENCE
 	OP_LPAREN,
 
 	OP_LOGICALOR,
-
 	OP_LOGICALAND,
+
+	OP_BITWISEOR,
+	OP_BITWISEAND,
+	OP_BITWISEXOR,
+	OP_BITWISELEFTSHIFT,
+	OP_BITWISERIGHTSHIFT,
 
 	OP_EQ,
 	OP_NEQ = OP_EQ,
@@ -330,6 +358,8 @@ enum class ENUM_OP_PRECEDENCE
 	OP_NOT,
 	OP_PLUS = OP_NOT,
 	OP_NEGATE = OP_NOT,
+	OP_DEREF = OP_NOT,
+	OP_BITWISENOT = OP_NOT,
 
 	OP_RPAREN,
 };
@@ -352,6 +382,7 @@ enum class ASTNodeType
 
 	ASTNode_NEGATE,
 	ASTNode_NOT,
+	ASTNode_DEREF,
 
 	ASTNode_LT,
 	ASTNode_LTEQ,
@@ -366,6 +397,10 @@ enum class ASTNodeType
 	ASTNode_LOGICALOR,
 	ASTNode_BITWISEAND,
 	ASTNode_BITWISEOR,
+	ASTNode_BITWISEXOR,
+	ASTNode_BITWISENOT,
+	ASTNode_BITWISELEFTSHIFT,
+	ASTNode_BITWISERIGHTSHIFT,
 
 	ASTNode_IF,
 	ASTNode_ELSE,

@@ -15,22 +15,48 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
-static void* pStaticPtr;
-
+static void* pStaticPtr_0;
+static void* pStaticPtr_1;
+static void* pStaticPtr_2;
+static void* pStaticPtr_3;
 int retNewFunc()
 {
-	int j = 32;
-	void* pNew = malloc(j * 10);
+	print("In retNewFunc................");
+	putc(10);
+
+	int j = 1;
+	void* pNew = malloc(j * 9);
 	print("pNew Allocated @", pNew);
 	putc(10);
 	
-	pStaticPtr = malloc(j * 20);
-	print("pNew Allocated @", pStaticPtr);
+	@pNew = 1977;
+	print("Value @ pNew = ", @pNew);
 	putc(10);	
 	
-	print("In retNewFunc() start");
+	pStaticPtr_0 = malloc(j * 19);
+	print("pNew Allocated @", @pStaticPtr_0);
 	putc(10);
 	
+	@pStaticPtr_0 = 1982;
+	print("Value of pStaticPtr_0 = ", @pStaticPtr_0);
+	putc(10);
+	
+	@pStaticPtr_0 = @pNew;
+	print("Assigned @pStaticPtr_0 = @pNew ==> ", @pStaticPtr_0);
+	putc(10);
+	
+	int iCount = @pStaticPtr_3;
+	iCount++;
+	@pStaticPtr_3 = iCount;
+	print("@pStaticPtr_3 Count ==> ", @pStaticPtr_3);
+	putc(10);
+	
+	print("In retNewFunc() start. (65535 & 255) = ", (65535 & 255), ", (170 | 85) = ", (170 | 85), ", (170 ^ 85) = ", (170 ^ 85), ", (~170) = ", (~170));
+	putc(10);
+	
+	print("Bitwise: (15 << 4) = ", (15 << 4), ", (240 >> 4) = ", (240 >> 4));
+	putc(10);	
+
 	int mmi = 11;
 	switch(mmi)
 	{
@@ -51,9 +77,6 @@ int retNewFunc()
 		break;
 	}
 	
-	print("In retNewFunc................");
-	putc(10);
-
 	int j = 0;
 	++j;
 	
@@ -70,7 +93,7 @@ int retNewFunc()
 	}
 	
 	free(pNew);
-	free(pStaticPtr);
+	free(pStaticPtr_0);
 	
 	int iReturnValue = 1977;
 	
@@ -79,14 +102,20 @@ int retNewFunc()
 
 int retFunc()
 {
+	pStaticPtr_1 = malloc(14);
+	
 	print("In retFunc................");
 	putc(10);
+	
+	free(pStaticPtr_1);
 	
 	return retNewFunc();
 }
 
 void tempFunc(int arg0, int arg1)
 {
+	pStaticPtr_2 = malloc(19);
+	
 	print("In tempFunc()");
 	putc(10);
 		
@@ -137,6 +166,8 @@ void tempFunc(int arg0, int arg1)
 		
 		k = j * 2;
 	}
+	
+	free(pStaticPtr_2);
 	
 	print("End of tempFunc()");
 	putc(10);
@@ -442,6 +473,9 @@ void callMe()
 
 void main()
 {
+	pStaticPtr_3 = malloc(4);
+	@pStaticPtr_3 = 0;
+	
 	print("In main()");
 	putc(10);
 		
@@ -462,6 +496,8 @@ void main()
 	//AsciiMandlebrot();
 	
 	callMe();
+	
+	free(pStaticPtr_3);
 	
 	print("End of main()................");
 	putc(10);

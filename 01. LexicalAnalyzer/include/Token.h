@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <assert.h>
 
 namespace TokenType
 {
@@ -28,6 +29,10 @@ namespace TokenType
 		TK_LOGICALOR,
 		TK_BITWISEAND,
 		TK_BITWISEOR,
+		TK_BITWISEXOR,
+		TK_BITWISENOT,
+		TK_BITWISELEFTSHIFT,
+		TK_BITWISERIGHTSHIFT,
 		TK_IF,
 		TK_ELSE,
 		TK_FOR,
@@ -60,6 +65,7 @@ namespace TokenType
 		TK_POSTFIXDECR,
 		TK_POSTFIXINCR,
 		TK_SWITCH,
+		TK_DEREF,
 		TK_UNKNOWN
 	};
 
@@ -90,6 +96,10 @@ namespace TokenType
 			case Type::TK_LOGICALOR:			return "TK_LOGICALOR";
 			case Type::TK_BITWISEAND:			return "TK_BITWISEAND";
 			case Type::TK_BITWISEOR:			return "TK_BITWISEOR";
+			case Type::TK_BITWISEXOR:			return "TK_BITWISEXOR";
+			case Type::TK_BITWISENOT:			return "TK_BITWISENOT";
+			case Type::TK_BITWISELEFTSHIFT:		return "TK_BITWISELEFTSHIFT";
+			case Type::TK_BITWISERIGHTSHIFT:	return "TK_BITWISERIGHTSHIFT";
 			case Type::TK_IF:					return "TK_IF";
 			case Type::TK_ELSE:					return "TK_ELSE";
 			case Type::TK_FOR:					return "TK_FOR";
@@ -122,6 +132,7 @@ namespace TokenType
 			case Type::TK_POSTFIXDECR:			return "TK_POSTFIXDECR";
 			case Type::TK_POSTFIXINCR:			return "TK_POSTFIXINCR";
 			case Type::TK_SWITCH:				return "TK_SWITCH";
+			case Type::TK_DEREF:				return "TK_DEREF";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -131,7 +142,7 @@ namespace TokenType
 
 	inline TokenType::Type fromString(std::string sTokenType)
 	{
-		if(sTokenType == "TK_MUL")						return Type::TK_MUL;
+			 if(sTokenType == "TK_MUL")					return Type::TK_MUL;
 		else if(sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
 		else if(sTokenType == "TK_DIV")					return Type::TK_DIV;
 		else if(sTokenType == "TK_DIVEQ")				return Type::TK_DIVEQ;
@@ -153,8 +164,12 @@ namespace TokenType
 		else if(sTokenType == "TK_LOGICALOR")			return Type::TK_LOGICALOR;
 		else if(sTokenType == "TK_BITWISEAND")			return Type::TK_BITWISEAND;
 		else if(sTokenType == "TK_BITWISEOR")			return Type::TK_BITWISEOR;
+		else if(sTokenType == "TK_BITWISEXOR")			return Type::TK_BITWISEXOR;
+		else if(sTokenType == "TK_BITWISENOT")			return Type::TK_BITWISENOT;
+		else if(sTokenType == "TK_BITWISELEFTSHIFT")	return Type::TK_BITWISELEFTSHIFT;
+		else if(sTokenType == "TK_BITWISERIGHTSHIFT")	return Type::TK_BITWISERIGHTSHIFT;
 		else if(sTokenType == "TK_IF")					return Type::TK_IF;
-		else if(sTokenType == "TK_ELSE")					return Type::TK_ELSE;
+		else if(sTokenType == "TK_ELSE")				return Type::TK_ELSE;
 		else if(sTokenType == "TK_FOR")					return Type::TK_FOR;
 		else if(sTokenType == "TK_WHILE")				return Type::TK_WHILE;
 		else if(sTokenType == "TK_PRINT")				return Type::TK_PRINT;
@@ -185,6 +200,7 @@ namespace TokenType
 		else if(sTokenType == "TK_POSTFIXDECR")			return Type::TK_POSTFIXDECR;
 		else if(sTokenType == "TK_POSTFIXINCR")			return Type::TK_POSTFIXINCR;
 		else if(sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
+		else if(sTokenType == "TK_DEREF")				return Type::TK_DEREF;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;

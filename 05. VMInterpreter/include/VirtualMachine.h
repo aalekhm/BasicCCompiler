@@ -22,6 +22,12 @@ enum class OPCODE
 	JMP_NEQ,
 	LOGICALOR,
 	LOGICALAND,
+	BITWISEOR,
+	BITWISEAND,
+	BITWISEXOR,
+	BITWISENOT,
+	BITWISELEFTSHIFT,
+	BITWISERIGHTSHIFT,
 	_NOT,
 	JMP,
 	JZ,
@@ -39,14 +45,16 @@ enum class OPCODE
 	NEGATE,
 	MALLOC,
 	FREE,
-
-	HLT,
+	LDA,
+	STA,
+	HLT
 };
 
-#define MAX_BYTECODE_SIZE			4096
+#define MAX_BYTECODE_SIZE			5120
 #define MAX_DATA_SIZE				1536
+#define MAX_HEAP_SIZE				2048
 #define MAX_STACK_SIZE				256
-#define MAX_RAM_SIZE				6144
+#define MAX_RAM_SIZE				MAX_BYTECODE_SIZE + MAX_DATA_SIZE + MAX_HEAP_SIZE + MAX_STACK_SIZE
 
 #define CS_START_OFFSET				0
 #define DS_START_OFFSET				CS_START_OFFSET + MAX_BYTECODE_SIZE
@@ -133,10 +141,22 @@ typedef struct REGISTERS
 	int32_t		CS;		// Code Segment Register
 	int32_t		DS;		// Data Segment Register
 	int32_t		SS;		// Stack Segment Register
+	int32_t		GS;		// Global Segment Register
 
 	int32_t		EFLAGS;
 	int32_t		EIP;
 } REGISTERS;
+
+struct HeapNode
+{
+	HeapNode(int32_t pAddress, int iSize)
+	: m_pAddress(pAddress)
+	, m_iSize(iSize)
+	{}
+
+	int32_t		m_pAddress;
+	int32_t		m_iSize;
+};
 
 class VirtualMachine
 {
@@ -154,6 +174,9 @@ class VirtualMachine
 		OPCODE						fetch();
 		void						eval(OPCODE eOpCode);
 		int64_t						readOperandFor(OPCODE eOpCode);
+
+		int32_t						malloc(int32_t iSize);
+		void						dealloc(int32_t pAddress);
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();
@@ -162,8 +185,14 @@ class VirtualMachine
 
 		int8_t*						CODE;
 		int32_t*					STACK;
+		int8_t*						DATA;
+		int32_t*					GLOBALS;
+		int8_t*						HEAP;
 
 		bool						m_bRunning;
 
 		int8_t						RAM[MAX_RAM_SIZE];
+
+		std::vector<HeapNode>		m_vAllocatedList;
+		std::vector<HeapNode>		m_vUnAllocatedList;
 };

@@ -1,6 +1,7 @@
 #include "VirtualMachine.h"
 #include "RandomAccessFile.h"
 #include <assert.h>
+#include <algorithm>
 
 VirtualMachine*	VirtualMachine::m_pVMInstance = nullptr;
 
@@ -46,6 +47,12 @@ struct CodeMap
 	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1,  PRIMIIVETYPE::INT_8 },
 	{ "LOGICALOR",	OPCODE::LOGICALOR,	1,  PRIMIIVETYPE::INT_8 },
 	{ "LOGICALAND",	OPCODE::LOGICALAND,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISEOR",	OPCODE::BITWISEOR,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISEAND",	OPCODE::BITWISEAND,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISEXOR",	OPCODE::BITWISEXOR,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISENOT",	OPCODE::BITWISENOT,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISELEFTSHIFT",	OPCODE::BITWISELEFTSHIFT,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISERIGHTSHIFT",	OPCODE::BITWISERIGHTSHIFT,	1,  PRIMIIVETYPE::INT_8 },
 	{ "NOT",		OPCODE::_NOT,		1,  PRIMIIVETYPE::INT_8 },
 	{ "JMP",		OPCODE::JMP,		2,  PRIMIIVETYPE::INT_32 },
 	{ "JZ",			OPCODE::JZ,			2,  PRIMIIVETYPE::INT_32 },
@@ -62,8 +69,12 @@ struct CodeMap
 	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8 },
 	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8 },
 	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8 },
+
 	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8 },
 	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32 },
+
+	{ "LDA",		OPCODE::LDA,		1,  PRIMIIVETYPE::INT_8 },
+	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
@@ -126,6 +137,8 @@ void VirtualMachine::reset()
 	REGS.SS = SS_START_OFFSET;
 	REGS.DS = DS_START_OFFSET;
 
+	m_vUnAllocatedList.push_back(HeapNode(0, MAX_HEAP_SIZE));
+
 	m_bRunning = false;
 }
 
@@ -134,11 +147,14 @@ int VirtualMachine::loadBSS(const char* iByteCode, int startOffset, int iBuffLen
 	int iOffset = startOffset;
 	int iStringCount = iByteCode[iOffset++];
 
+	int iStringSize = 0;
 	int iStringStartOffset = DS_START_OFFSET + (iStringCount * sizeof(int32_t));
-	int32_t* pStringLocOffset = (int32_t*)&RAM[DS_START_OFFSET];
+	int32_t* pStringLocOffset = (int32_t*)DATA;
+
+	// Load Strings in Memory
 	for (int i = 0; i < iStringCount; i++)
 	{
-		int iStringSize = iByteCode[iOffset++];
+		iStringSize = iByteCode[iOffset++];
 
 		*pStringLocOffset++ = iStringStartOffset;
 
@@ -148,6 +164,18 @@ int VirtualMachine::loadBSS(const char* iByteCode, int startOffset, int iBuffLen
 		iStringStartOffset += iStringSize + 1;
 		iOffset += iStringSize;
 	}
+
+	// Get Static variable count
+	{
+		int32_t iStaticVariableCount = (*(int32_t*)&iByteCode[iOffset]);
+
+		GLOBALS = (int32_t*)&RAM[iStringStartOffset];
+		iOffset += sizeof(int32_t);
+		iStringStartOffset += sizeof(int32_t) * iStaticVariableCount;
+	}
+
+	HEAP = &RAM[iStringStartOffset];
+	REGS.GS = iStringStartOffset;
 
 	return iOffset;
 }
@@ -168,6 +196,7 @@ void VirtualMachine::load(const char* iByteCode, int iBuffLength)
 {
 	CODE = (int8_t*)&RAM[CS_START_OFFSET];
 	STACK = (int32_t*)&RAM[SS_START_OFFSET];
+	DATA = (int8_t*)&RAM[DS_START_OFFSET];
 
 	int iEndOffset = 0;
 	iEndOffset = loadBSS(iByteCode, 0, iBuffLength);
@@ -211,7 +240,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 				}
 				else // STATIC variable saved on the HEAP
 				{
-
+					STACK[--REGS.RSP] = GLOBALS[iVariablePos];
 				}
 			}
 		break;
@@ -233,7 +262,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 				}
 				else // STATIC variable saved on the HEAP
 				{
-
+					GLOBALS[iVariablePos] = STACK[REGS.RSP++];
 				}
 			}
 		break;
@@ -452,12 +481,91 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			else
 				STACK[--REGS.RSP] = 0;
 		break;
+		case OPCODE::BITWISEOR:
+			iTemp2 = STACK[REGS.RSP++];
+			iTemp1 = STACK[REGS.RSP++];
+
+			STACK[--REGS.RSP] = (iTemp1 | iTemp2);
+		break;
+		case OPCODE::BITWISEAND:
+			iTemp2 = STACK[REGS.RSP++];
+			iTemp1 = STACK[REGS.RSP++];
+
+			STACK[--REGS.RSP] = (iTemp1 & iTemp2);
+		break;
+		case OPCODE::BITWISEXOR:
+			iTemp2 = STACK[REGS.RSP++];
+			iTemp1 = STACK[REGS.RSP++];
+
+			STACK[--REGS.RSP] = (iTemp1 ^ iTemp2);
+		break;
+		case OPCODE::BITWISENOT:
+			iTemp1 = STACK[REGS.RSP++];
+
+			STACK[--REGS.RSP] = (~iTemp1);
+		break;
+		case OPCODE::BITWISELEFTSHIFT:
+			iTemp2 = STACK[REGS.RSP++];
+			iTemp1 = STACK[REGS.RSP++];
+
+			STACK[--REGS.RSP] = (iTemp1 << iTemp2);
+		break;
+		case OPCODE::BITWISERIGHTSHIFT:
+			iTemp2 = STACK[REGS.RSP++];
+			iTemp1 = STACK[REGS.RSP++];
+
+			STACK[--REGS.RSP] = (iTemp1 >> iTemp2);
+		break;
 		case OPCODE::_NOT:
 			iTemp1 = STACK[REGS.RSP++];
 			if(iTemp1 > 0)
 				STACK[--REGS.RSP] = 0;
 			else
 				STACK[--REGS.RSP] = 1;
+		break;
+		case OPCODE::LDA:
+		{
+			// LDA - Load Value from memory address in Accumulator(in our case, the STACK)
+			int32_t iAddress = STACK[REGS.RSP++];
+			
+			int32_t* pAddress = (int32_t*)&HEAP[iAddress];
+			int32_t iValue = *pAddress;
+			
+			STACK[--REGS.RSP] = iValue;
+			//printf("Value @ %d = %d", iAddress, iValue);
+		}
+		break;
+		case OPCODE::STA:
+		{
+			// STA - Store Value in Accumulator(in our case, the STACK) to memory address
+			iOperand = READ_OPERAND(eOpCode);		// Pointer Variable.
+			iTemp1 = STACK[REGS.RSP++];				// Value to be stored, picked up from the STACK.
+			int32_t iAddress = 0;
+			{
+				int16_t iVariablePos = (iOperand & 0x0000FFFF);
+				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
+
+				// Local Var or Function Argument ==> saved on the STACK
+				if (eVariableType == E_VARIABLETYPE::ARGUMENT
+					||
+					eVariableType == E_VARIABLETYPE::LOCAL
+				) {
+					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+						iVariablePos *= -1;
+
+					iAddress = STACK[REGS.RBP - iVariablePos];
+				}
+				else // STATIC variable saved on the HEAP
+				{
+					iAddress = GLOBALS[iVariablePos];
+				}
+
+				int32_t* pAddress = (int32_t*)&HEAP[iAddress];
+				*pAddress = iTemp1;
+
+				printf("Stored %d\n", iTemp1);
+			}
+		}
 		break;
 		case OPCODE::NEGATE:
 			iTemp1 = STACK[REGS.RSP++];
@@ -498,10 +606,15 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			printf("%d", iTemp1);
 		break;
 		case OPCODE::MALLOC:
+		{
 			iTemp1 = STACK[REGS.RSP++];
-			printf("Allocated %d bytes @ 12345\n", iTemp1);
 
-			STACK[--REGS.RSP] = 12345;
+			int32_t iAddress = malloc(iTemp1);
+			assert(iAddress >= 0);
+			printf("Allocated %d bytes @ %d\n", iTemp1, iAddress);
+
+			STACK[--REGS.RSP] = iAddress;
+		}
 		break;
 		case OPCODE::FREE:
 			iOperand = READ_OPERAND(eOpCode);
@@ -516,13 +629,20 @@ void VirtualMachine::eval(OPCODE eOpCode)
 				) {
 					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
 						iVariablePos *= -1;
+
+					int32_t iAddress = STACK[REGS.RBP - iVariablePos];
+					dealloc(iAddress);
+
+					printf("Freed memory @ %d by local variable %d\n", iAddress, iVariablePos);
 				}
 				else // STATIC variable saved on the HEAP
 				{
+					int32_t iAddress = GLOBALS[iVariablePos];
+					dealloc(iAddress);
 
+					printf("Free memory allocated by STATIC variable %d\n", iVariablePos);
 				}
 			}
-			printf("Free memory allocated by variable @ %d\n", iOperand);
 		break;
 		case OPCODE::HLT:
 			m_bRunning = false;
@@ -572,3 +692,81 @@ int64_t VirtualMachine::readOperandFor(OPCODE eOpCode)
 		break;
 	}
 }
+
+int32_t VirtualMachine::malloc(int32_t iSize)
+{
+	int32_t iReturnAddress = -1;
+	std::vector<HeapNode>::iterator itrUnAllocList = m_vUnAllocatedList.begin();
+	for (; itrUnAllocList != m_vUnAllocatedList.end(); ++itrUnAllocList)
+	{
+		HeapNode& pUnAllocHeapNode = *itrUnAllocList;
+		if(iSize <= pUnAllocHeapNode.m_iSize)
+		{
+			iReturnAddress = pUnAllocHeapNode.m_pAddress;
+			m_vAllocatedList.push_back(HeapNode(pUnAllocHeapNode.m_pAddress, iSize));
+			
+			if (iSize == pUnAllocHeapNode.m_iSize)
+			{
+				m_vUnAllocatedList.erase(itrUnAllocList);
+			}
+			else
+			{
+				pUnAllocHeapNode.m_pAddress += iSize;
+				pUnAllocHeapNode.m_iSize -= iSize;
+			}
+
+			break;
+		}
+	}
+
+	return iReturnAddress;
+}
+
+bool sortList(const HeapNode& first, const HeapNode& second)
+{
+	return (first.m_pAddress < second.m_pAddress);
+}
+
+void VirtualMachine::dealloc(int32_t pAddress)
+{
+	std::vector<HeapNode>::iterator itrAllocList = m_vAllocatedList.begin();
+
+	for (; itrAllocList != m_vAllocatedList.end();  ++itrAllocList)
+	{
+		HeapNode& pAllocHeapNode = *itrAllocList;
+		if (pAddress == pAllocHeapNode.m_pAddress)
+		{
+			bool bFoundPrecedingNode = false;
+			for (HeapNode& pUnAllocHeapNode : m_vUnAllocatedList)
+			{
+				if (pUnAllocHeapNode.m_pAddress + pUnAllocHeapNode.m_iSize == pAddress)
+				{
+					bFoundPrecedingNode = true;
+					pUnAllocHeapNode.m_iSize += pAllocHeapNode.m_iSize;
+					break;
+				}
+			}
+
+			{
+				std::vector<HeapNode>::iterator itr = std::find_if(	m_vUnAllocatedList.begin(), 
+																	m_vUnAllocatedList.end(), 
+																	[pAllocHeapNode](HeapNode& pHeapNode) {
+																		return (	pAllocHeapNode.m_pAddress >= pHeapNode.m_pAddress
+																					&&
+																					(pAllocHeapNode.m_pAddress + pAllocHeapNode.m_iSize) <= (pHeapNode.m_pAddress + pHeapNode.m_iSize)
+																				);
+																	});
+				if (itr == m_vUnAllocatedList.end())
+				{
+					m_vUnAllocatedList.push_back(HeapNode(pAllocHeapNode.m_pAddress, pAllocHeapNode.m_iSize));
+					std::sort(m_vUnAllocatedList.begin(), m_vUnAllocatedList.end(), sortList);
+				}
+
+				m_vAllocatedList.erase(itrAllocList);
+			}
+
+			break;
+		}
+	}
+}
+

@@ -50,6 +50,24 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 	if (sOperator == "&&")
 		eOperator = ENUM_OP_PRECEDENCE::OP_LOGICALAND;
 	else
+	if (sOperator == "|")
+		eOperator = ENUM_OP_PRECEDENCE::OP_BITWISEOR;
+	else
+	if (sOperator == "&")
+		eOperator = ENUM_OP_PRECEDENCE::OP_BITWISEAND;
+	else
+	if (sOperator == "^")
+		eOperator = ENUM_OP_PRECEDENCE::OP_BITWISEXOR;
+	else
+	if (sOperator == "~")
+		eOperator = ENUM_OP_PRECEDENCE::OP_BITWISENOT;
+	else
+	if (sOperator == "<<")
+		eOperator = ENUM_OP_PRECEDENCE::OP_BITWISELEFTSHIFT;
+	else
+	if (sOperator == ">>")
+		eOperator = ENUM_OP_PRECEDENCE::OP_BITWISERIGHTSHIFT;
+	else
 	if (sOperator == "==")
 		eOperator = ENUM_OP_PRECEDENCE::OP_EQ;
 	else
@@ -94,6 +112,9 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 	else
 	if (sOperator == "NEGATE")
 		eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
+	else
+	if (sOperator == "@")
+		eOperator = ENUM_OP_PRECEDENCE::OP_DEREF;
 
 	return eOperator;
 }

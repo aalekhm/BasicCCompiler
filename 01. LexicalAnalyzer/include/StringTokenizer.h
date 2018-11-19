@@ -47,6 +47,7 @@ protected:
 		Token						readSingleLineComment();
 		Token						readMultiLineComment();
 		Token						readPrefixIncrDecr(bool bIsIncr);
+		Token						readPointerDeref();
 
 		bool						isBNFCode(bool bStartTag);
 

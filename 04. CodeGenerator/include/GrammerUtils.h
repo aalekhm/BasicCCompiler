@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	4096
+#define MAX_BYTECODE_SIZE	5120
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -41,11 +41,10 @@ class GrammerUtils
 		static void									populateStrings(Tree* pParentNode, std::vector<std::string>& sVector);
 		static void									addString(std::string& sText, std::vector<std::string>& vVector);
 
-		static int									getVariablePosition(const char* sIdentifier);
 		static int									getStringPosition(const char* sString);
 
-		static void									printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings);
-		static void									printAssembly(int8_t* iByteCode, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings);
+		static void									printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vStrings);
+		static void									printAssembly(int8_t* iByteCode, std::vector<std::string>& vStrings);
 	private:
 		static void									handleFunctionDef(Tree* pNode);
 		static void									handleFunctionStart(Tree* pNode);
@@ -89,7 +88,6 @@ class GrammerUtils
 
 		static void									emitIntAtPos(int32_t iCode, uint32_t iOffset);
 
-		static std::vector<std::string>				m_vVariables;
 		static std::vector<std::string>				m_vStrings;
 
 		static std::map<std::string, FunctionInfo*>	m_MapFunctionInfos;

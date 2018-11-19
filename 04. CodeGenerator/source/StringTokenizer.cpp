@@ -279,7 +279,6 @@ Token StringTokenizer::readDefault(char ch0)
 	else if(ch0 == WHITESPACE_SPACE || ch0 == WHITESPACE_TAB)				{ initRead(); consume(1); return createToken(TokenType::Type::TK_WHITESPACE); }
 	else if(ch0 == 'N' && ch1 == 'E' && peek(2) == 'G' && peek(3) == 'A' && peek(4) == 'T' && peek(5) == 'E')
 																			{ initRead(); consume(6); return createToken(TokenType::Type::TK_NEGATE); }
-			
 	else if(ch0 == CARRIAGE_RETURN && ch1 == LINE_FEED)						{ initRead(); consume(2); return readEOL(); }
 	else if(ch0 == LINE_FEED)												{ return readEOL(); }
 	else if(isdigit(ch0) || (ch0 == '-' && isdigit(ch1)))					{ return readNumber(); }
@@ -309,6 +308,8 @@ Token StringTokenizer::readDefault(char ch0)
 																			{ return readPrefixIncrDecr(false); }
 	else if(ch0 == '+' && ch1 == '+' && (isalpha(peek(2)) || peek(2) == '_'))
 																			{ return readPrefixIncrDecr(true); }
+	else if(ch0 == '@')
+																			{ return readPointerDeref(); }
 	else if(isalpha(ch0) || ch0 == '_')										{ return readIdentifier(); }
 
 	else if(ch0 == '+')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_ADD); }
@@ -318,9 +319,7 @@ Token StringTokenizer::readDefault(char ch0)
 
 	else if(ch0 == '<' && NOT m_bIgnoreBNFNonTerminals)						{ return readBNFNonTerminal(); }
 	
-	else if(ch0 == '<')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_LT); }
 	else if(ch0 == '>' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_GTEQ); }
-	else if(ch0 == '>')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_GT); }
 	else if(ch0 == '=' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_EQ); }
 	else if(ch0 == '=')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_ASSIGN); }
 	else if(ch0 == '!' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_NEQ); }
@@ -329,6 +328,12 @@ Token StringTokenizer::readDefault(char ch0)
 	else if(ch0 == '&')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEAND); }
 	else if(ch0 == '|' && ch1 == '|')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_LOGICALOR); }
 	else if(ch0 == '|')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEOR); }
+	else if(ch0 == '^')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISEXOR); }
+	else if(ch0 == '~')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_BITWISENOT); }
+	else if(ch0 == '<' && ch1 == '<')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_BITWISELEFTSHIFT); }
+	else if(ch0 == '<')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_LT); }
+	else if(ch0 == '>' && ch1 == '>')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_BITWISERIGHTSHIFT); }
+	else if(ch0 == '>')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_GT); }
 	
 	else if(ch0 == ':' && ch1 == ':' && peek(2) == '=' && NOT m_bIgnoreBNFNonTerminals)			
 																			{ initRead(); consume(3); return createToken(TokenType::Type::TK_BNFASSIGNMENT); }
@@ -389,6 +394,23 @@ Token StringTokenizer::readPrefixIncrDecr(bool bIsIncr)
 	}
 
 	return createToken(bIsIncr ? TokenType::Type::TK_PREFIXINCR : TokenType::Type::TK_PREFIXDECR);
+}
+
+Token StringTokenizer::readPointerDeref()
+{
+	consume(1);
+	initRead();
+
+	while (true)
+	{
+		char ch = peek(0);
+		if (isalpha(ch) || ch == '_' || isdigit(ch))
+			consume(1);
+		else
+			break;
+	}
+
+	return createToken(TokenType::Type::TK_DEREF);
 }
 
 Token StringTokenizer::readBNFNonTerminal()

@@ -10,7 +10,6 @@ std::vector<std::string>				GrammerUtils::m_vKeywords;
 
 StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
 int										GrammerUtils::iTabCount = 0;
-std::vector<std::string>				GrammerUtils::m_vVariables;
 std::vector<std::string>				GrammerUtils::m_vStrings;
 int8_t									GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
 std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapFunctionInfos;
@@ -55,6 +54,12 @@ CodeMap opCodeMap[] =
 	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1,  PRIMIIVETYPE::INT_8},
 	{ "LOGICALOR",	OPCODE::LOGICALOR,	1,  PRIMIIVETYPE::INT_8},
 	{ "LOGICALAND",	OPCODE::LOGICALAND,	1,  PRIMIIVETYPE::INT_8},
+	{ "BITWISEOR",	OPCODE::BITWISEOR,	1,  PRIMIIVETYPE::INT_8},
+	{ "BITWISEAND",	OPCODE::BITWISEAND,	1,  PRIMIIVETYPE::INT_8},
+	{ "BITWISEXOR",	OPCODE::BITWISEXOR,	1,  PRIMIIVETYPE::INT_8},
+	{ "BITWISENOT",	OPCODE::BITWISENOT,	1,  PRIMIIVETYPE::INT_8},
+	{ "BITWISELEFTSHIFT",	OPCODE::BITWISELEFTSHIFT,	1,  PRIMIIVETYPE::INT_8},
+	{ "BITWISERIGHTSHIFT",	OPCODE::BITWISERIGHTSHIFT,	1,  PRIMIIVETYPE::INT_8},
 	{ "NOT",		OPCODE::_NOT,		1,  PRIMIIVETYPE::INT_8},
 	{ "JMP",		OPCODE::JMP,		2,  PRIMIIVETYPE::INT_32},
 	{ "JZ",			OPCODE::JZ,			2,  PRIMIIVETYPE::INT_32},
@@ -74,6 +79,9 @@ CodeMap opCodeMap[] =
 
 	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8},
 	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32},
+
+	{ "LDA",		OPCODE::LDA,		1,  PRIMIIVETYPE::INT_8 },
+	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
 };
@@ -259,17 +267,19 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			std::cout << " = ";
 
 			Tree* pExpressionNode = pNode->m_pLeftNode;
-
-			if (pExpressionNode->m_vStatements.size() > 0)
-			{
-				for (Tree* pChild : pExpressionNode->m_vStatements)
-				{
-					std::cout << pChild->m_sText << " ";
-				}
-			}
-			else
 			if(pExpressionNode != nullptr)
-				std::cout << pExpressionNode->m_sText;
+			{
+				if (pExpressionNode->m_vStatements.size() > 0)
+				{
+					for (Tree* pChild : pExpressionNode->m_vStatements)
+					{
+						std::cout << pChild->m_sText << " ";
+					}
+				}
+				else
+				if(pExpressionNode != nullptr)
+					std::cout << pExpressionNode->m_sText;
+			}
 
 			std::cout << ";";
 		}
@@ -335,16 +345,19 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 				}
 			}
 
+			std::string sIdentifierText = (pIdentifierNode->m_eASTNodeType == ASTNodeType::ASTNode_IDENTIFIER) ? "" : "@";
+			sIdentifierText += pIdentifierNode->m_sText;
+
 			if (pExpressionNode->m_vStatements.size() > 0)
 			{
-				std::cout << pIdentifierNode->m_sText << " = ";
+				std::cout << sIdentifierText << " = ";
 				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
 				{
 					printAST(pChildNode, false);
 				}
 			}
 			else
-				std::cout << pIdentifierNode->m_sText << " = " << pExpressionNode->m_sText << ";" << std::endl;
+				std::cout << sIdentifierText << " = " << pExpressionNode->m_sText << ";" << std::endl;
 
 			// PostFix
 			if (pExpressionNode->m_pRightNode != nullptr)
@@ -626,7 +639,7 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 		}
 		//////////////////////////////////////////////////////////////////////////////
 
-		printAssembly(m_iByteCode, m_vVariables, m_vStrings);
+		printAssembly(m_iByteCode, m_vStrings);
 	}
 }
 
@@ -872,6 +885,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::FETCH:
 		case OPCODE::PUSHI:
 		case OPCODE::FREE:
+		case OPCODE::STA:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
@@ -915,6 +929,12 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::JMP_NEQ:
 		case OPCODE::LOGICALAND:
 		case OPCODE::LOGICALOR:
+		case OPCODE::BITWISEAND:
+		case OPCODE::BITWISEOR:
+		case OPCODE::BITWISEXOR:
+		case OPCODE::BITWISENOT:
+		case OPCODE::BITWISELEFTSHIFT:
+		case OPCODE::BITWISERIGHTSHIFT:
 		case OPCODE::_NOT:
 		case OPCODE::NEGATE:
 		case OPCODE::PRTC:
@@ -922,6 +942,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::PRTS:
 		case OPCODE::MALLOC:
 		case OPCODE::RET:
+		case OPCODE::LDA:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
@@ -929,23 +950,6 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 			EMIT_BYTE(eOPCODE);
 		}
 		break;
-	}
-}
-
-int GrammerUtils::getVariablePosition(const char* pIdentifier)
-{
-	if (pIdentifier != nullptr)
-	{
-		std::string str = pIdentifier;
-		int iCount = 0;
-		for (std::string sVar : m_vVariables)
-		{
-			if (sVar == str)
-				return iCount;
-			iCount++;
-		}
-
-		return -1;
 	}
 }
 
@@ -1209,11 +1213,32 @@ void GrammerUtils::handleExpression(Tree* pNode)
 			case TokenType::Type::TK_LOGICALOR:
 				EMIT_1(OPCODE::LOGICALOR, 0);
 			break;
+			case TokenType::Type::TK_BITWISEAND:
+				EMIT_1(OPCODE::BITWISEAND, 0);
+			break;
+			case TokenType::Type::TK_BITWISEOR:
+				EMIT_1(OPCODE::BITWISEOR, 0);
+			break;
+			case TokenType::Type::TK_BITWISEXOR:
+				EMIT_1(OPCODE::BITWISEXOR, 0);
+			break;
+			case TokenType::Type::TK_BITWISENOT:
+				EMIT_1(OPCODE::BITWISENOT, 0);
+			break;
+			case TokenType::Type::TK_BITWISELEFTSHIFT:
+				EMIT_1(OPCODE::BITWISELEFTSHIFT, 0);
+			break;
+			case TokenType::Type::TK_BITWISERIGHTSHIFT:
+				EMIT_1(OPCODE::BITWISERIGHTSHIFT, 0);
+			break;
 			case TokenType::Type::TK_NOT:
 				EMIT_1(OPCODE::_NOT, 0);
 			break;
 			case TokenType::Type::TK_NEGATE:
 				EMIT_1(OPCODE::NEGATE, 0);
+			break;
+			case TokenType::Type::TK_DEREF:
+				EMIT_1(OPCODE::LDA, 0);
 			break;
 		}
 	}
@@ -1292,20 +1317,22 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 {
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
-
-	if (pExpressionNode->m_vStatements.size() > 0)
+	if (pExpressionNode != nullptr)
 	{
-		for (Tree* pChild : pExpressionNode->m_vStatements)
+		if (pExpressionNode->m_vStatements.size() > 0)
 		{
-			populateCode(pChild);
+			for (Tree* pChild : pExpressionNode->m_vStatements)
+			{
+				populateCode(pChild);
+			}
+
+			EMIT_1(OPCODE::PUSHR, EREGISTERS::RAX);
 		}
+		else
+			populateCode(pExpressionNode);
 
-		EMIT_1(OPCODE::PUSHR, EREGISTERS::RAX);
+		EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 	}
-	else
-		populateCode(pExpressionNode);
-
-	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
 }
 
 void GrammerUtils::handlePrimitiveVoidPtrEpilogue(Tree* pNode)
@@ -1315,7 +1342,8 @@ void GrammerUtils::handlePrimitiveVoidPtrEpilogue(Tree* pNode)
 
 void GrammerUtils::handleAssign(Tree* pNode)
 {
-	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
+	Tree* pExpressionNode = pNode->m_pLeftNode;
+	Tree* pIdentifiedNode = pNode->m_pRightNode;	// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
 
 	// Compute PreFixExpr
@@ -1325,7 +1353,18 @@ void GrammerUtils::handleAssign(Tree* pNode)
 
 	populateCode(pExpressionNode);
 
-	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+	ASTNodeType	eRightNodeASTNodeType = pIdentifiedNode->m_eASTNodeType;
+	{
+		if (eRightNodeASTNodeType == ASTNodeType::ASTNode_IDENTIFIER)
+		{
+			EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+		}
+		else 
+		if (eRightNodeASTNodeType == ASTNodeType::ASTNode_DEREF)
+		{
+			EMIT_1(OPCODE::STA, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+		}
+	}
 
 	// Compute PostFixExpr
 	{
@@ -1620,24 +1659,28 @@ void GrammerUtils::handleStatements(Tree* pNode)
 	}
 }
 
-void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings)
+void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vStrings)
 {
+	// Write String info
 	pRaf->writeByte(vStrings.size());
 	for (std::string sString : vStrings)
 	{
 		pRaf->writeByte(sString.length());
 		pRaf->write(sString.c_str());
 	}
+
+	// Write Global(Static) variable info
+	pRaf->writeInt(FunctionInfo::m_vStaticVariables.size());
 }
 
-void GrammerUtils::printAssembly(int8_t* iByteCode, std::vector<std::string>& vVariables, std::vector<std::string>& vStrings)
+void GrammerUtils::printAssembly(int8_t* iByteCode, std::vector<std::string>& vStrings)
 {
 	RandomAccessFile* pRaf = new RandomAccessFile();
 	bool bCanWrite = pRaf->openForWrite("main.o");
 
 	if (bCanWrite)
 	{
-		printHeaders(pRaf, vVariables, vStrings);
+		printHeaders(pRaf, vStrings);
 	}
 
 	m_pBAIS->reset();
