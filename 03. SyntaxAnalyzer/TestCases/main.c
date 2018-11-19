@@ -15,11 +15,11 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
-static void* pStaticPtr_1;
-static void* pStaticPtr_2;
-static void* pStaticPtr_3;
+static int32_t* pStaticPtr_1;
+static int32_t* pStaticPtr_2;
+static int32_t* pStaticPtr_3;
 
-static int32_t* pStaticPtr_0_Start;
+static int8_t* pStaticPtr_0_Start;
 int32_t retNewFunc()
 {
 	print("In retNewFunc................");
@@ -35,7 +35,7 @@ int32_t retNewFunc()
 	putc(10);
 
 	int32_t j = 1;
-	void* pNew = malloc(j * 9);
+	int32_t* pNew = malloc(j * 9);
 	print("pNew Allocated @", pNew);
 	putc(10);
 	
@@ -44,7 +44,7 @@ int32_t retNewFunc()
 	putc(10);	
 	
 	////////////////////////////////////////////////
-	int32_t* pPtr_0 = malloc(j * 19);
+	int8_t* pPtr_0 = malloc(j * 19);
 	print("pNew Allocated @", @pPtr_0);
 	putc(10);
 	

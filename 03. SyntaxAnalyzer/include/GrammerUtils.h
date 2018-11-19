@@ -80,7 +80,9 @@ class GrammerUtils
 
 		static void									populateCode(Tree* pNode);
 
-		static void									cast(ASTNodeType eASTNodeType);
+		static int32_t								sizeOf(ASTNodeType eASTNodeType);
+		static int32_t								castValueFor(ASTNodeType eASTNodeType);
+		static void									cast(int32_t iCastValue);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);
 		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2);

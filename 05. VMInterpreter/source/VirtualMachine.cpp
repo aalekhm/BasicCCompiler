@@ -73,7 +73,7 @@ struct CodeMap
 	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8 },
 	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32 },
 
-	{ "LDA",		OPCODE::LDA,		1,  PRIMIIVETYPE::INT_8 },
+	{ "LDA",		OPCODE::LDA,		2,  PRIMIIVETYPE::INT_32},
 	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
@@ -526,10 +526,12 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::LDA:
 		{
 			// LDA - Load Value from memory address in Accumulator(in our case, the STACK)
-			int32_t iAddress = STACK[REGS.RSP++];
-			
+			iOperand = READ_OPERAND(eOpCode);		// Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
+
+			int32_t iAddress = STACK[REGS.RSP++];			
 			int32_t* pAddress = (int32_t*)&HEAP[iAddress];
-			int32_t iValue = *pAddress;
+
+			int32_t iValue = ((*pAddress) & iOperand);
 			
 			STACK[--REGS.RSP] = iValue;
 			//printf("Value @ %d = %d", iAddress, iValue);

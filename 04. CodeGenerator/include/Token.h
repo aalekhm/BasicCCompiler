@@ -775,27 +775,6 @@ typedef struct FunctionInfo
 			m_vStaticVariables.push_back(pNode);
 	}
 
-	int32_t sizeOf(ASTNodeType eASTNodeType)
-	{
-		switch (eASTNodeType)
-		{
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
-				return sizeof(int8_t);
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
-				return sizeof(int16_t);
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
-			case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
-			case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
-				return sizeof(int32_t);
-			default:
-				return 1;
-		}
-	}
-
 	Tree*							m_pNode;
 	int								m_iStartOffsetInCode;
 	std::string						m_sFunctionName;

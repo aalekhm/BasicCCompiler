@@ -34,6 +34,10 @@ std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
 #define CURRENT_OFFSET									m_pBAOS->getCurrentOffset()
 #define CURRENT_OFFSET_READ								m_pBAIS->getCurrentOffset()
 
+#define GET_VARIABLE_POSITION(__VAR__NAME__)			m_pCurrentFunction->getLocalVariablePosition(__VAR__NAME__)
+#define IS_POINTER_TYPE(__VAR_NAME__)					m_pCurrentFunction->IsVariableAPointerType(__VAR_NAME__)
+#define GET_VARIABLE_NODETYPE(__VAR_NAME__)				m_pCurrentFunction->getVariableNodeType(__VAR_NAME__)
+
 CodeMap opCodeMap[] =
 {
 	{ "NOP",		OPCODE::NOP,		1,  PRIMIIVETYPE::INT_8},
@@ -80,7 +84,7 @@ CodeMap opCodeMap[] =
 	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8},
 	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32},
 
-	{ "LDA",		OPCODE::LDA,		1,  PRIMIIVETYPE::INT_8 },
+	{ "LDA",		OPCODE::LDA,		2,  PRIMIIVETYPE::INT_32},
 	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
@@ -921,6 +925,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::PUSHI:
 		case OPCODE::FREE:
 		case OPCODE::STA:
+		case OPCODE::LDA:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
@@ -977,7 +982,6 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::PRTS:
 		case OPCODE::MALLOC:
 		case OPCODE::RET:
-		case OPCODE::LDA:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
@@ -1164,16 +1168,16 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 		{
 			/////////////////////////////////////////////////
 			// 1. Fetch variable value & store it onto the stack
-			EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pPreFixNode->m_sText.c_str()));
+			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(pPreFixNode->m_sText.c_str()));
 
 			/////////////////////////////////////////////////
 			// 2. Push integer 1.
 			{
 				int8_t iIncrementValue = 1;
-				if (m_pCurrentFunction->IsVariableAPointerType(pPreFixNode->m_sText.c_str()))
+				if (IS_POINTER_TYPE(pPreFixNode->m_sText.c_str()))
 				{
-					ASTNodeType _eASTNodeType = m_pCurrentFunction->getVariableNodeType(pPreFixNode->m_sText.c_str());
-					iIncrementValue = m_pCurrentFunction->sizeOf(_eASTNodeType);
+					ASTNodeType _eASTNodeType = GET_VARIABLE_NODETYPE(pPreFixNode->m_sText.c_str());
+					iIncrementValue = sizeOf(_eASTNodeType);
 				}
 
 				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_PREINCR) ? iIncrementValue : -iIncrementValue);
@@ -1185,7 +1189,7 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 
 			//////////////////////////////////////////////////////
 			// Store the decremented/incremented value from the stack back to the variable
-			EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pPreFixNode->m_sText.c_str()));
+			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pPreFixNode->m_sText.c_str()));
 		}
 	}
 }
@@ -1213,7 +1217,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
 			break;
 			case TokenType::Type::TK_IDENTIFIER:
-				EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(tok.getText()));
+				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(tok.getText()));
 			break;
 			case TokenType::Type::TK_STRING:
 				EMIT_1(OPCODE::PUSHI, getStringPosition(tok.getText()));
@@ -1282,7 +1286,13 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				EMIT_1(OPCODE::NEGATE, 0);
 			break;
 			case TokenType::Type::TK_DEREF:
-				EMIT_1(OPCODE::LDA, 0);
+			{
+				// Send in the 'CAST' value of the pointer Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF)
+				// which will be used @ runtime to make a 'CAST'.
+				ASTNodeType eASTNodeType = GET_VARIABLE_NODETYPE(prevTok.getText());
+				uint32_t iCastValue = castValueFor(eASTNodeType);
+				EMIT_1(OPCODE::LDA, iCastValue);
+			}
 			break;
 		}
 	}
@@ -1316,16 +1326,16 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 		{
 			/////////////////////////////////////////////////
 			// 1. Fetch variable value & store it onto the stack
-			EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pPostFixNode->m_sText.c_str()));
+			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(pPostFixNode->m_sText.c_str()));
 
 			/////////////////////////////////////////////////
 			// 2. Push integer 1.
 			{
 				int8_t iIncrementValue = 1;
-				if (m_pCurrentFunction->IsVariableAPointerType(pPostFixNode->m_sText.c_str()))
+				if (IS_POINTER_TYPE(pPostFixNode->m_sText.c_str()))
 				{
-					ASTNodeType _eASTNodeType = m_pCurrentFunction->getVariableNodeType(pPostFixNode->m_sText.c_str());
-					iIncrementValue = m_pCurrentFunction->sizeOf(_eASTNodeType);
+					ASTNodeType _eASTNodeType = GET_VARIABLE_NODETYPE(pPostFixNode->m_sText.c_str());
+					iIncrementValue = sizeOf(_eASTNodeType);
 				}
 
 				EMIT_1(OPCODE::PUSHI, (eASTNodeType == ASTNodeType::ASTNode_POSTINCR) ? iIncrementValue : -iIncrementValue);
@@ -1337,7 +1347,7 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 
 			//////////////////////////////////////////////////////
 			// Store the decremented/incremented value from the stack back to the variable
-			EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pPostFixNode->m_sText.c_str()));
+			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pPostFixNode->m_sText.c_str()));
 		}
 	}
 }
@@ -1358,7 +1368,7 @@ void GrammerUtils::handleInteger(Tree* pNode)
 
 void GrammerUtils::handleIdentifier(Tree* pNode)
 {
-	EMIT_1(OPCODE::FETCH, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 }
 
 void GrammerUtils::handleString(Tree* pNode)
@@ -1384,14 +1394,14 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 		else
 			populateCode(pExpressionNode);
 
-		cast(pNode->m_eASTNodeType);
-		EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+		cast(castValueFor(pNode->m_eASTNodeType));
+		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 	}
 }
 
 void GrammerUtils::handlePrimitivePtrEpilogue(Tree* pNode)
 {
-	EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 }
 
 void GrammerUtils::handleAssign(Tree* pNode)
@@ -1407,16 +1417,25 @@ void GrammerUtils::handleAssign(Tree* pNode)
 
 	populateCode(pExpressionNode);
 
+	ASTNodeType eVariableASTNodeType = GET_VARIABLE_NODETYPE(pNode->m_sText.c_str());
+	// Cast only int8_t, int16_t, int32_t, @DEREF assignments to their respective 'TYPES'.
+	// DO NOT cast pointer assignments ie.
+	//		int32_t* pPtr0, pPtr1;
+	//		pPtr0 = pPtr1; // DO NOT cast this assignment.
+
 	ASTNodeType	eRightNodeASTNodeType = pIdentifiedNode->m_eASTNodeType;
 	{
 		if (eRightNodeASTNodeType == ASTNodeType::ASTNode_IDENTIFIER)
 		{
-			EMIT_1(OPCODE::STORE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+			if(NOT IS_POINTER_TYPE(pNode->m_sText.c_str()))
+				cast(castValueFor(eVariableASTNodeType));
+			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 		}
 		else 
 		if (eRightNodeASTNodeType == ASTNodeType::ASTNode_DEREF)
 		{
-			EMIT_1(OPCODE::STA, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+			cast(castValueFor(eVariableASTNodeType));
+			EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 		}
 	}
 
@@ -1657,7 +1676,7 @@ void GrammerUtils::handleMalloc(Tree* pNode)
 
 void GrammerUtils::handleFree(Tree* pNode)
 {
-	EMIT_1(OPCODE::FREE, m_pCurrentFunction->getLocalVariablePosition(pNode->m_sText.c_str()));
+	EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
 }
 
 void GrammerUtils::handleStatics(Tree* pNode)
@@ -1713,24 +1732,54 @@ void GrammerUtils::handleStatements(Tree* pNode)
 	}
 }
 
-void GrammerUtils::cast(ASTNodeType eASTNodeType)
+int32_t GrammerUtils::sizeOf(ASTNodeType eASTNodeType)
 {
-	// Cast the expresseion with relevant cast
+	switch (eASTNodeType)
+	{
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+			return sizeof(int8_t);
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+			return sizeof(int16_t);
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
+			return sizeof(int32_t);
+		default:
+			return 1;
+	}
+}
+
+int32_t GrammerUtils::castValueFor(ASTNodeType eASTNodeType)
+{
+		// Cast the expresseion with relevant cast
 	switch (eASTNodeType)
 	{
 		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8:	// & 0xFF
-			EMIT_1(OPCODE::PUSHI, 0xFF);
-			EMIT_1(OPCODE::BITWISEAND, 0);
-		break;
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT8PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT8PTR:
+			return 0xFF;
 		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16:	// & 0xFFFF
-			EMIT_1(OPCODE::PUSHI, 0xFFFF);
-			EMIT_1(OPCODE::BITWISEAND, 0);
-		break;
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT16PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT16PTR:
+			return 0xFFFF;
 		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32:	// & 0xFFFFFFFF
-			EMIT_1(OPCODE::PUSHI, 0xFFFFFFFF);
-			EMIT_1(OPCODE::BITWISEAND, 0);
-		break;
+		case ASTNodeType::ASTNode_PRIMITIVETYPEINT32PTR:
+		case ASTNodeType::ASTNode_PRIMITIVETYPESTATICINT32PTR:
+			return 0xFFFFFFFF;
 	}
+
+	return 0;
+}
+
+void GrammerUtils::cast(int32_t iCastValue)
+{
+	// Cast the expresseion with relevant Type Value
+	EMIT_1(OPCODE::PUSHI, iCastValue);
+	EMIT_1(OPCODE::BITWISEAND, 0);
 }
 
 void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vStrings)
