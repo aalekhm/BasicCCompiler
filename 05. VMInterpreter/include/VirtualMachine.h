@@ -50,7 +50,7 @@ enum class OPCODE
 	HLT
 };
 
-#define MAX_BYTECODE_SIZE			5120
+#define MAX_BYTECODE_SIZE			6144
 #define MAX_DATA_SIZE				1536
 #define MAX_HEAP_SIZE				2048
 #define MAX_STACK_SIZE				256

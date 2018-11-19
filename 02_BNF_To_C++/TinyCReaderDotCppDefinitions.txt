@@ -112,9 +112,6 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 	else
 	if (sOperator == "NEGATE")
 		eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
-	else
-	if (sOperator == "@")
-		eOperator = ENUM_OP_PRECEDENCE::OP_DEREF;
 
 	return eOperator;
 }

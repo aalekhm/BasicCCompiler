@@ -1291,6 +1291,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				// which will be used @ runtime to make a 'CAST'.
 				ASTNodeType eASTNodeType = GET_VARIABLE_NODETYPE(prevTok.getText());
 				uint32_t iCastValue = castValueFor(eASTNodeType);
+				EMIT_1(OPCODE::PUSHI, sizeOf(eASTNodeType));		// Push the size of the node for ArrayIndexing.
 				EMIT_1(OPCODE::LDA, iCastValue);
 			}
 			break;
@@ -1417,25 +1418,55 @@ void GrammerUtils::handleAssign(Tree* pNode)
 
 	populateCode(pExpressionNode);
 
-	ASTNodeType eVariableASTNodeType = GET_VARIABLE_NODETYPE(pNode->m_sText.c_str());
+	ASTNodeType eVariableType = GET_VARIABLE_NODETYPE(pNode->m_sText.c_str());
 	// Cast only int8_t, int16_t, int32_t, @DEREF assignments to their respective 'TYPES'.
 	// DO NOT cast pointer assignments ie.
 	//		int32_t* pPtr0, pPtr1;
-	//		pPtr0 = pPtr1; // DO NOT cast this assignment.
+	//		pPtr0 = pPtr1;	// DO NOT cast this assignment.
+							// as its an address which shouldn't down casted.
 
-	ASTNodeType	eRightNodeASTNodeType = pIdentifiedNode->m_eASTNodeType;
+	ASTNodeType	eIdentifierNodeASTNodeType = pIdentifiedNode->m_eASTNodeType;
 	{
-		if (eRightNodeASTNodeType == ASTNodeType::ASTNode_IDENTIFIER)
+		switch (eIdentifierNodeASTNodeType)
 		{
-			if(NOT IS_POINTER_TYPE(pNode->m_sText.c_str()))
-				cast(castValueFor(eVariableASTNodeType));
-			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
-		}
-		else 
-		if (eRightNodeASTNodeType == ASTNodeType::ASTNode_DEREF)
-		{
-			cast(castValueFor(eVariableASTNodeType));
-			EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+			case ASTNodeType::ASTNode_IDENTIFIER:
+			{
+				if (NOT IS_POINTER_TYPE(pNode->m_sText.c_str()))
+					cast(castValueFor(eVariableType));
+				EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+			}
+			break;
+			case ASTNodeType::ASTNode_DEREF:
+			{
+				cast(castValueFor(eVariableType));					// Perform relevant 'CAST'
+
+				EMIT_1(OPCODE::PUSHI, 0);							// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
+																	// @pVar = iRValue; ==> @pVar[0] = iRValue;
+
+				EMIT_1(OPCODE::PUSHI, sizeOf(eVariableType));		// Push variable TYPE onto the STACK as it will be
+																	// required to access the array pointer.
+
+				EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+			}
+			break;
+			case ASTNodeType::ASTNode_DEREFARRAY:
+			{
+				Tree* pDerefExpressionLeaf = pIdentifiedNode->m_pLeftNode;
+				if (pDerefExpressionLeaf != nullptr)
+				{
+					cast(castValueFor(eVariableType));					// Perform relevant 'CAST'
+
+					populateCode(pDerefExpressionLeaf);					// ArrayIndex pushed as an expression.
+																		// which will be read from STACK @ runtime.
+																		// @pVar[index] = iRValue;
+
+					EMIT_1(OPCODE::PUSHI, sizeOf(eVariableType));		// Push variable TYPE onto the STACK as it will be
+																		// required to access the array pointer.
+
+					EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+				}
+			}
+			break;
 		}
 	}
 

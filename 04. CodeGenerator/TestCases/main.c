@@ -41,10 +41,10 @@ int32_t retNewFunc()
 	
 	@pNew = 1977;
 	print("Value @ pNew = ", @pNew);
-	putc(10);	
+	putc(10);
 	
 	////////////////////////////////////////////////
-	int8_t* pPtr_0 = malloc(j * 19);
+	int8_t* pPtr_0 = malloc(j * 8);
 	print("pNew Allocated @", @pPtr_0);
 	putc(10);
 	
@@ -54,18 +54,47 @@ int32_t retNewFunc()
 	pPtr_0++;
 	@pPtr_0 = 1983;
 	pPtr_0--;
-	print("Value of pPtr_0[0] = ", @pPtr_0);
+	print("Value of @pPtr_0[0] = ", @pPtr_0, ", @pPtr_0[1] = ", @pPtr_0[1]);
 	putc(10);
 	pPtr_0++;
 	print("Value of pPtr_0[1] = ", @pPtr_0);
+	putc(10);
+	
+	pPtr_0 = pStaticPtr_0_Start;
+	@pPtr_0[2] = 1984;
+	@pPtr_0[3] = 1985;
+	@pPtr_0[4] = 1986;
+	print("Value of @pPtr_0[0] = ", @pPtr_0[0], ", @pPtr_0[1] = ", @pPtr_0[1], ", @pPtr_0[2] = ", @pPtr_0[2], ", @pPtr_0[3] = ", @pPtr_0[3], ", @pPtr_0[4] = ", @pPtr_0[4]);
 	putc(10);
 	
 	@pPtr_0 = @pNew;
 	print("Assigned @pPtr_0 = @pNew ==> ", @pPtr_0);
 	putc(10);
 	
-	pPtr_0 = pStaticPtr_0_Start;
+	for(int32_t ii = 0; ii < 8; ii++)
+	{
+		// LValue Nested ArrayIndexing
+		@pPtr_0[ii + 2 - 2 + @pNew[0] - 1977] = 255 - ii;
+	}
+	
+	for(int32_t ii = 0; ii < 8; ii++)
+	{
+		print("@pPtr_0[", ii, "] = ", @pPtr_0[ii + 2 - 2]);
+		putc(10);
+	}
+	
+	// RValue Nested ArrayIndexing
+	int32_t iVar = @pNew + @pPtr_0[2 * 3 - 4 + @pPtr_0[1] - 256];	// 1977 + 255
+	print("iVar = ", iVar, "...");
+	putc(10);
 	////////////////////////////////////////////////
+	
+	///////////////////////////////////////////////
+	@pNew[j*0] = 2016 * 2;
+	print("@pNew[0] = ", @pNew);
+	putc(10);
+	///////////////////////////////////////////////
+	
 	int32_t iCount = @pStaticPtr_3;
 	iCount++;
 	@pStaticPtr_3 = iCount;

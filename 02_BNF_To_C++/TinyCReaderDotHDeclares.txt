@@ -2,7 +2,7 @@
 		void 						read(const char* sFile);
 		std::string					popOperator();
 		ENUM_OP_PRECEDENCE 			opFromString(std::string sOperator);
-		void						checkOpPrecedenceAndPush(std::string sCurrentOperator);		
+		void						checkOpPrecedenceAndPush(std::string sCurrentOperator);
 		
 		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
 		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);

@@ -112,9 +112,6 @@ ENUM_OP_PRECEDENCE TinyCReader::opFromString(std::string sOperator)
 	else
 	if (sOperator == "NEGATE")
 		eOperator = ENUM_OP_PRECEDENCE::OP_NEGATE;
-	else
-	if (sOperator == "@")
-		eOperator = ENUM_OP_PRECEDENCE::OP_DEREF;
 
 	return eOperator;
 }
@@ -627,6 +624,10 @@ return true;
 }
 else
 if(prePostFixedIncrDecr()) {
+return true;
+}
+else
+if(assignmentDerefArray()) {
 return true;
 }
 else
@@ -1833,6 +1834,70 @@ return true;
 
 }
 
+bool TinyCReader::assignmentDerefArray() {
+if(!GrammerUtils::match(TokenType::Type::TK_DEREFARRAY, MANDATORY))
+return false;
+
+														TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
+														std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+														assert(!sFullyQualifiedVariableName.empty());
+
+														Tree* pTemp = nullptr;
+														Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
+														{
+															pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+														}
+
+														Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_DEREFARRAY, sFullyQualifiedVariableName.c_str());
+														Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														{
+															pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+
+															pAssignmentNode->m_pRightNode = pIdentifierLeaf;
+															pIdentifierLeaf->m_pParentNode = pAssignmentNode;
+
+															pTemp = m_pASTCurrentNode;
+
+															pIdentifierLeaf->m_pLeftNode = pArrayIndexExpressionLeaf;
+															pArrayIndexExpressionLeaf->m_pParentNode = pIdentifierLeaf;
+
+															m_pASTCurrentNode = pArrayIndexExpressionLeaf;
+														}													
+													
+if(!GrammerUtils::match('[', MANDATORY))
+return false;
+if(!expr())
+return false;
+
+														pArrayIndexExpressionLeaf = createPostFixExpr(pArrayIndexExpressionLeaf);
+														pIdentifierLeaf->addChild(pArrayIndexExpressionLeaf);
+													
+if(!GrammerUtils::match(']', MANDATORY))
+return false;
+if(!GrammerUtils::match('=', MANDATORY))
+return false;
+
+														Tree* pRValueExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														{
+															pAssignmentNode->m_pLeftNode = pRValueExpressionLeaf;
+															pRValueExpressionLeaf->m_pParentNode = pAssignmentNode;
+
+															m_pASTCurrentNode = pRValueExpressionLeaf;
+														}
+													
+if(!expr())
+return false;
+
+														m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pAssignmentNode);
+													
+return true;
+
+}
+
 bool TinyCReader::lValue() {
 if(GrammerUtils::match(TokenType::Type::TK_DEREF, OPTIONAL)) {
 return true;
@@ -1872,13 +1937,13 @@ if(!GrammerUtils::match('=', MANDATORY))
 return false;
 
 															Tree* pTemp = nullptr;
-															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															Tree* pRValueExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 															{
-																pAssignmentNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
+																pAssignmentNode->m_pLeftNode = pRValueExpressionLeftLeaf;
+																pRValueExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
 																
 																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pExpressionLeftLeaf;
+																m_pASTCurrentNode = pRValueExpressionLeftLeaf;
 															}
 														
 if(!expr())
@@ -2445,15 +2510,46 @@ if(GrammerUtils::match(TokenType::Type::TK_DEREF, OPTIONAL)) {
 																std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 																
-																checkOpPrecedenceAndPush("@");
-																
+																m_vPostFix.push_back("0");	// Push a fake ArrayIndex of '0'.
 																m_vPostFix.push_back(sFullyQualifiedVariableName);
+																m_vPostFix.push_back("@");
 															
+return true;
+}
+else
+if(rValueDeref()) {
 return true;
 }
 else
 return false;
 
+return true;
+
+}
+
+bool TinyCReader::rValueDeref() {
+if(!GrammerUtils::match(TokenType::Type::TK_DEREFARRAY, MANDATORY))
+return false;
+
+														std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+													
+if(!GrammerUtils::match('[', MANDATORY))
+return false;
+
+														checkOpPrecedenceAndPush("(");
+													
+if(!expr())
+return false;
+
+														checkOpPrecedenceAndPush(")");
+													
+
+														m_vPostFix.push_back(sFullyQualifiedVariableName);
+														m_vPostFix.push_back("@");
+													
+if(!GrammerUtils::match(']', MANDATORY))
+return false;
 return true;
 
 }

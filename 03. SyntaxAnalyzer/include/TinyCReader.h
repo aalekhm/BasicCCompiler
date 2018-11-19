@@ -96,6 +96,7 @@ class TinyCReader {
 		bool newString();
 		bool ptrAssign();
 		bool malloc();
+		bool assignmentDerefArray();
 		bool lValue();
 		bool assignmentRHS();
 		bool freePtrStatement();
@@ -124,6 +125,7 @@ class TinyCReader {
 		bool unary_expr();
 		bool unary_oper();
 		bool preFixInExpr();
+		bool rValueDeref();
 		bool postFixIncrDecrInExpr();
 		bool paren_expr();
 
@@ -131,7 +133,7 @@ class TinyCReader {
 		void 						read(const char* sFile);
 		std::string					popOperator();
 		ENUM_OP_PRECEDENCE 			opFromString(std::string sOperator);
-		void						checkOpPrecedenceAndPush(std::string sCurrentOperator);		
+		void						checkOpPrecedenceAndPush(std::string sCurrentOperator);
 		
 		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
 		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);

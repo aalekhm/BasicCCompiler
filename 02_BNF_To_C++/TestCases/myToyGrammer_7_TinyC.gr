@@ -154,8 +154,10 @@
 <stmt>      					::=   	( 	<functionCall> 
 											|
 											<prePostFixedIncrDecr>
-											| 
-											<assignmentRHS> 
+											|
+											<assignmentDerefArray>
+											|
+											<assignmentRHS>
 											| 
 											<assignmentNewVariable> 
 											| 
@@ -814,6 +816,58 @@
 															"</code>"
 										')';
 										
+<assignmentDerefArray>			::=		TK_DEREFARRAY
+													"<code>"
+														TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
+														std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+														assert(!sFullyQualifiedVariableName.empty());
+
+														Tree* pTemp = nullptr;
+														Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
+														{
+															pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+														}
+
+														Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_DEREFARRAY, sFullyQualifiedVariableName.c_str());
+														Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														{
+															pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+
+															pAssignmentNode->m_pRightNode = pIdentifierLeaf;
+															pIdentifierLeaf->m_pParentNode = pAssignmentNode;
+
+															pTemp = m_pASTCurrentNode;
+
+															pIdentifierLeaf->m_pLeftNode = pArrayIndexExpressionLeaf;
+															pArrayIndexExpressionLeaf->m_pParentNode = pIdentifierLeaf;
+
+															m_pASTCurrentNode = pArrayIndexExpressionLeaf;
+														}													
+													"</code>"
+										'['
+										<expr>		"<code>"
+														pArrayIndexExpressionLeaf = createPostFixExpr(pArrayIndexExpressionLeaf);
+														pIdentifierLeaf->addChild(pArrayIndexExpressionLeaf);
+													"</code>"
+										']'
+										'='			"<code>"
+														Tree* pRValueExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														{
+															pAssignmentNode->m_pLeftNode = pRValueExpressionLeaf;
+															pRValueExpressionLeaf->m_pParentNode = pAssignmentNode;
+
+															m_pASTCurrentNode = pRValueExpressionLeaf;
+														}
+													"</code>"
+										<expr>		"<code>"
+														m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pAssignmentNode);
+													"</code>"
+										;
+
 <lValue>						::=		(	TK_DEREF
 											|
 											TK_IDENTIFIER
@@ -838,17 +892,16 @@
 														"</code>"
 										'='				"<code>"
 															Tree* pTemp = nullptr;
-															Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															Tree* pRValueExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 															{
-																pAssignmentNode->m_pLeftNode = pExpressionLeftLeaf;
-																pExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
+																pAssignmentNode->m_pLeftNode = pRValueExpressionLeftLeaf;
+																pRValueExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
 																
 																pTemp = m_pASTCurrentNode;
-																m_pASTCurrentNode = pExpressionLeftLeaf;
+																m_pASTCurrentNode = pRValueExpressionLeftLeaf;
 															}
 														"</code>"
-										<expr>
-														"<code>"
+										<expr>			"<code>"
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															
 															m_pASTCurrentNode = pTemp;
@@ -1102,11 +1155,30 @@
 																std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 																
-																checkOpPrecedenceAndPush("@");
-																
+																m_vPostFix.push_back("0");	// Push a fake ArrayIndex of '0'.
 																m_vPostFix.push_back(sFullyQualifiedVariableName);
+																m_vPostFix.push_back("@");
 															"</code>"
+											|
+											<rValueDeref>
 										);
+										
+<rValueDeref>				::=		TK_DEREFARRAY	"<code>"
+														std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+													"</code>"
+									'['				"<code>"
+														checkOpPrecedenceAndPush("(");
+													"</code>"
+									<expr>			"<code>"
+														checkOpPrecedenceAndPush(")");
+													"</code>"
+													"<code>"
+														m_vPostFix.push_back(sFullyQualifiedVariableName);
+														m_vPostFix.push_back("@");
+													"</code>"
+									']'
+									;
 
 <postFixIncrDecrInExpr>				::= 	(	TK_POSTFIXDECR	"<code>"
 																	if(m_pASTCurrentNode->m_pRightNode == nullptr)

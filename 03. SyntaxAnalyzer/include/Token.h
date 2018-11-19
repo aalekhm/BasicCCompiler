@@ -66,6 +66,7 @@ namespace TokenType
 		TK_POSTFIXINCR,
 		TK_SWITCH,
 		TK_DEREF,
+		TK_DEREFARRAY,
 		TK_UNKNOWN
 	};
 
@@ -133,6 +134,7 @@ namespace TokenType
 			case Type::TK_POSTFIXINCR:			return "TK_POSTFIXINCR";
 			case Type::TK_SWITCH:				return "TK_SWITCH";
 			case Type::TK_DEREF:				return "TK_DEREF";
+			case Type::TK_DEREFARRAY:			return "TK_DEREFARRAY";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -201,6 +203,7 @@ namespace TokenType
 		else if(sTokenType == "TK_POSTFIXINCR")			return Type::TK_POSTFIXINCR;
 		else if(sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
 		else if(sTokenType == "TK_DEREF")				return Type::TK_DEREF;
+		else if(sTokenType == "TK_DEREFARRAY")			return Type::TK_DEREFARRAY;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else return Type::TK_INVALID;
@@ -358,7 +361,7 @@ enum class ENUM_OP_PRECEDENCE
 	OP_NOT,
 	OP_PLUS = OP_NOT,
 	OP_NEGATE = OP_NOT,
-	OP_DEREF = OP_NOT,
+	//OP_DEREF = OP_NOT,
 	OP_BITWISENOT = OP_NOT,
 
 	OP_RPAREN,
@@ -383,6 +386,7 @@ enum class ASTNodeType
 	ASTNode_NEGATE,
 	ASTNode_NOT,
 	ASTNode_DEREF,
+	ASTNode_DEREFARRAY,
 
 	ASTNode_LT,
 	ASTNode_LTEQ,

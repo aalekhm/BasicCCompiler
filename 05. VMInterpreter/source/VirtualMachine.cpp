@@ -219,7 +219,7 @@ OPCODE VirtualMachine::fetch()
 
 void VirtualMachine::eval(OPCODE eOpCode)
 {
-	int iOperand = 0, iOperand2 = 0, iTemp1 = 0, iTemp2 = 0;
+	int iOperand = 0, iOperand2 = 0, iTemp1 = 0, iTemp2 = 0, iTemp3 = 0;
 	switch (eOpCode)
 	{
 		case OPCODE::FETCH:
@@ -526,10 +526,15 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::LDA:
 		{
 			// LDA - Load Value from memory address in Accumulator(in our case, the STACK)
-			iOperand = READ_OPERAND(eOpCode);		// Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
+			iOperand = READ_OPERAND(eOpCode);			// Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
 
-			int32_t iAddress = STACK[REGS.RSP++];			
-			int32_t* pAddress = (int32_t*)&HEAP[iAddress];
+			int32_t iVarType = STACK[REGS.RSP++];		// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+			int32_t iAddress = STACK[REGS.RSP++];
+			int32_t iArrayIndex = STACK[REGS.RSP++];	// ArrayIndex.
+			
+			int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
+			pAddress_8 += (iArrayIndex * iVarType);
+			int32_t* pAddress = (int32_t*)pAddress_8;
 
 			int32_t iValue = ((*pAddress) & iOperand);
 			
@@ -540,8 +545,12 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::STA:
 		{
 			// STA - Store Value in Accumulator(in our case, the STACK) to memory address
-			iOperand = READ_OPERAND(eOpCode);		// Pointer Variable.
-			iTemp1 = STACK[REGS.RSP++];				// Value to be stored, picked up from the STACK.
+			iOperand = READ_OPERAND(eOpCode);			// Pointer Variable.
+
+			int32_t iVarType = STACK[REGS.RSP++];		// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+			int32_t iArrayIndex = STACK[REGS.RSP++];	// ArrayIndex.
+			int32_t iRValue = STACK[REGS.RSP++];		// RValue to be stored, picked up from the STACK.
+
 			int32_t iAddress = 0;
 			{
 				int16_t iVariablePos = (iOperand & 0x0000FFFF);
@@ -562,10 +571,12 @@ void VirtualMachine::eval(OPCODE eOpCode)
 					iAddress = GLOBALS[iVariablePos];
 				}
 
-				int32_t* pAddress = (int32_t*)&HEAP[iAddress];
-				*pAddress = iTemp1;
+				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
+				pAddress_8 += (iArrayIndex*iVarType);
+				int32_t* pAddress = (int32_t*)pAddress_8;
+				*pAddress = iRValue;
 
-				printf("Stored %d\n", iTemp1);
+				printf("Stored %d @[%d]\n", iRValue, iArrayIndex);
 			}
 		}
 		break;

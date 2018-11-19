@@ -407,6 +407,12 @@ Token StringTokenizer::readPointerDeref()
 		if (isalpha(ch) || ch == '_' || isdigit(ch))
 			consume(1);
 		else
+		if (ch == '[')
+		{
+			Token tok = createToken(TokenType::Type::TK_DEREFARRAY);
+			return tok;
+		}
+		else
 			break;
 	}
 

@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	5120
+#define MAX_BYTECODE_SIZE	6144
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
