@@ -18,7 +18,8 @@ enum class E_VARIABLETYPE
 	INVALID = -1,
 	ARGUMENT,
 	LOCAL,
-	STATIC
+	STATIC,
+	MEMBER
 };
 
 struct CodeMap
@@ -75,6 +76,8 @@ struct CodeMap
 
 	{ "LDA",		OPCODE::LDA,		2,  PRIMIIVETYPE::INT_32},
 	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
+
+	{ "CLR",		OPCODE::CLR,		7,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
@@ -219,36 +222,24 @@ OPCODE VirtualMachine::fetch()
 
 void VirtualMachine::eval(OPCODE eOpCode)
 {
-	int iOperand = 0, iOperand2 = 0, iTemp1 = 0, iTemp2 = 0, iTemp3 = 0;
+	int32_t iOperand = 0, iOperand2 = 0, iTemp1 = 0, iTemp2 = 0, iTemp3 = 0;
 	switch (eOpCode)
 	{
 		case OPCODE::FETCH:
-			iOperand = READ_OPERAND(eOpCode);
+		{
+			int32_t iVariable = READ_OPERAND(eOpCode);
 			{
-				int16_t iVariablePos = (iOperand & 0x0000FFFF);
-				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
-
-				// Local Var or Function Argument ==> saved on the STACK
-				if (eVariableType == E_VARIABLETYPE::ARGUMENT
-					||
-					eVariableType == E_VARIABLETYPE::LOCAL
-				) {
-					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
-						iVariablePos *= -1;
-
-					STACK[--REGS.RSP] = STACK[REGS.RBP - iVariablePos];
-				}
-				else // STATIC variable saved on the HEAP
-				{
-					STACK[--REGS.RSP] = GLOBALS[iVariablePos];
-				}
+				int32_t iAddress = getAddressOf(iVariable);
+				STACK[--REGS.RSP] = iAddress;
 			}
+		}
 		break;
 		case OPCODE::STORE:
-			iOperand = READ_OPERAND(eOpCode);
+		{
+			int32_t iVariable = READ_OPERAND(eOpCode);
 			{
-				int16_t iVariablePos = (iOperand & 0x0000FFFF);
-				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
+				int16_t iVariablePos = (iVariable & 0x0000FFFF);
+				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
 
 				// Local Var or Function Argument ==> saved on the STACK
 				if (eVariableType == E_VARIABLETYPE::ARGUMENT
@@ -265,6 +256,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 					GLOBALS[iVariablePos] = STACK[REGS.RSP++];
 				}
 			}
+		}
 		break;
 		case OPCODE::PUSH:
 		case OPCODE::PUSHI:
@@ -539,44 +531,52 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			int32_t iValue = ((*pAddress) & iOperand);
 			
 			STACK[--REGS.RSP] = iValue;
-			//printf("Value @ %d = %d", iAddress, iValue);
 		}
 		break;
 		case OPCODE::STA:
 		{
 			// STA - Store Value in Accumulator(in our case, the STACK) to memory address
-			iOperand = READ_OPERAND(eOpCode);			// Pointer Variable.
+			int32_t iVariable = READ_OPERAND(eOpCode);		// Pointer Variable.
 
-			int32_t iVarType = STACK[REGS.RSP++];		// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
-			int32_t iArrayIndex = STACK[REGS.RSP++];	// ArrayIndex.
-			int32_t iRValue = STACK[REGS.RSP++];		// RValue to be stored, picked up from the STACK.
+			int32_t iVarType = STACK[REGS.RSP++];				// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+			int32_t iArrayIndex = STACK[REGS.RSP++];			// ArrayIndex.
+			int32_t iRValue = STACK[REGS.RSP++];				// RValue to be stored, picked up from the STACK.
 
-			int32_t iAddress = 0;
+			int32_t iAddress = getAddressOf(iVariable);
 			{
-				int16_t iVariablePos = (iOperand & 0x0000FFFF);
-				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
-
-				// Local Var or Function Argument ==> saved on the STACK
-				if (eVariableType == E_VARIABLETYPE::ARGUMENT
-					||
-					eVariableType == E_VARIABLETYPE::LOCAL
-				) {
-					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
-						iVariablePos *= -1;
-
-					iAddress = STACK[REGS.RBP - iVariablePos];
-				}
-				else // STATIC variable saved on the HEAP
-				{
-					iAddress = GLOBALS[iVariablePos];
-				}
-
 				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
 				pAddress_8 += (iArrayIndex*iVarType);
 				int32_t* pAddress = (int32_t*)pAddress_8;
 				*pAddress = iRValue;
 
 				printf("Stored %d @[%d]\n", iRValue, iArrayIndex);
+			}
+		}
+		break;
+		case OPCODE::CLR:
+		{
+			// arr[5..7] = 0; ------------ - (II)
+
+			int32_t iOperand1_Variable				= READ_OPERAND(eOpCode);		// 1. "arr" position in heap
+			int32_t iOperand2_ArrayIndex			= READ_OPERAND(eOpCode);		// 2. '5'	==> ArrayIndex.
+			int32_t iOperand3_LastPos				= READ_OPERAND(eOpCode);		// 3. Count (in this case, 3 i.e for 5, 6, 7)
+			int32_t iOperand4_RValue				= READ_OPERAND(eOpCode);		// 4. '0'	==> RValue to be stored
+			int32_t iOperand5_VarType				= READ_OPERAND(eOpCode);		// 5. Cast Value of Type "arr" to perform relevant 'CAST'
+			int32_t iOperand6_CastValue				= READ_OPERAND(eOpCode);		// 6. Variable TYPE(int8_t = 1, int16_t = 2, int32_t = 4).
+
+			// Clear Memory
+			{
+				int32_t iAddress = getAddressOf(iOperand1_Variable);
+
+				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
+				pAddress_8 += (iOperand2_ArrayIndex * iOperand5_VarType);
+				int32_t iCount = (iOperand3_LastPos - iOperand2_ArrayIndex);
+
+				for (int32_t i = 1; i <= iCount; i++)
+				{
+					*pAddress_8 = (iOperand4_RValue & iOperand6_CastValue);
+					pAddress_8 += iOperand5_VarType;
+				}
 			}
 		}
 		break;
@@ -630,32 +630,13 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		}
 		break;
 		case OPCODE::FREE:
-			iOperand = READ_OPERAND(eOpCode);
+		{
+			int32_t iVariable = READ_OPERAND(eOpCode);
 			{
-				int16_t iVariablePos = (iOperand & 0x0000FFFF);
-				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iOperand >> (sizeof(int16_t) * 8));
-
-				// Local Var or Function Argument ==> saved on the STACK
-				if (eVariableType == E_VARIABLETYPE::ARGUMENT
-					||
-					eVariableType == E_VARIABLETYPE::LOCAL
-				) {
-					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
-						iVariablePos *= -1;
-
-					int32_t iAddress = STACK[REGS.RBP - iVariablePos];
-					dealloc(iAddress);
-
-					printf("Freed memory @ %d by local variable %d\n", iAddress, iVariablePos);
-				}
-				else // STATIC variable saved on the HEAP
-				{
-					int32_t iAddress = GLOBALS[iVariablePos];
-					dealloc(iAddress);
-
-					printf("Free memory allocated by STATIC variable %d\n", iVariablePos);
-				}
+				int32_t iAddress = getAddressOf(iVariable);
+				dealloc(iAddress);
 			}
+		}
 		break;
 		case OPCODE::HLT:
 			m_bRunning = false;
@@ -781,5 +762,29 @@ void VirtualMachine::dealloc(int32_t pAddress)
 			break;
 		}
 	}
+}
+
+int32_t VirtualMachine::getAddressOf(int32_t iVariable)
+{
+	int32_t iAddress = 0;
+	int16_t iVariablePos = (iVariable & 0x0000FFFF);
+	E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
+
+	// Local Var or Function Argument ==> saved on the STACK
+	if (eVariableType == E_VARIABLETYPE::ARGUMENT
+		||
+		eVariableType == E_VARIABLETYPE::LOCAL
+	) {
+		if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+			iVariablePos *= -1;
+
+		iAddress = STACK[REGS.RBP - iVariablePos];
+	}
+	else // STATIC variable saved on the HEAP
+	{
+		iAddress = GLOBALS[iVariablePos];
+	}
+
+	return iAddress;
 }
 

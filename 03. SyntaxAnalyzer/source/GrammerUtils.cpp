@@ -2,6 +2,7 @@
 #include "ByteArrayOutputStream.h"
 #include "ByteArrayInputStream.h"
 #include <assert.h>
+#include "TinyCReader.h"
 
 Token									GrammerUtils::m_pToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
 Token									GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
@@ -13,8 +14,10 @@ StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
 int										GrammerUtils::iTabCount = 0;
 std::vector<std::string>				GrammerUtils::m_vStrings;
 int8_t									GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
-std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapFunctionInfos;
+std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapGlobalFunctions;
+std::map<std::string, StructInfo*>		GrammerUtils::m_MapGlobalStructs;
 FunctionInfo*							GrammerUtils::m_pCurrentFunction;
+StructInfo*								GrammerUtils::m_pCurrentStruct;
 ByteArrayOutputStream*					GrammerUtils::m_pBAOS;
 ByteArrayInputStream*					GrammerUtils::m_pBAIS;
 
@@ -38,6 +41,9 @@ std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
 #define GET_VARIABLE_POSITION(__VAR__NAME__)			m_pCurrentFunction->getLocalVariablePosition(__VAR__NAME__)
 #define IS_POINTER_TYPE(__VAR_NAME__)					m_pCurrentFunction->IsVariableAPointerType(__VAR_NAME__)
 #define GET_VARIABLE_NODETYPE(__VAR_NAME__)				m_pCurrentFunction->getVariableNodeType(__VAR_NAME__)
+
+#define IS_STATEMENT_INSIDE_FUNCTION					if(m_pCurrentFunction != nullptr)
+#define CREATE_NODE_OF_AST(__eASTType__, __TEXT__)		createNodeOfType(__eASTType__, __TEXT__)
 
 CodeMap opCodeMap[] =
 {
@@ -87,6 +93,7 @@ CodeMap opCodeMap[] =
 
 	{ "LDA",		OPCODE::LDA,		2,  PRIMIIVETYPE::INT_32},
 	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
+	{ "CLR",		OPCODE::CLR,		7,  PRIMIIVETYPE::INT_32},
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
 };
@@ -216,280 +223,291 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 	Tree* pRightNode = pNode->m_pRightNode;
 	bool bProcessChildren = true;
 
-	if(bPrintTabs)
+	if (bPrintTabs)
 	{
 		printTabs();
 	}
 
 	switch (pNode->m_eASTNodeType)
 	{
-		case ASTNodeType::ASTNode_TYPESTATIC:
+	case ASTNodeType::ASTNode_STRUCTDEF:
+	{
+		std::cout << "struct " << pNode->m_sText << std::endl;
+		std::cout << "{" << std::endl;
+		iTabCount++;
+
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_TYPESTATIC:
+	{
+		std::cout << "static ";
+		std::string sType = pNode->getAdditionalInfoFor("type");
+		std::cout << sType << "* " << pNode->m_sText << ";";
+	}
+	break;
+	case ASTNodeType::ASTNode_FUNCTIONDEF:
+	{
+		Tree* pReturnTypeNode = pNode->m_pLeftNode;
+		Tree* pArgListNode = pNode->m_pRightNode;
+
+		std::cout << pReturnTypeNode->m_sText << " " << pNode->m_sText << "(";
+
+		// Arg List
+		for (Tree* pArgNode : pArgListNode->m_vStatements)
 		{
-			std::cout << "static ";
-			std::string sType = pNode->getAdditionalInfoFor("type");
-			std::cout << sType << "* " << pNode->m_sText << ";";
+			std::cout << pArgNode->getAdditionalInfoFor("type") << " " << pArgNode->m_sAdditionalInfo << ", ";
 		}
-		break;
-		case ASTNodeType::ASTNode_FUNCTIONDEF:
+
+		std::cout << ") {" << std::endl;
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_FUNCTIONCALL:
+	{
+		std::cout << pNode->m_sText << "(";
+
+		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+		for (Tree* pChildNode : *vStatements)
 		{
-			Tree* pReturnTypeNode = pNode->m_pLeftNode;
-			Tree* pArgListNode = pNode->m_pRightNode;
-
-			std::cout << pReturnTypeNode->m_sText << " " << pNode->m_sText << "(";
-
-			// Arg List
-			for (Tree* pArgNode : pArgListNode->m_vStatements)
-			{
-				std::cout << pArgNode->getAdditionalInfoFor("type") << " " << pArgNode->m_sAdditionalInfo << ", ";
-			}
-
-			std::cout << ") {" << std::endl;
-			iTabCount++;
+			if (pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+				std::cout << pChildNode->m_sText << ", ";
 		}
-		break;
-		case ASTNodeType::ASTNode_FUNCTIONCALL:
-		{
-			std::cout << pNode->m_sText << "(";
+		std::cout << ");";
 
-			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-			for (Tree* pChildNode : *vStatements)
-			{
-				if(pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
-					std::cout << pChildNode->m_sText << ", ";
-			}
-			std::cout << ");";
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_TYPE:
+	{
+		std::cout << pNode->getAdditionalInfoFor("type");
+		std::cout << (pNode->m_bIsPointerType ? "*" : "");
+		std::cout << " ";
+		std::cout << pNode->m_sText;
 
-			bProcessChildren = false;
-		}
-		break;
-		case ASTNodeType::ASTNode_TYPE:
+		Tree* pExpressionNode = pNode->m_pLeftNode;
+		if (pExpressionNode != nullptr)
 		{
-			std::cout << pNode->getAdditionalInfoFor("type");
 			std::cout << " = ";
-
-			Tree* pExpressionNode = pNode->m_pLeftNode;
-			if(pExpressionNode != nullptr)
-			{
-				if (pExpressionNode->m_vStatements.size() > 0)
-				{
-					for (Tree* pChild : pExpressionNode->m_vStatements)
-					{
-						std::cout << pChild->m_sText << " ";
-					}
-				}
-				else
-				if(pExpressionNode != nullptr)
-					std::cout << pExpressionNode->m_sText;
-			}
-
-			std::cout << ";";
-		}
-		break;
-		case ASTNodeType::ASTNode_TYPEARRAY:
-		{
-			Tree* pArraySizeLeaf = pNode->m_pLeftNode;
-			Tree* pArrayElementsLeaf = pNode->m_pRightNode;
-
-			std::cout << pNode->getAdditionalInfoFor("type") << " " << pNode->m_sAdditionalInfo << "[";
-			if (pArraySizeLeaf != nullptr)
-			{
-				std::cout << pArraySizeLeaf->m_sText;
-			}
-
-			std::cout << "]";
-
-			if (pArrayElementsLeaf != nullptr)
-			{
-				std::cout << " " << "=" << " ";
-				std::cout << "{";
-
-				for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
-				{
-					std::cout << " " << pArrayElement->m_sText << ",";
-				}
-
-				std::cout << "}";
-			}
-
-			std::cout << ";";
-		}
-		break;
-		case ASTNodeType::ASTNode_MALLOC:
-		{
-			std::cout << "malloc(";
-
-			Tree* pExpressionNode = pNode->m_pLeftNode;
-			std::cout << pExpressionNode->m_sText;
-
-			std::cout << ");";
-		}
-		break;
-		case ASTNodeType::ASTNode_PREDECR:
-		case ASTNodeType::ASTNode_PREINCR:
-		{
-			std::cout << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << pNode->m_sText << ";";
-		}
-		break;
-		case ASTNodeType::ASTNode_POSTDECR:
-		case ASTNodeType::ASTNode_POSTINCR:
-		{
-			std::cout << pNode->m_sText << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";";
-		}
-		break;
-		case ASTNodeType::ASTNode_ASSIGN:
-		{
-			Tree* pIdentifierNode = pRightNode;
-			Tree* pExpressionNode = pLeftNode;
-
-			// PreFix
-			if (pExpressionNode->m_pLeftNode != nullptr)
-			{
-				for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
-				{
-					printAST(pChildNode);
-				}
-			}
-
-			std::string sIdentifierText = (pIdentifierNode->m_eASTNodeType == ASTNodeType::ASTNode_IDENTIFIER) ? "" : "@";
-			sIdentifierText += pIdentifierNode->m_sText;
 
 			if (pExpressionNode->m_vStatements.size() > 0)
 			{
-				std::cout << sIdentifierText << " = ";
-				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
+				for (Tree* pChild : pExpressionNode->m_vStatements)
 				{
-					printAST(pChildNode, false);
+					std::cout << pChild->m_sText << " ";
 				}
 			}
 			else
-				std::cout << sIdentifierText << " = " << pExpressionNode->m_sText << ";" << std::endl;
+				if (pExpressionNode != nullptr)
+					std::cout << pExpressionNode->m_sText;
+		}
+	}
+	break;
+	case ASTNodeType::ASTNode_TYPEARRAY:
+	{
+		Tree* pArraySizeLeaf = pNode->m_pLeftNode;
+		Tree* pArrayElementsLeaf = pNode->m_pRightNode;
 
-			// PostFix
-			if (pExpressionNode->m_pRightNode != nullptr)
+		std::cout << pNode->getAdditionalInfoFor("type") << " " << pNode->m_sAdditionalInfo << "[";
+		if (pArraySizeLeaf != nullptr)
+		{
+			std::cout << pArraySizeLeaf->m_sText;
+		}
+
+		std::cout << "]";
+
+		if (pArrayElementsLeaf != nullptr)
+		{
+			std::cout << " " << "=" << " ";
+			std::cout << "{";
+
+			for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
 			{
-				for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
-				{
-					printAST(pChildNode);
-				}
+				std::cout << " " << pArrayElement->m_sText << ",";
 			}
 
-			bProcessChildren = false;
+			std::cout << "}";
 		}
-		break;
-		case ASTNodeType::ASTNode_IF:
-		{
-			std::cout << "if(" << pLeftNode->m_sText << ") {" << std::endl;
-			iTabCount++;
-		}
-		break;
-		case ASTNodeType::ASTNode_ELSE:
-		{
-			std::cout << "else" << "{\n";
-			iTabCount++;
-		}
-		break;
-		case ASTNodeType::ASTNode_WHILE:
-		{
-			Tree* pExpressionNode = pLeftNode;
 
-			// PreFix
-			if (pExpressionNode->m_pLeftNode != nullptr)
+		std::cout << ";";
+	}
+	break;
+	case ASTNodeType::ASTNode_MALLOC:
+	{
+		std::cout << "malloc(";
+
+		Tree* pExpressionNode = pNode->m_pLeftNode;
+		std::cout << pExpressionNode->m_sText;
+
+		std::cout << ");";
+	}
+	break;
+	case ASTNodeType::ASTNode_PREDECR:
+	case ASTNodeType::ASTNode_PREINCR:
+	{
+		std::cout << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << pNode->m_sText << ";";
+	}
+	break;
+	case ASTNodeType::ASTNode_POSTDECR:
+	case ASTNodeType::ASTNode_POSTINCR:
+	{
+		std::cout << pNode->m_sText << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";";
+	}
+	break;
+	case ASTNodeType::ASTNode_ASSIGN:
+	{
+		Tree* pIdentifierNode = pRightNode;
+		Tree* pExpressionNode = pLeftNode;
+
+		// PreFix
+		if (pExpressionNode->m_pLeftNode != nullptr)
+		{
+			for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
 			{
-				for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
-				{
-					printAST(pChildNode);
-				}
+				printAST(pChildNode);
 			}
+		}
 
-			std::cout << "while(" << pLeftNode->m_sText << ") {" << std::endl;
-			
-			iTabCount++;
-		}
-		break;
-		case ASTNodeType::ASTNode_SWITCH:
+		std::string sIdentifierText = (pIdentifierNode->m_eASTNodeType == ASTNodeType::ASTNode_IDENTIFIER) ? "" : "@";
+		sIdentifierText += pIdentifierNode->m_sText;
+
+		if (pExpressionNode->m_vStatements.size() > 0)
 		{
-			std::cout << "switch(" << pNode->m_pLeftNode->m_sText << ") {" << std::endl;
-			iTabCount++;
-		}
-		break;
-		case ASTNodeType::ASTNode_SWITCHCASE:
-		{
-			std::cout << "case " << pNode->m_sText << ":" << std::endl;
-			iTabCount++;
-		}
-		break;
-		case ASTNodeType::ASTNode_SWITCHDEFAULT:
-		{
-			std::cout << "default:" << std::endl;
-			iTabCount++;
-		}
-		break;
-		case ASTNodeType::ASTNode_SWITCHBREAK:
-		{
-			std::cout << "break;";
-			bProcessChildren = false;
-		}
-		break;
-		case ASTNodeType::ASTNode_PRINT:
-		{
-			std::cout << "print(";
-			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-			for (Tree* pChildNode : *vStatements)
+			std::cout << sIdentifierText << " = ";
+			for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
 			{
-				std::cout << pChildNode->m_sText << ", ";
+				printAST(pChildNode, false);
 			}
-			std::cout << ");";
-
-			bProcessChildren = false;
 		}
-		break;
-		case ASTNodeType::ASTNode_PUTC:
+		else
+			std::cout << sIdentifierText << " = " << pExpressionNode->m_sText << ";" << std::endl;
+
+		// PostFix
+		if (pExpressionNode->m_pRightNode != nullptr)
 		{
-			std::cout << "putc(";
-			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-			for (Tree* pChildNode : *vStatements)
+			for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
 			{
-				std::cout << pChildNode->m_sText;
+				printAST(pChildNode);
 			}
-			std::cout << ");";
+		}
 
-			bProcessChildren = false;
-		}
-		break;
-		case ASTNodeType::ASTNode_STRING:
-		{
-			std::cout << pNode->m_sText << " ";
-			bProcessChildren = false;
-		}
-		break;
-		case ASTNodeType::ASTNode_EXPRESSION:
-		{
-			std::cout << pNode->m_sText << " ";
-			bProcessChildren = false;
-		}
-		break;
-		case ASTNodeType::ASTNode_RETURNSTMT:
-		{
-			std::cout << "return" << " ";
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_IF:
+	{
+		std::cout << "if(" << pLeftNode->m_sText << ") {" << std::endl;
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_ELSE:
+	{
+		std::cout << "else" << "{\n";
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_WHILE:
+	{
+		Tree* pExpressionNode = pLeftNode;
 
-			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-			for (Tree* pChildNode : *vStatements)
+		// PreFix
+		if (pExpressionNode->m_pLeftNode != nullptr)
+		{
+			for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
 			{
-				std::cout << pChildNode->m_sText << ", ";
+				printAST(pChildNode);
 			}
-			std::cout << ";";
-
-			bProcessChildren = false;
 		}
-		break;
-		case ASTNodeType::ASTNode_FREE:
+
+		std::cout << "while(" << pLeftNode->m_sText << ") {" << std::endl;
+
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCH:
+	{
+		std::cout << "switch(" << pNode->m_pLeftNode->m_sText << ") {" << std::endl;
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCHCASE:
+	{
+		std::cout << "case " << pNode->m_sText << ":" << std::endl;
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCHDEFAULT:
+	{
+		std::cout << "default:" << std::endl;
+		iTabCount++;
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCHBREAK:
+	{
+		std::cout << "break;";
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_PRINT:
+	{
+		std::cout << "print(";
+		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+		for (Tree* pChildNode : *vStatements)
 		{
-			std::cout << "free(" << pNode->m_sText.c_str() << ")";
-			std::cout << ";";
-
-			bProcessChildren = false;
+			std::cout << pChildNode->m_sText << ", ";
 		}
-		break;
+		std::cout << ");";
+
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_PUTC:
+	{
+		std::cout << "putc(";
+		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+		for (Tree* pChildNode : *vStatements)
+		{
+			std::cout << pChildNode->m_sText;
+		}
+		std::cout << ");";
+
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_STRING:
+	{
+		std::cout << pNode->m_sText << " ";
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_EXPRESSION:
+	{
+		std::cout << pNode->m_sText << " ";
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_RETURNSTMT:
+	{
+		std::cout << "return" << " ";
+
+		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+		for (Tree* pChildNode : *vStatements)
+		{
+			std::cout << pChildNode->m_sText << ", ";
+		}
+		std::cout << ";";
+
+		bProcessChildren = false;
+	}
+	break;
+	case ASTNodeType::ASTNode_FREE:
+	{
+		std::cout << "free(" << pNode->m_sText.c_str() << ")";
+		std::cout << ";";
+
+		bProcessChildren = false;
+	}
+	break;
 	}
 
 	if (bProcessChildren)
@@ -503,77 +521,83 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 
 	switch (pNode->m_eASTNodeType)
 	{
-		case ASTNodeType::ASTNode_FUNCTIONDEF:
+	case ASTNodeType::ASTNode_STRUCTDEF:
+	case ASTNodeType::ASTNode_FUNCTIONDEF:
+	{
+		if (iTabCount >= 0)
+			iTabCount--;
+
+		printTabs();  std::cout << "}";
+	}
+	break;
+	case ASTNodeType::ASTNode_IF:
+	{
+		if (iTabCount >= 0)
+			iTabCount--;
+
+		printTabs();  std::cout << "}" << std::endl;
+		// Else
+		if (pRightNode != nullptr)
+			printAST(pRightNode);
+
+		std::cout << std::endl;
+	}
+	break;
+	case ASTNodeType::ASTNode_ELSE:
+	{
+		if (iTabCount >= 0)
+			iTabCount--;
+
+		printTabs(); std::cout << "}";
+	}
+	break;
+	case ASTNodeType::ASTNode_WHILE:
+	{
+		Tree* pExpressionNode = pLeftNode;
+
+		// PostFix
+		if (pExpressionNode->m_pRightNode != nullptr)
 		{
-			if (iTabCount >= 0)
-				iTabCount--;
-
-			printTabs();  std::cout << "}";
-		}
-		break;
-		case ASTNodeType::ASTNode_IF:
-		{
-			if (iTabCount >= 0)
-				iTabCount--;
-
-			printTabs();  std::cout << "}" << std::endl;
-			// Else
-			if (pRightNode != nullptr)
-				printAST(pRightNode);
-
-			std::cout << std::endl;
-		}
-		break;
-		case ASTNodeType::ASTNode_ELSE:
-		{
-			if (iTabCount >= 0)
-				iTabCount--;
-
-			printTabs(); std::cout << "}";
-		}
-		break;
-		case ASTNodeType::ASTNode_WHILE:
-		{
-			Tree* pExpressionNode = pLeftNode;
-
-			// PostFix
-			if (pExpressionNode->m_pRightNode != nullptr)
+			for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
 			{
-				for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
-				{
-					printAST(pChildNode);
-				}
+				printAST(pChildNode);
 			}
-
-			if (iTabCount >= 0)
-				iTabCount--;
-
-			printTabs(); std::cout << "}";
 		}
-		break;
-		case ASTNodeType::ASTNode_SWITCH:
-		{
-			if (iTabCount >= 0)
-				iTabCount--;
 
-			printTabs(); std::cout << "}";
-		}
-		break;
-		case ASTNodeType::ASTNode_SWITCHCASE:
-		{
-			if (iTabCount >= 0)
-				iTabCount--;
-		}
-		break;
-		case ASTNodeType::ASTNode_SWITCHDEFAULT:
-		{
-			printTabs();
-			std::cout << "break;" << std::endl;
+		if (iTabCount >= 0)
+			iTabCount--;
 
-			if (iTabCount >= 0)
-				iTabCount--;
-		}
-		break;
+		printTabs(); std::cout << "}";
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCH:
+	{
+		if (iTabCount >= 0)
+			iTabCount--;
+
+		printTabs(); std::cout << "}";
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCHCASE:
+	{
+		if (iTabCount >= 0)
+			iTabCount--;
+	}
+	break;
+	case ASTNodeType::ASTNode_SWITCHDEFAULT:
+	{
+		printTabs();
+		std::cout << "break;" << std::endl;
+
+		if (iTabCount >= 0)
+			iTabCount--;
+	}
+	break;
+	case ASTNodeType::ASTNode_TYPE:
+	{
+		std::cout << ";";
+	}
+	break;
 	}
 
 	std::cout << std::endl;
@@ -623,7 +647,7 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 		//////////////////////////////////////////////////////////////////////////////
 
 		//////////////////////////////////////////////////////////////////////////////
-		EMIT_INT_ATPOS(CURRENT_OFFSET, iMainRetAddressHole);//emit(iOffset, iMainRetAddressHole);
+		EMIT_INT_ATPOS(CURRENT_OFFSET, iMainRetAddressHole);
 
 		std::cout << CURRENT_OFFSET << ". " << "HLT" << std::endl;
 		EMIT_BYTE(OPCODE::HLT);
@@ -631,9 +655,9 @@ void GrammerUtils::generateCode(Tree* pRootNode)
 
 		//////////////////////////////////////////////////////////////////////////////
 		// Map main() jump offset.
-		std::map<std::string, FunctionInfo*>::const_iterator itrFuncMain = m_MapFunctionInfos.find("main");
-		assert(itrFuncMain != m_MapFunctionInfos.end());
-		if (itrFuncMain != m_MapFunctionInfos.end())
+		std::map<std::string, FunctionInfo*>::const_iterator itrFuncMain = m_MapGlobalFunctions.find("main");
+		assert(itrFuncMain != m_MapGlobalFunctions.end());
+		if (itrFuncMain != m_MapGlobalFunctions.end())
 		{
 			FunctionInfo* pMainFuncInfo = (FunctionInfo*)itrFuncMain->second;
 
@@ -657,38 +681,38 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 		{
 			switch (pNode->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_FUNCTIONDEF:
-				case ASTNodeType::ASTNode_FUNCTIONCALL:
-				case ASTNodeType::ASTNode_WHILE:
-				case ASTNodeType::ASTNode_PRINT:
+			case ASTNodeType::ASTNode_FUNCTIONDEF:
+			case ASTNodeType::ASTNode_FUNCTIONCALL:
+			case ASTNodeType::ASTNode_WHILE:
+			case ASTNodeType::ASTNode_PRINT:
+			{
+				populateStrings(pNode, sVector);
+			}
+			break;
+			case ASTNodeType::ASTNode_STRING:
+			case ASTNodeType::ASTNode_CHARACTER:
+			{
+				addString(pNode->m_sText, sVector);
+			}
+			break;
+			case ASTNodeType::ASTNode_IF:
+			{
+				populateStrings(pNode, sVector);
+				Tree* pElseNode = pNode->m_pRightNode;
+				if (pElseNode != nullptr)
 				{
-					populateStrings(pNode, sVector);
+					populateStrings(pElseNode, sVector);
 				}
-				break;
-				case ASTNodeType::ASTNode_STRING:
-				case ASTNodeType::ASTNode_CHARACTER:
+			}
+			break;
+			case ASTNodeType::ASTNode_SWITCH:
+			{
+				for (Tree* pSwitchCaseNode : pNode->m_vStatements)
 				{
-					addString(pNode->m_sText, sVector);
+					populateStrings(pSwitchCaseNode, sVector);
 				}
-				break;
-				case ASTNodeType::ASTNode_IF:
-				{
-					populateStrings(pNode, sVector);
-					Tree* pElseNode = pNode->m_pRightNode;
-					if (pElseNode != nullptr)
-					{
-						populateStrings(pElseNode, sVector);
-					}
-				}
-				break;
-				case ASTNodeType::ASTNode_SWITCH:
-				{
-					for (Tree* pSwitchCaseNode : pNode->m_vStatements)
-					{
-						populateStrings(pSwitchCaseNode, sVector);
-					}
-				}
-				break;
+			}
+			break;
 			}
 		}
 	}
@@ -726,6 +750,47 @@ void GrammerUtils::populateCode(Tree* pNode)
 		// Prologues
 		switch (pNode->m_eASTNodeType)
 		{
+			case ASTNodeType::ASTNode_STRUCTDEF:
+			{
+				handleStructDef(pNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_STRUCTSTART:
+			{
+
+			}
+			break;
+			case ASTNodeType::ASTNode_STRUCTEND:
+			{
+				bool bDefaultAdded = false;
+				std::string sStructName = m_pCurrentStruct->m_sStructName;
+				Tree* pStructNode = m_pCurrentStruct->m_pNode;
+				if (NOT m_pCurrentStruct->m_bHasConstructor)
+				{
+					Tree* pDefaultConstructor = createFunctionWithNoArguments(sStructName.c_str(), "void");
+					pStructNode->addChild(pDefaultConstructor);
+
+					bDefaultAdded = true;
+				}
+
+				if (NOT m_pCurrentStruct->m_bHasDestructor)
+				{
+					std::string sDestructorName = "#" + sStructName;
+					Tree* pDestructor = createFunctionWithNoArguments(sDestructorName.c_str(), "void");
+					pStructNode->addChild(pDestructor);
+
+					bDefaultAdded = true;
+				}
+
+				if (bDefaultAdded)
+				{
+					Tree* pStructEndNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_STRUCTEND, "");
+					pStructNode->addChild(pStructEndNode);
+				}
+				else
+					m_pCurrentStruct = nullptr;
+			}
+			break;
 			case ASTNodeType::ASTNode_TYPESTATIC:
 			{
 				handleStatics(pNode);
@@ -790,13 +855,19 @@ void GrammerUtils::populateCode(Tree* pNode)
 			break;
 			case ASTNodeType::ASTNode_TYPE:
 			{
-				if(NOT pNode->m_bIsPointerType)
-					handlePrimitiveInt(pNode);
+				IS_STATEMENT_INSIDE_FUNCTION
+				{
+					if (NOT pNode->m_bIsPointerType)
+						handlePrimitiveInt(pNode);
+				}
 			}
 			break;
 			case ASTNodeType::ASTNode_TYPEARRAY:
 			{
-				handleTypeArray(pNode);
+				IS_STATEMENT_INSIDE_FUNCTION
+				{
+					handleTypeArray(pNode);
+				}
 			}
 			break;
 			case ASTNodeType::ASTNode_ASSIGN:
@@ -847,8 +918,11 @@ void GrammerUtils::populateCode(Tree* pNode)
 			break;
 			case ASTNodeType::ASTNode_TYPE:
 			{
-				if (pNode->m_bIsPointerType)
-					handlePrimitivePtrEpilogue(pNode);
+				IS_STATEMENT_INSIDE_FUNCTION
+				{
+					if (pNode->m_bIsPointerType)
+						handlePrimitivePtrEpilogue(pNode);
+				}
 			}
 			break;
 		}
@@ -893,75 +967,75 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 {
 	switch (eOPCODE)
 	{
-		case OPCODE::STORE:
-		case OPCODE::FETCH:
-		case OPCODE::PUSHI:
-		case OPCODE::FREE:
-		case OPCODE::STA:
-		case OPCODE::LDA:
-		{
+	case OPCODE::STORE:
+	case OPCODE::FETCH:
+	case OPCODE::PUSHI:
+	case OPCODE::FREE:
+	case OPCODE::STA:
+	case OPCODE::LDA:
+	{
 #if (VERBOSE == 1)
-			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
-			std::cout << iOperand << std::endl;
+		std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+		std::cout << iOperand << std::endl;
 #endif
-			EMIT_BYTE(eOPCODE);
-			EMIT_INT(iOperand);
-		}
-		break;
-		case OPCODE::PUSHR:
-		case OPCODE::POPR:
-		{
+		EMIT_BYTE(eOPCODE);
+		EMIT_INT(iOperand);
+	}
+	break;
+	case OPCODE::PUSHR:
+	case OPCODE::POPR:
+	{
 #if (VERBOSE == 1)
-			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
-			std::cout << registerMap[iOperand].sRegister << std::endl;
+		std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+		std::cout << registerMap[iOperand].sRegister << std::endl;
 #endif
-			EMIT_BYTE(eOPCODE);
-			EMIT_BYTE(iOperand);
-		}
-		break;
-		case OPCODE::CALL:
-		{
+		EMIT_BYTE(eOPCODE);
+		EMIT_BYTE(iOperand);
+	}
+	break;
+	case OPCODE::CALL:
+	{
 #if (VERBOSE == 1)
-			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
-			std::cout << iOperand << std::endl;
+		std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+		std::cout << iOperand << std::endl;
 #endif
-			EMIT_BYTE(eOPCODE);
-			EMIT_INT(iOperand);
-		}
-		break;
-		case OPCODE::ADD:
-		case OPCODE::SUB:
-		case OPCODE::MUL:
-		case OPCODE::DIV:
-		case OPCODE::MOD:
-		case OPCODE::JMP_LT:
-		case OPCODE::JMP_LTEQ:
-		case OPCODE::JMP_GT:
-		case OPCODE::JMP_GTEQ:
-		case OPCODE::JMP_EQ:
-		case OPCODE::JMP_NEQ:
-		case OPCODE::LOGICALAND:
-		case OPCODE::LOGICALOR:
-		case OPCODE::BITWISEAND:
-		case OPCODE::BITWISEOR:
-		case OPCODE::BITWISEXOR:
-		case OPCODE::BITWISENOT:
-		case OPCODE::BITWISELEFTSHIFT:
-		case OPCODE::BITWISERIGHTSHIFT:
-		case OPCODE::_NOT:
-		case OPCODE::NEGATE:
-		case OPCODE::PRTC:
-		case OPCODE::PRTI:
-		case OPCODE::PRTS:
-		case OPCODE::MALLOC:
-		case OPCODE::RET:
-		{
+		EMIT_BYTE(eOPCODE);
+		EMIT_INT(iOperand);
+	}
+	break;
+	case OPCODE::ADD:
+	case OPCODE::SUB:
+	case OPCODE::MUL:
+	case OPCODE::DIV:
+	case OPCODE::MOD:
+	case OPCODE::JMP_LT:
+	case OPCODE::JMP_LTEQ:
+	case OPCODE::JMP_GT:
+	case OPCODE::JMP_GTEQ:
+	case OPCODE::JMP_EQ:
+	case OPCODE::JMP_NEQ:
+	case OPCODE::LOGICALAND:
+	case OPCODE::LOGICALOR:
+	case OPCODE::BITWISEAND:
+	case OPCODE::BITWISEOR:
+	case OPCODE::BITWISEXOR:
+	case OPCODE::BITWISENOT:
+	case OPCODE::BITWISELEFTSHIFT:
+	case OPCODE::BITWISERIGHTSHIFT:
+	case OPCODE::_NOT:
+	case OPCODE::NEGATE:
+	case OPCODE::PRTC:
+	case OPCODE::PRTI:
+	case OPCODE::PRTS:
+	case OPCODE::MALLOC:
+	case OPCODE::RET:
+	{
 #if (VERBOSE == 1)
-			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
+		std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << std::endl;
 #endif
-			EMIT_BYTE(eOPCODE);
-		}
-		break;
+		EMIT_BYTE(eOPCODE);
+	}
+	break;
 	}
 }
 
@@ -982,6 +1056,245 @@ int	GrammerUtils::getStringPosition(const char* sString)
 	}
 }
 
+void GrammerUtils::handleStructDef(Tree* pNode)
+{
+	std::string sStructName = pNode->m_sText;
+
+	m_pCurrentStruct = new StructInfo(pNode);
+	if (m_pCurrentStruct != nullptr)
+	{
+		m_MapGlobalStructs[sStructName] = m_pCurrentStruct;
+	}
+}
+
+Tree* GrammerUtils::createASTForArrayType(Tree* pASTArrayTypeSrc)
+{
+	Tree* pPrimTypeArrayNode = nullptr;
+	if (pASTArrayTypeSrc != nullptr)
+	{
+		pPrimTypeArrayNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_TYPEARRAY, pASTArrayTypeSrc->m_sText.c_str());
+		{
+			pPrimTypeArrayNode->m_sAdditionalInfo.append(pASTArrayTypeSrc->m_sAdditionalInfo);
+			pPrimTypeArrayNode->m_bIsPointerType = true;
+			pPrimTypeArrayNode->setAdditionalInfo("type", pASTArrayTypeSrc->getAdditionalInfoFor("type"));
+			pPrimTypeArrayNode->m_pParentNode = nullptr;
+
+			// optional Array Size
+			{
+				std::string sArraySize = pASTArrayTypeSrc->m_pLeftNode->m_sText;
+				Tree* pArraySizeLeaf = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_INTEGER, sArraySize.c_str());
+				{
+					pPrimTypeArrayNode->m_pLeftNode = pArraySizeLeaf;
+					pArraySizeLeaf->m_pParentNode = pPrimTypeArrayNode;
+				}
+			}
+
+			//= 
+
+			// Optional ELements
+			{
+				//int32_t arr[] = {10, 20, 30, 40};
+				Tree* pArrayElementsLeaf = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_TYPEARRAYELEMENTS, "");
+				pPrimTypeArrayNode->m_pRightNode = pArrayElementsLeaf;
+				pArrayElementsLeaf->m_pParentNode = pPrimTypeArrayNode;
+
+				Tree* pSrcArrayElementsNode = pASTArrayTypeSrc->m_pRightNode;
+				if (pSrcArrayElementsNode != nullptr)
+				{
+					pArrayElementsLeaf->m_sText = pSrcArrayElementsNode->m_sText;
+					for (Tree* pExpressionsLeaf : pSrcArrayElementsNode->m_vStatements)
+					{
+						Tree* pExpressionArrayElementLeaf = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_EXPRESSION, "");
+						pExpressionArrayElementLeaf->m_sText = pExpressionsLeaf->m_sText;
+
+						pArrayElementsLeaf->addChild(pExpressionArrayElementLeaf);
+					}
+				}
+			}
+		}
+	}
+
+	return pPrimTypeArrayNode;
+}
+
+Tree* GrammerUtils::createASTForPointerType(Tree* pASTArrayTypeSrc)
+{
+	Tree* pPrimTypePointerNode = nullptr;
+	if (pASTArrayTypeSrc != nullptr)
+	{
+		pPrimTypePointerNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_TYPE, pASTArrayTypeSrc->m_sText.c_str());
+		{
+			pPrimTypePointerNode->m_sAdditionalInfo.append(pASTArrayTypeSrc->m_sAdditionalInfo);
+			pPrimTypePointerNode->m_bIsPointerType = true;
+			pPrimTypePointerNode->setAdditionalInfo("type", pASTArrayTypeSrc->getAdditionalInfoFor("type"));
+			pPrimTypePointerNode->m_pParentNode = nullptr;
+		}
+	}
+
+	return pPrimTypePointerNode;
+}
+
+Tree* GrammerUtils::createASTForType(Tree* pASTArrayTypeSrc)
+{
+	Tree* pPrimTypeNode = nullptr;
+	if (pASTArrayTypeSrc != nullptr)
+	{
+		pPrimTypeNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_TYPE, pASTArrayTypeSrc->m_sText.c_str());
+		{
+			pPrimTypeNode->m_sAdditionalInfo.append(pASTArrayTypeSrc->m_sAdditionalInfo);
+			pPrimTypeNode->setAdditionalInfo("type", pASTArrayTypeSrc->getAdditionalInfoFor("type"));
+
+			// =
+			// Optional RHS(Expression)
+			{
+				Tree* pExpressionLeftLeaf = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_EXPRESSION, "");
+				pPrimTypeNode->m_pLeftNode = pExpressionLeftLeaf;
+				pExpressionLeftLeaf->m_pParentNode = pPrimTypeNode;
+
+				pExpressionLeftLeaf->m_sText = pASTArrayTypeSrc->m_pLeftNode->m_sText;
+			}
+		}
+	}
+
+	return pPrimTypeNode;
+}
+
+Tree* GrammerUtils::createFreeASTForArrayType(Tree* pASTArrayTypeSrc)
+{
+	Tree* pFreeTypeNode = nullptr;
+	if (pASTArrayTypeSrc != nullptr)
+	{
+		pFreeTypeNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FREE, pASTArrayTypeSrc->m_sText.c_str());
+	}
+
+	return pFreeTypeNode;
+}
+
+Tree* GrammerUtils::createFunctionWithNoArguments(const char* sFunctionName, const char* sReturnType)
+{
+	Tree* pFunctionDefNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName);
+	{
+		Tree* pReturnTypeNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType);
+		Tree* pArgListNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONARGLIST, "");
+
+		pReturnTypeNode->m_pParentNode = pFunctionDefNode;
+		pArgListNode->m_pParentNode = pFunctionDefNode;
+
+		pFunctionDefNode->m_pLeftNode = pReturnTypeNode;
+		pFunctionDefNode->m_pRightNode = pArgListNode;
+
+		// FunctionStart
+		{
+			Tree* pFuncStartNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONSTART, "");
+			pFunctionDefNode->addChild(pFuncStartNode);
+		}
+
+		// Statements
+		{
+
+		}
+
+		// FunctionEnd
+		{
+			Tree* pFuncEndNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONEND, "");
+			pFunctionDefNode->addChild(pFuncEndNode);
+		}
+	}
+
+	return pFunctionDefNode;
+}
+
+Tree* GrammerUtils::createNodeOfType(ASTNodeType eASTNodeType, const char* sText)
+{
+	Tree* pASTNode = TinyCReader::makeLeaf(eASTNodeType, sText);
+	return pASTNode;
+}
+
+void GrammerUtils::addASTForStructMemberVariableConstruction(FunctionInfo* pFunctionInfo)
+{
+	Tree* pFunctionNode = pFunctionInfo->m_pNode;
+	Tree* pCreatedASTNode = nullptr;
+	for (Tree* pASTNode : m_pCurrentStruct->m_vMemberVariables)
+	{
+		switch (pASTNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_TYPE:
+			{
+				if (pASTNode->m_bIsPointerType)
+				{
+					//pCreatedASTNode = createASTForPointerType(pASTNode);
+				}
+				else
+				{
+					pCreatedASTNode = createASTForType(pASTNode);
+				}
+			}
+			break;
+			case ASTNodeType::ASTNode_TYPEARRAY:
+			{
+				pCreatedASTNode = createASTForArrayType(pASTNode);
+			}
+			break;
+		}
+
+		if (pCreatedASTNode != nullptr)
+		{
+			// Inserting @ position '1' as '0' is ASTNode_FUNCTIONSTART
+			pFunctionNode->insertAt(1, pCreatedASTNode);
+		}
+
+		pCreatedASTNode = nullptr;
+	}
+}
+
+void GrammerUtils::addASTForStructMemberVariableDestruction(FunctionInfo* pFunctionInfo)
+{
+	Tree* pFunctionNode = pFunctionInfo->m_pNode;
+	Tree* pCreatedASTNode = nullptr;
+	for (Tree* pASTNode : m_pCurrentStruct->m_vMemberVariables)
+	{
+		switch (pASTNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_TYPEARRAY:
+			{
+				pCreatedASTNode = createFreeASTForArrayType(pASTNode);
+			}
+			break;
+		}
+
+		if (pCreatedASTNode != nullptr)
+		{
+			// Inserting @ position '1' as '0' is ASTNode_FUNCTIONSTART
+			pFunctionNode->insertAt(1, pCreatedASTNode);
+		}
+
+		pCreatedASTNode = nullptr;
+	}
+}
+
+void GrammerUtils::handleStructConstructorOrDestructor(FunctionInfo* pFunctionInfo)
+{
+	// Check if current Function is Constructor or Destructor
+	std::string sStructName = m_pCurrentStruct->m_sStructName;
+	std::string sFunctionName = pFunctionInfo->m_sFunctionName;
+	std::string sDestructorName = "#" + sStructName;
+
+	// Constructor
+	if (sFunctionName == sStructName)
+	{
+		// Constructor without Arguments
+		if(pFunctionInfo->m_pFunctionArguments->m_sAdditionalInfo.empty())
+			m_pCurrentStruct->m_bHasConstructor = true;
+		addASTForStructMemberVariableConstruction(pFunctionInfo);
+	}
+	else // Destructor
+	if (sFunctionName == sDestructorName)
+	{
+		m_pCurrentStruct->m_bHasDestructor = true;
+		addASTForStructMemberVariableDestruction(pFunctionInfo);
+	}
+}
+
 void GrammerUtils::handleFunctionDef(Tree* pNode)
 {
 	std::string sFuncName = pNode->m_sText;
@@ -991,7 +1304,17 @@ void GrammerUtils::handleFunctionDef(Tree* pNode)
 	m_pCurrentFunction = new FunctionInfo(pNode, CURRENT_OFFSET);
 	if (m_pCurrentFunction != nullptr)
 	{
-		m_MapFunctionInfos[sFuncName] = m_pCurrentFunction;
+		if (m_pCurrentStruct != nullptr)
+		{
+			m_pCurrentStruct->addFunction(m_pCurrentFunction);
+			m_pCurrentFunction->setParent(m_pCurrentStruct);
+
+			handleStructConstructorOrDestructor(m_pCurrentFunction);
+		}
+		else
+		{
+			m_MapGlobalFunctions[sFuncName] = m_pCurrentFunction;
+		}
 	}
 }
 
@@ -1013,7 +1336,7 @@ void GrammerUtils::handleFunctionEnd(Tree* pNode)
 
 	// Pop
 	EMIT_1(OPCODE::POPR, EREGISTERS::RBP);
-	
+
 	// Ret
 	EMIT_1(OPCODE::RET, 0);
 
@@ -1022,6 +1345,8 @@ void GrammerUtils::handleFunctionEnd(Tree* pNode)
 		////// Push the already Popped Return Value in EAX onto the stack.
 		EMIT_1(OPCODE::PUSHR, EREGISTERS::RAX);
 	}
+
+	m_pCurrentFunction = nullptr;
 }
 
 void GrammerUtils::handleFunctionCall(Tree* pNode)
@@ -1030,7 +1355,7 @@ void GrammerUtils::handleFunctionCall(Tree* pNode)
 	std::string sFuncCallee = pNode->m_sText;
 
 	// Check if the 'Callee' is our list !
-	FunctionInfo* pCalleeFunctionInfo = m_MapFunctionInfos[sFuncCallee];
+	FunctionInfo* pCalleeFunctionInfo = m_MapGlobalFunctions[sFuncCallee];
 
 	assert(pCalleeFunctionInfo != nullptr);
 	if (pCalleeFunctionInfo != nullptr)
@@ -1051,9 +1376,9 @@ void GrammerUtils::handleFunctionCall(Tree* pNode)
 			&&
 			(sFUNCDEF_Signature == sCALLEE_Signature));
 
-		if (	(iFUNCDEF_ArgCount == iCALLEE_ArgCount)
-				&&
-				(sFUNCDEF_Signature == sCALLEE_Signature)
+		if ((iFUNCDEF_ArgCount == iCALLEE_ArgCount)
+			&&
+			(sFUNCDEF_Signature == sCALLEE_Signature)
 		) {
 			/*
 			//////////////////////////////////////////////////////
@@ -1106,9 +1431,9 @@ void GrammerUtils::handleFunctionCall(Tree* pNode)
 			// Patch the return address
 			EMIT_INT_ATPOS(CURRENT_OFFSET, iReturnAddressOffsetHole);
 
-			#if (VERBOSE == 1)
-				std::cout << "------" << "iReturnAddressOffsetHole [" << iReturnAddressOffsetHole << "] = " << CURRENT_OFFSET << std::endl;
-			#endif
+#if (VERBOSE == 1)
+			std::cout << "------" << "iReturnAddressOffsetHole [" << iReturnAddressOffsetHole << "] = " << CURRENT_OFFSET << std::endl;
+#endif
 		}
 	}
 }
@@ -1185,79 +1510,79 @@ void GrammerUtils::handleExpression(Tree* pNode)
 		{
 			case TokenType::Type::TK_CHARACTER:
 				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
-			break;
+				break;
 			case TokenType::Type::TK_INTEGER:
 				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
-			break;
+				break;
 			case TokenType::Type::TK_IDENTIFIER:
 				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(tok.getText()));
-			break;
+				break;
 			case TokenType::Type::TK_STRING:
 				EMIT_1(OPCODE::PUSHI, getStringPosition(tok.getText()));
-			break;
+				break;
 			case TokenType::Type::TK_MUL:
 				EMIT_1(OPCODE::MUL, 0);
-			break;
+				break;
 			case TokenType::Type::TK_DIV:
 				EMIT_1(OPCODE::DIV, 0);
-			break;
+				break;
 			case TokenType::Type::TK_MOD:
 				EMIT_1(OPCODE::MOD, 0);
-			break;
+				break;
 			case TokenType::Type::TK_ADD:
 				EMIT_1(OPCODE::ADD, 0);
-			break;
+				break;
 			case TokenType::Type::TK_SUB:
 				EMIT_1(OPCODE::SUB, 0);
-			break;
+				break;
 			case TokenType::Type::TK_LT:
 				EMIT_1(OPCODE::JMP_LT, 0);
-			break;
+				break;
 			case TokenType::Type::TK_LTEQ:
 				EMIT_1(OPCODE::JMP_LTEQ, 0);
-			break;
+				break;
 			case TokenType::Type::TK_GT:
 				EMIT_1(OPCODE::JMP_GT, 0);
-			break;
+				break;
 			case TokenType::Type::TK_GTEQ:
 				EMIT_1(OPCODE::JMP_GTEQ, 0);
-			break;
+				break;
 			case TokenType::Type::TK_EQ:
 				EMIT_1(OPCODE::JMP_EQ, 0);
-			break;
+				break;
 			case TokenType::Type::TK_NEQ:
 				EMIT_1(OPCODE::JMP_NEQ, 0);
-			break;
+				break;
 			case TokenType::Type::TK_LOGICALAND:
 				EMIT_1(OPCODE::LOGICALAND, 0);
-			break;
+				break;
 			case TokenType::Type::TK_LOGICALOR:
 				EMIT_1(OPCODE::LOGICALOR, 0);
-			break;
+				break;
 			case TokenType::Type::TK_BITWISEAND:
 				EMIT_1(OPCODE::BITWISEAND, 0);
-			break;
+				break;
 			case TokenType::Type::TK_BITWISEOR:
 				EMIT_1(OPCODE::BITWISEOR, 0);
-			break;
+				break;
 			case TokenType::Type::TK_BITWISEXOR:
 				EMIT_1(OPCODE::BITWISEXOR, 0);
-			break;
+				break;
 			case TokenType::Type::TK_BITWISENOT:
 				EMIT_1(OPCODE::BITWISENOT, 0);
-			break;
+				break;
 			case TokenType::Type::TK_BITWISELEFTSHIFT:
 				EMIT_1(OPCODE::BITWISELEFTSHIFT, 0);
-			break;
+				break;
 			case TokenType::Type::TK_BITWISERIGHTSHIFT:
 				EMIT_1(OPCODE::BITWISERIGHTSHIFT, 0);
-			break;
+				break;
 			case TokenType::Type::TK_NOT:
 				EMIT_1(OPCODE::_NOT, 0);
-			break;
+				break;
 			case TokenType::Type::TK_NEGATE:
 				EMIT_1(OPCODE::NEGATE, 0);
-			break;
+				break;
 			case TokenType::Type::TK_DEREF:
 			{
 				// Send in the 'CAST' value of the pointer Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF)
@@ -1402,9 +1727,17 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));	// Store the memory address in the array variable.
 	}
 
+	// int32_t arr[8] = {10, 20, 30, 40};
+	//		==> arr[0]		= 10; ------|
+	//		==> arr[1]		= 20;		|_____ (I)
+	//		==> arr[2]		= 30;		|
+	//		==> arr[3]		= 40;-------|
+	//		==> arr[5..7]	= 0; ------------- (II)
+
 	// Initialize array elements
 	if (pArrayElementsLeaf != nullptr)
 	{
+		// (I)
 		int32_t iCount = 0;
 		for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
 		{
@@ -1417,10 +1750,25 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 			}
 		}
 
-		for(; iCount < iSize; iCount++)
+		// (II)
 		{
-			EMIT_1(OPCODE::PUSHI, 0);						// Init the array element value to '0'.
-			storeValueAtPosForVariable(iCount, sType.c_str(), pNode->m_sText.c_str());
+			// arr[5..7] = 0; ------------ - (II)
+
+			std::string sVariableName = pNode->m_sText;
+			int32_t iOperand1_PointerVariable = GET_VARIABLE_POSITION(sVariableName.c_str());	// 1. "arr" position in heap
+			int32_t iOperand2_StartPos = iCount;												// 2. '5'
+			int32_t iOperand3_LastPos = iSize;													// 3. Count (in this case, 3 i.e for 5, 6, 7)
+			int32_t iOperand4_Value = 0;														// 4. '0'
+			int32_t iOperand5_ArrayType = sizeOf(sType);										// 5. sizeof(Type) i.e bytes to get to access subsequent "arr" elements.
+			int32_t iOperand6_CastValue = castValueFor(sType);									// 6. Cast Value of Type "arr" to perform relevant 'CAST'
+
+			EMIT_BYTE(OPCODE::CLR);
+			EMIT_INT(iOperand1_PointerVariable);
+			EMIT_INT(iOperand2_StartPos);
+			EMIT_INT(iOperand3_LastPos);
+			EMIT_INT(iOperand4_Value);
+			EMIT_INT(iOperand5_ArrayType);
+			EMIT_INT(iOperand6_CastValue);
 		}
 	}
 }
@@ -1518,7 +1866,7 @@ void GrammerUtils::handleIfWhile(Tree* pNode)
 	}
 
 	// Epilogues
-	{	
+	{
 		switch (pNode->m_eASTNodeType)
 		{
 			case ASTNodeType::ASTNode_IF:
@@ -1544,9 +1892,9 @@ void GrammerUtils::handleIfWhile_Prologue(Tree* pNode, int& i_While_Loop_Hole, i
 		handleExpression(pExpressionNode);
 
 		EMIT_BYTE(OPCODE::JZ);
-		#if (VERBOSE == 1)
-			std::cout << CURRENT_OFFSET << ". " << "JZ" << std::endl;
-		#endif
+#if (VERBOSE == 1)
+		std::cout << CURRENT_OFFSET << ". " << "JZ" << std::endl;
+#endif
 
 		i_IfWhile_JCondition_Hole = CURRENT_OFFSET;
 		EMIT_INT(0);
@@ -1565,9 +1913,9 @@ void GrammerUtils::handleIf_Epilogue(Tree* pNode, int& i_ElseEnd_JMP_Offset, int
 	EMIT_INT(0);
 
 	EMIT_INT_ATPOS(CURRENT_OFFSET, i_IfWhile_JCondition_Hole);
-	#if (VERBOSE == 1)
-		std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << CURRENT_OFFSET << std::endl;
-	#endif
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_IfWhile_JCondition_Hole [" << i_IfWhile_JCondition_Hole << "] = " << CURRENT_OFFSET << std::endl;
+#endif
 
 	if (pElseNode != nullptr)
 	{
@@ -1575,9 +1923,9 @@ void GrammerUtils::handleIf_Epilogue(Tree* pNode, int& i_ElseEnd_JMP_Offset, int
 	}
 
 	EMIT_INT_ATPOS(CURRENT_OFFSET, i_ElseEnd_JMP_Offset);
-	#if (VERBOSE == 1)
-		std::cout << "------" << "i_ElseEnd_JMP_Offset [" << i_ElseEnd_JMP_Offset << "] = " << CURRENT_OFFSET << std::endl;
-	#endif
+#if (VERBOSE == 1)
+	std::cout << "------" << "i_ElseEnd_JMP_Offset [" << i_ElseEnd_JMP_Offset << "] = " << CURRENT_OFFSET << std::endl;
+#endif
 }
 
 void GrammerUtils::handleWhile_Epilogue(Tree* pNode, int& i_While_Loop_Hole, int& i_IfWhile_JCondition_Hole)
@@ -1736,15 +2084,17 @@ void GrammerUtils::handleStatics(Tree* pNode)
 
 void GrammerUtils::handleStatements(Tree* pNode)
 {
-	std::vector<Tree*> vStatements = pNode->m_vStatements;
-	for (Tree* pChildNode : vStatements)
+	int32_t iCount = 0;
+	for(; iCount < pNode->m_vStatements.size(); iCount++)
 	{
+		Tree* pChildNode = pNode->m_vStatements.at(iCount);
+
 		////////////////////////////////////////////////////////////////////////////
 		if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
 		{
 			// Bail out for the function arguments.
 			// They will be processed in 'ASTNode_FUNCTIONCALLEND'
-			if(pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+			if (pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
 				continue;
 		}
 		////////////////////////////////////////////////////////////////////////////
@@ -1862,7 +2212,7 @@ void GrammerUtils::printAssembly(int8_t* iByteCode, std::vector<std::string>& vS
 		std::cout << CURRENT_OFFSET_READ;
 
 		eOpCode = (OPCODE)m_pBAIS->readByte();
-		if(bCanWrite)
+		if (bCanWrite)
 			pRaf->writeByte((int)eOpCode);
 
 		CodeMap pMachineInstruction = opCodeMap[(int)eOpCode];
@@ -1871,7 +2221,7 @@ void GrammerUtils::printAssembly(int8_t* iByteCode, std::vector<std::string>& vS
 		{
 			std::cout << ". " << pMachineInstruction.sOpCode;
 
-			for(int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
+			for (int i = 1; i < pMachineInstruction.iOpcodeOperandCount; i++)
 			{
 				std::cout << " ";
 				switch (pMachineInstruction.ePRIMIIVETYPE)

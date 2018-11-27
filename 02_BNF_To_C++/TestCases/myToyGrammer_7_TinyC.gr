@@ -4,14 +4,51 @@
 											addType("int16_t");
 											addType("int32_t");
 										"</code>"
-										{ <functionList> };
+										{ <objectList> };
 										
-<functionList>					::=		( 	<staticDeclarations>
+<objectList>					::=		( 	<structDeclaration>
 											|
-											<functionDef> 
+											<staticDeclaration>
+											|
+											<functionDef>
 										) ;
 										
-<staticDeclarations>			::=		"static"
+<structDeclaration>				::		"struct"
+										TK_IDENTIFIER
+															"<code>"
+																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
+																updateBlockString(sStructName);
+																
+																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
+																m_pASTCurrentNode->addChild(pStructDefNode);
+															"</code>"
+										'{'					"<code>"
+																Tree* pTemp = nullptr;
+																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
+																m_pASTCurrentNode = pStructDefNode;
+																
+																Tree* pStructStartNode = makeLeaf(ASTNodeType::ASTNode_STRUCTSTART, "");
+																m_pASTCurrentNode->addChild(pStructStartNode);
+															"</code>"
+											{ <structObjectList> [';'] }
+										'}'					"<code>"
+																removeLastFromBlockString();
+																
+																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
+																m_pASTCurrentNode->addChild(pStructEndNode);
+
+																m_pASTCurrentNode = pTemp;
+															"</code>"
+										';';
+										
+<structObjectList>				::=		( 	<structInlineFunction>
+											|
+											<newPtrOrArrayOrInt>
+										);
+										
+<structInlineFunction>			::=		"inline" <functionDef>;
+										
+<staticDeclaration>				::=		"static"
 										( <staticPtr> );
 										
 <primitiveType>					::=		"<code>"
@@ -118,8 +155,6 @@
 											<prePostFixedIncrDecr>
 											|
 											<assignmentDerefArray>
-											//|
-											//<arrayDeclaration>
 											| 
 											<newPtrOrArrayOrInt> 
 											|
@@ -645,7 +680,16 @@
 															"</code>"
 										;
 
-<newPtrOrArrayOrInt>			::= 	<primitiveType> <primPtrOrArrayOrInt>;
+<newPtrOrArrayOrInt>			::= 	<primitiveType> <primPtrOrArrayOrInt>;		// 1. 	Primitive Pointer:
+																					//		int8_t* pPtr;
+																					// 		int8_t* pPtr = malloc(32);
+																					// 2. 	Primitive Array:
+																					//		int32_t arr1[10];
+																					//		int32_t arr[] = {10, 20, 30, 40};
+																					//		int32_t arr[6] = {10, 20, 30, 40};
+																					// 3.	Primitive Variable:
+																					//		int16_t pVar;
+																					//		int16_t pvar = MATHEMATICAL_EXPR;
 										
 <primPtrOrArrayOrInt>			::=		(	<primPtr>
 											|
@@ -662,25 +706,30 @@
 														std::string sFullyQualifiedVariableName;
 														sFullyQualifiedVariableName.append(getBlockString());
 														sFullyQualifiedVariableName.append(sVariableName);
-													"</code>"
-										'='			"<code>" 
+														
 														ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 														Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 														Tree* pTemp = nullptr;
 														{
 															pTemp = m_pASTCurrentNode;
+															
 															pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 															pPrimPtrNode->m_bIsPointerType = true;
 															pPrimPtrNode->setAdditionalInfo("type", sPointerType);
 															pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
 															m_pASTCurrentNode = pPrimPtrNode;
-														}																
+														}
 													"</code>"
-										<ptrAssign>	"<code>"
+													
+										[ <primPtrOptionalRHS> ]
+													"<code>"
 														m_pASTCurrentNode = pTemp;
 														m_pASTCurrentNode->addChild(pPrimPtrNode);
 													"</code>"
 										;
+										
+<primPtrOptionalRHS>			::=		'='
+										<ptrAssign> ;
 												
 <primArrayOrInt>				::=		(	<primArray>
 											|
@@ -762,31 +811,38 @@
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
-															"</code>"
-										'='					"<code>"
+																
 																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
+																	pTemp = m_pASTCurrentNode;
+																
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimIntNode->setAdditionalInfo("type", sPrimitiveType);
 																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
+																	
+																	m_pASTCurrentNode = pPrimIntNode;
 																}
-																
+															"</code>"
+										[ <primTypeOptionalRHS> ]
+															"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pPrimIntNode);
+															"</code>"
+										;
+										
+<primTypeOptionalRHS>			::=		'='					"<code>"
 																Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 																{
-																	pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
-																	pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																	m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
+																	pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 																	
-																	pTemp = m_pASTCurrentNode;
 																	m_pASTCurrentNode = pExpressionLeftLeaf;
 																}
 															"</code>"
-										<expr>				"<code>"
+										<expr> 				"<code>"
 																m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
-															
-																m_pASTCurrentNode = pTemp;
-																m_pASTCurrentNode->addChild(pPrimIntNode);
 															"</code>"
 										;
 
@@ -870,31 +926,6 @@
 													"</code>"
 										;
 										
-<arrayDeclaration>				::=		<primitiveType>
-										TK_IDENTIFIER
-										'['
-										[ <expr> ]
-										']'
-										(	<arrayDeclaration_Option0>		// int arr1[10];
-											|
-											<arrayDeclaration_Option1>		// int arr[] = {10, 20, 30, 40};
-																			// int arr[6] = {10, 20, 30, 40};
-										);
-
-// int arr1[10];
-<arrayDeclaration_Option0>		::=		"<code>"
-											std::string sSemiColon = GrammerUtils::m_pToken.getText();
-											return (sSemiColon == ";");
-										"</code>"
-										;
-
-// int arr[] = {10, 20, 30, 40};
-<arrayDeclaration_Option1>		::=		'='
-										'{'
-											{ <expr> [','] }
-										'}'
-										;
-
 <assignmentRHS>					::=  	TK_IDENTIFIER	"<code>"
 															TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
 															std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;

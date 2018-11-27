@@ -15,6 +15,63 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+struct Example1
+{
+	// * Member Variables should be declared before the functions.
+	int8_t	m_aNumberList[8];
+	
+	inline void example1Func1()
+	{
+		print("In example1Func1");
+		putc(10);
+	}
+	
+	// For this struct, Default Constructor & Destructor will be created by the compiler.
+	// The Constructor will generate code equivalent to:
+	//		m_aNumberList = malloc(8*sizeof(int8_t)); // Allocate memory on the heap of the specified size & store the address in 'm_aNumberList';
+	// The Destructor will be populated with the code equivalent:
+	//		free(m_aNumberList);
+};
+
+struct Person
+{
+	// * Member Variables should be declared before the functions.
+	int8_t 	m_sName[16] = {'A', 'a', 'r', 'i', 'v' };
+	int8_t 	m_sAddress[32];
+	int8_t 	m_sEmail[32] = {'a', 'a', 'l', 'e', 'k', 'h', 'm', '@', 'g', 'm', 'a', 'i', 'l', '.', 'c', 'o', 'm' };
+	int8_t	m_iAge = 18 * 2;
+	int8_t*	m_pDesignation;
+		
+	inline void Person(int8_t iAge)
+	{
+		print("In Person Constructor with 1 argument");
+		putc(10);
+	}
+	
+	inline void func1()
+	{
+		print("In func1");
+		putc(10);
+		
+		m_iAge = 1;
+		
+		print("m_iAge = ", m_iAge);
+		putc(10);
+	}
+	
+	inline void func2()
+	{
+		print("In func2");
+		putc(10);		
+	}
+	
+	inline void #Person()
+	{
+		print("In Person Destructor");
+		putc(10);
+	}
+};
+
 static int32_t* pStaticPtr_1;
 static int32_t* pStaticPtr_2;
 static int32_t* pStaticPtr_3;
@@ -78,6 +135,9 @@ int32_t retNewFunc()
 	print("Value of pPtr_0[0] = ", pPtr_0[0], ", pPtr_0[1] = ", pPtr_0[1], ", pPtr_0[2] = ", pPtr_0[2], ", pPtr_0[3] = ", pPtr_0[3], ", pPtr_0[4] = ", pPtr_0[4]);
 	putc(10);
 	
+	print("Value of pNew = ", pNew[0]);
+	putc(10);
+
 	pPtr_0[0] = pNew[0];
 	print("Assigned pPtr_0 = pNew ==> ", pPtr_0[0]);
 	putc(10);
@@ -155,6 +215,9 @@ int32_t retNewFunc()
 	
 	free(pNew);
 	free(pPtr_0);
+	
+	// ToDo
+	free(arr1);		// Need to to this automatically for arrays !
 	
 	int32_t iReturnValue = 1977;
 	

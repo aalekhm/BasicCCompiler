@@ -47,10 +47,11 @@ enum class OPCODE
 	FREE,
 	LDA,
 	STA,
+	CLR,
 	HLT
 };
 
-#define MAX_BYTECODE_SIZE			6656
+#define MAX_BYTECODE_SIZE			8192
 #define MAX_DATA_SIZE				1536
 #define MAX_HEAP_SIZE				2048
 #define MAX_STACK_SIZE				256
@@ -177,6 +178,8 @@ class VirtualMachine
 
 		int32_t						malloc(int32_t iSize);
 		void						dealloc(int32_t pAddress);
+
+		int32_t						getAddressOf(int32_t iVariablePos);
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();

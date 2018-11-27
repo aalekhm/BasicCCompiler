@@ -251,27 +251,59 @@ void TinyCReader::removeLastFromBlockString()
 std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::string sVariable)
 {
 	std::string sFullyQualifiedName;
+	bool bFound = false;
 
-	for (Tree* pChild : pNode->m_vStatements)
+	if (NOT bFound)
 	{
-		if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
-			|
-			pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
-		) {
-			if (pChild->m_sAdditionalInfo == sVariable)
+		for (Tree* pChild : pNode->m_vStatements)
+		{
+			if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+				|
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+				) {
+				if (pChild->m_sAdditionalInfo == sVariable)
+				{
+					sFullyQualifiedName = pChild->m_sText;
+					bFound = true;
+					break;
+				}
+			}
+		}
+	}
+
+	if (NOT bFound)
+	{
+		for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
+		{
+			if (pStaticVar->m_sText == sVariable)
 			{
-				sFullyQualifiedName = pChild->m_sText;
+				sFullyQualifiedName = pStaticVar->m_sText;
+				bFound = true;
 				break;
 			}
 		}
 	}
 
-	for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
+	// Check for 'Member Variables'
+	if (NOT bFound)
 	{
-		if (pStaticVar->m_sText == sVariable)
+		Tree* pParentNode = pNode->m_pParentNode;
+		if (pParentNode->m_eASTNodeType == ASTNodeType::ASTNode_STRUCTDEF)
 		{
-			sFullyQualifiedName = pStaticVar->m_sText;
-			break;
+			for (Tree* pChildNode : pParentNode->m_vStatements) // Starts with index 0
+			{
+				if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+					||
+					pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+				) {
+					if (pChildNode->m_sAdditionalInfo == sVariable)
+					{
+						sFullyQualifiedName = pChildNode->m_sText;
+						bFound = true;
+						break;
+					}
+				}
+			}
 		}
 	}
 
@@ -319,7 +351,7 @@ bool TinyCReader::def() {
 	addType("int32_t");
 
 	while (true) {
-		if (functionList()) {
+		if (objectList()) {
 		}
 		else
 			break;
@@ -329,12 +361,84 @@ bool TinyCReader::def() {
 
 }
 
-bool TinyCReader::functionList() {
-	if (staticDeclarations()) {
+bool TinyCReader::objectList() {
+	if (structDeclaration()) {
 		return true;
 	}
 	else
-		if (functionDef()) {
+		if (staticDeclaration()) {
+			return true;
+		}
+		else
+			if (functionDef()) {
+				return true;
+			}
+			else
+				return false;
+
+	return true;
+
+}
+
+bool TinyCReader::structDeclaration() {
+	if (!GrammerUtils::match("struct", MANDATORY))
+		return false;
+	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+		return false;
+
+	std::string sStructName = GrammerUtils::m_pPrevToken.getText();
+	updateBlockString(sStructName);
+
+	Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
+	m_pASTCurrentNode->addChild(pStructDefNode);
+
+	if (!GrammerUtils::match('{', MANDATORY))
+		return false;
+
+	Tree* pTemp = nullptr;
+	pTemp = m_pASTCurrentNode; // Save Root Node temporarily
+	m_pASTCurrentNode = pStructDefNode;
+
+	Tree* pStructStartNode = makeLeaf(ASTNodeType::ASTNode_STRUCTSTART, "");
+	m_pASTCurrentNode->addChild(pStructStartNode);
+
+	while (true) {
+		if (structObjectList()) {
+			if (!GrammerUtils::match(';', OPTIONAL)) {
+
+			}
+
+			else {
+
+			}
+
+		}
+		else
+			break;
+	}
+
+	if (!GrammerUtils::match('}', MANDATORY))
+		return false;
+
+	removeLastFromBlockString();
+
+	Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
+	m_pASTCurrentNode->addChild(pStructEndNode);
+
+	m_pASTCurrentNode = pTemp;
+
+	if (!GrammerUtils::match(';', MANDATORY))
+		return false;
+	return true;
+
+}
+
+bool TinyCReader::structObjectList() {
+	if (structInlineFunction()) {
+		return true;
+	}
+	else
+		if (newPtrOrArrayOrInt()) {
 			return true;
 		}
 		else
@@ -344,7 +448,16 @@ bool TinyCReader::functionList() {
 
 }
 
-bool TinyCReader::staticDeclarations() {
+bool TinyCReader::structInlineFunction() {
+	if (!GrammerUtils::match("inline", MANDATORY))
+		return false;
+	if (!functionDef())
+		return false;
+	return true;
+
+}
+
+bool TinyCReader::staticDeclaration() {
 	if (!GrammerUtils::match("static", MANDATORY))
 		return false;
 	if (staticPtr()) {
@@ -1578,14 +1691,12 @@ bool TinyCReader::primPtr() {
 	sFullyQualifiedVariableName.append(getBlockString());
 	sFullyQualifiedVariableName.append(sVariableName);
 
-	if (!GrammerUtils::match('=', MANDATORY))
-		return false;
-
 	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 	Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 	Tree* pTemp = nullptr;
 	{
 		pTemp = m_pASTCurrentNode;
+
 		pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 		pPrimPtrNode->m_bIsPointerType = true;
 		pPrimPtrNode->setAdditionalInfo("type", sPointerType);
@@ -1593,12 +1704,24 @@ bool TinyCReader::primPtr() {
 		m_pASTCurrentNode = pPrimPtrNode;
 	}
 
-	if (!ptrAssign())
-		return false;
+	if (!primPtrOptionalRHS()) {
+	}
+	else {
+	}
+
 
 	m_pASTCurrentNode = pTemp;
 	m_pASTCurrentNode->addChild(pPrimPtrNode);
 
+	return true;
+
+}
+
+bool TinyCReader::primPtrOptionalRHS() {
+	if (!GrammerUtils::match('=', MANDATORY))
+		return false;
+	if (!ptrAssign())
+		return false;
 	return true;
 
 }
@@ -1735,24 +1858,41 @@ bool TinyCReader::primType() {
 	sFullyQualifiedVariableName.append(getBlockString());
 	sFullyQualifiedVariableName.append(sVariableName);
 
-	if (!GrammerUtils::match('=', MANDATORY))
-		return false;
-
 	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
 	Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 	Tree* pTemp = nullptr;
 	{
+		pTemp = m_pASTCurrentNode;
+
 		pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
 		pPrimIntNode->setAdditionalInfo("type", sPrimitiveType);
 		pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
+
+		m_pASTCurrentNode = pPrimIntNode;
 	}
+
+	if (!primTypeOptionalRHS()) {
+	}
+	else {
+	}
+
+
+	m_pASTCurrentNode = pTemp;
+	m_pASTCurrentNode->addChild(pPrimIntNode);
+
+	return true;
+
+}
+
+bool TinyCReader::primTypeOptionalRHS() {
+	if (!GrammerUtils::match('=', MANDATORY))
+		return false;
 
 	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 	{
-		pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
-		pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+		m_pASTCurrentNode->m_pLeftNode = pExpressionLeftLeaf;
+		pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 
-		pTemp = m_pASTCurrentNode;
 		m_pASTCurrentNode = pExpressionLeftLeaf;
 	}
 
@@ -1760,9 +1900,6 @@ bool TinyCReader::primType() {
 		return false;
 
 	m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
-
-	m_pASTCurrentNode = pTemp;
-	m_pASTCurrentNode->addChild(pPrimIntNode);
 
 	return true;
 
@@ -1875,69 +2012,6 @@ bool TinyCReader::assignmentDerefArray() {
 	m_pASTCurrentNode = pTemp;
 	m_pASTCurrentNode->addChild(pAssignmentNode);
 
-	return true;
-
-}
-
-bool TinyCReader::arrayDeclaration() {
-	if (!primitiveType())
-		return false;
-	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
-		return false;
-	if (!GrammerUtils::match('[', MANDATORY))
-		return false;
-	if (!expr()) {
-	}
-	else {
-	}
-
-	if (!GrammerUtils::match(']', MANDATORY))
-		return false;
-	if (arrayDeclaration_Option0()) {
-		return true;
-	}
-	else
-		if (arrayDeclaration_Option1()) {
-			return true;
-		}
-		else
-			return false;
-
-	return true;
-
-}
-
-bool TinyCReader::arrayDeclaration_Option0() {
-
-	std::string sSemiColon = GrammerUtils::m_pToken.getText();
-	return (sSemiColon == ";");
-
-	return true;
-
-}
-
-bool TinyCReader::arrayDeclaration_Option1() {
-	if (!GrammerUtils::match('=', MANDATORY))
-		return false;
-	if (!GrammerUtils::match('{', MANDATORY))
-		return false;
-	while (true) {
-		if (expr()) {
-			if (!GrammerUtils::match(',', OPTIONAL)) {
-
-			}
-
-			else {
-
-			}
-
-		}
-		else
-			break;
-	}
-
-	if (!GrammerUtils::match('}', MANDATORY))
-		return false;
 	return true;
 
 }

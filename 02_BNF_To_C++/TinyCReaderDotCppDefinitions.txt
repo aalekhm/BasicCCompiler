@@ -251,27 +251,59 @@ void TinyCReader::removeLastFromBlockString()
 std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::string sVariable)
 {
 	std::string sFullyQualifiedName;
+	bool bFound = false;
 
-	for (Tree* pChild : pNode->m_vStatements)
+	if(NOT bFound)
 	{
-		if (	pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+		for (Tree* pChild : pNode->m_vStatements)
+		{
+			if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 				|
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
-		){
-			if (pChild->m_sAdditionalInfo == sVariable)
+			) {
+				if (pChild->m_sAdditionalInfo == sVariable)
+				{
+					sFullyQualifiedName = pChild->m_sText;
+					bFound = true;
+					break;
+				}
+			}
+		}
+	}
+
+	if (NOT bFound)
+	{
+		for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
+		{
+			if (pStaticVar->m_sText == sVariable)
 			{
-				sFullyQualifiedName = pChild->m_sText;
+				sFullyQualifiedName = pStaticVar->m_sText;
+				bFound = true;
 				break;
 			}
 		}
 	}
 
-	for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
+	// Check for 'Member Variables'
+	if (NOT bFound)
 	{
-		if (pStaticVar->m_sText == sVariable)
+		Tree* pParentNode = pNode->m_pParentNode;
+		if (pParentNode->m_eASTNodeType == ASTNodeType::ASTNode_STRUCTDEF)
 		{
-			sFullyQualifiedName = pStaticVar->m_sText;
-			break;
+			for (Tree* pChildNode : pParentNode->m_vStatements) // Starts with index 0
+			{
+				if(	pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+					||
+					pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+				) {
+					if (pChildNode->m_sAdditionalInfo == sVariable)
+					{
+						sFullyQualifiedName = pChildNode->m_sText;
+						bFound = true;
+						break;
+					}
+				}
+			}
 		}
 	}
 

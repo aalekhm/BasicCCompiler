@@ -310,7 +310,7 @@ Token StringTokenizer::readDefault(char ch0)
 																			{ return readPrefixIncrDecr(true); }
 	else if(ch0 == '@')
 																			{ return readPointerDeref(); }
-	else if(isalpha(ch0) || ch0 == '_')										{ return readIdentifier(); }
+	else if(isalpha(ch0) || ch0 == '_' || ch0 == '#')						{ return readIdentifier(); }
 
 	else if(ch0 == '+')														{ initRead(); consume(1); return createToken(TokenType::Type::TK_ADD); }
 	else if(ch0 == '-' && ch1 == '=')										{ initRead(); consume(2); return createToken(TokenType::Type::TK_SUBEQ); }

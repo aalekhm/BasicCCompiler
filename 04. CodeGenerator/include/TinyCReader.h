@@ -10,6 +10,8 @@ class TinyCReader {
 		TinyCReader();
 
 		void addKeywords() {
+			GrammerUtils::m_vKeywords.push_back("struct");
+			GrammerUtils::m_vKeywords.push_back("inline");
 			GrammerUtils::m_vKeywords.push_back("static");
 			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
@@ -36,8 +38,11 @@ class TinyCReader {
 		}
 
 		bool def();
-		bool functionList();
-		bool staticDeclarations();
+		bool objectList();
+		bool structDeclaration();
+		bool structObjectList();
+		bool structInlineFunction();
+		bool staticDeclaration();
 		bool primitiveType();
 		bool staticPtr();
 		bool functionDef();
@@ -77,16 +82,15 @@ class TinyCReader {
 		bool newPtrOrArrayOrInt();
 		bool primPtrOrArrayOrInt();
 		bool primPtr();
+		bool primPtrOptionalRHS();
 		bool primArrayOrInt();
 		bool primArray();
 		bool primArrayOptionalRHS();
 		bool primType();
+		bool primTypeOptionalRHS();
 		bool ptrAssign();
 		bool malloc();
 		bool assignmentDerefArray();
-		bool arrayDeclaration();
-		bool arrayDeclaration_Option0();
-		bool arrayDeclaration_Option1();
 		bool assignmentRHS();
 		bool freePtrStatement();
 		bool expr();
@@ -124,7 +128,7 @@ class TinyCReader {
 		ENUM_OP_PRECEDENCE 			opFromString(std::string sOperator);
 		void						checkOpPrecedenceAndPush(std::string sCurrentOperator);
 		
-		Tree*						makeLeaf(ASTNodeType eASTNodeType, const char* sText);
+		static Tree*				makeLeaf(ASTNodeType eASTNodeType, const char* sText);
 		Tree*						makeNode(ASTNodeType eASTNodeType, Tree* pLeft, Tree* pRight);
 		Tree*						createPostFixExpr(Tree* pLeaf = nullptr);
 		

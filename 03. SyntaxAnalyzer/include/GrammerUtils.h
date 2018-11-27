@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	6656
+#define MAX_BYTECODE_SIZE	8192
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -51,6 +51,17 @@ class GrammerUtils
 		static void									handleFunctionStart(Tree* pNode);
 		static void									handleFunctionEnd(Tree* pNode);
 		static void									handleFunctionCall(Tree* pNode);
+
+		static void									handleStructDef(Tree* pNode);
+		static void									handleStructConstructorOrDestructor(FunctionInfo* pNode);
+		static void									addASTForStructMemberVariableConstruction(FunctionInfo* pFunctionInfo);
+		static void									addASTForStructMemberVariableDestruction(FunctionInfo* pFunctionInfo);
+		static Tree*								createASTForArrayType(Tree* pASTArrayTypeNode);
+		static Tree*								createASTForPointerType(Tree* pASTArrayTypeSrc);
+		static Tree*								createASTForType(Tree* pASTArrayTypeSrc);
+		static Tree*								createFreeASTForArrayType(Tree* pASTArrayTypeSrc);
+		static Tree*								createFunctionWithNoArguments(const char* sFunctionName, const char* sReturnType);
+		static Tree*								createNodeOfType(ASTNodeType eASTNodeType, const char* sText = "");
 
 		static void									handlePreFixExpression(Tree* pNode);
 		static void									handleExpression(Tree* pNode);
@@ -97,11 +108,15 @@ class GrammerUtils
 
 		static std::vector<std::string>				m_vStrings;
 
-		static std::map<std::string, FunctionInfo*>	m_MapFunctionInfos;
+		static std::map<std::string, FunctionInfo*>	m_MapGlobalFunctions;
+		static std::map<std::string, StructInfo*>	m_MapGlobalStructs;
+
 		static FunctionInfo*						m_pCurrentFunction;
 
 		static int8_t								m_iByteCode[MAX_BYTECODE_SIZE];
 
 		static ByteArrayOutputStream*				m_pBAOS;
 		static ByteArrayInputStream*				m_pBAIS;
+	public:
+		static StructInfo*							m_pCurrentStruct;
 };
