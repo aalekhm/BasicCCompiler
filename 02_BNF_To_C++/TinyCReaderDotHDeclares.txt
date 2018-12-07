@@ -15,6 +15,9 @@
 
 		void 						addType(std::string sType);
 		bool						isValidType(std::string sType);
+		void 						addStructType(std::string sType);
+		bool 						isValidStructType(std::string sType);
+		bool 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
 	protected:
 		
 	private:

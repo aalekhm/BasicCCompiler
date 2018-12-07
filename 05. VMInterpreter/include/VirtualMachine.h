@@ -179,7 +179,9 @@ class VirtualMachine
 		int32_t						malloc(int32_t iSize);
 		void						dealloc(int32_t pAddress);
 
-		int32_t						getAddressOf(int32_t iVariablePos);
+		int32_t						getAddressOf(int32_t iVariable);
+		int32_t						getValueIn(int32_t iVariable);
+		void						storeValueFromStackIn(int32_t iVariable);
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();

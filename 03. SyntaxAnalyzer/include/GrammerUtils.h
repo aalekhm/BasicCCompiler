@@ -33,6 +33,7 @@ class GrammerUtils
 		static StringTokenizer*						m_pStrTok;
 		static std::vector<std::string>				m_vKeywords;
 		static std::vector<std::string>				m_vTypes;
+		static std::vector<std::string>				m_vUserDefinedTypes;
 
 		static int									iTabCount;
 		static void									printAST(Tree* pNode, bool bPrintTabs = true);
@@ -61,6 +62,7 @@ class GrammerUtils
 		static Tree*								createASTForType(Tree* pASTArrayTypeSrc);
 		static Tree*								createFreeASTForArrayType(Tree* pASTArrayTypeSrc);
 		static Tree*								createFunctionWithNoArguments(const char* sFunctionName, const char* sReturnType);
+		static Tree*								createFunctionCallWithNoArguments(const char* sFunctionName);
 		static Tree*								createNodeOfType(ASTNodeType eASTNodeType, const char* sText = "");
 
 		static void									handlePreFixExpression(Tree* pNode);
@@ -88,6 +90,7 @@ class GrammerUtils
 		static void									handleMalloc(Tree* pNode);
 		static void									handleFree(Tree* pNode);
 		static void									handleStatics(Tree* pNode);
+		static void									handleTypeStructs(Tree* pNode);
 
 		static void									handleStatements(Tree* pNode);
 
@@ -105,6 +108,8 @@ class GrammerUtils
 		static void									emitInt(int32_t iCode);
 
 		static void									emitIntAtPos(int32_t iCode, uint32_t iOffset);
+
+		static FunctionInfo*						getFunctionInfo(Tree* pNode);
 
 		static std::vector<std::string>				m_vStrings;
 

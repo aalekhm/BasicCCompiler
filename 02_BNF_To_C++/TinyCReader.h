@@ -25,6 +25,7 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("for");
 			GrammerUtils::m_vKeywords.push_back("print");
 			GrammerUtils::m_vKeywords.push_back("putc");
+			GrammerUtils::m_vKeywords.push_back("new");
 			GrammerUtils::m_vKeywords.push_back("malloc");
 			GrammerUtils::m_vKeywords.push_back("free");
 			GrammerUtils::m_vKeywords.push_back("&&");
@@ -44,6 +45,7 @@ class TinyCReader {
 		bool structInlineFunction();
 		bool staticDeclaration();
 		bool primitiveType();
+		bool structType();
 		bool staticPtr();
 		bool functionDef();
 		bool functionArgumentDefList();
@@ -79,6 +81,8 @@ class TinyCReader {
 		bool putc();
 		bool putcList();
 		bool bracesstmtlist();
+		bool newStructPtr();
+		bool userDefinedConstructorCall();
 		bool newPtrOrArrayOrInt();
 		bool primPtrOrArrayOrInt();
 		bool primPtr();
@@ -139,6 +143,9 @@ class TinyCReader {
 
 		void 						addType(std::string sType);
 		bool						isValidType(std::string sType);
+		void 						addStructType(std::string sType);
+		bool 						isValidStructType(std::string sType);
+		bool 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
 	protected:
 		
 	private:

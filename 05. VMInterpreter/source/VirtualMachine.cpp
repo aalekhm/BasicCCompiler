@@ -2,6 +2,9 @@
 #include "RandomAccessFile.h"
 #include <assert.h>
 #include <algorithm>
+#include <iostream>
+
+#define VERBOSE	1
 
 VirtualMachine*	VirtualMachine::m_pVMInstance = nullptr;
 
@@ -229,8 +232,8 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		{
 			int32_t iVariable = READ_OPERAND(eOpCode);
 			{
-				int32_t iAddress = getAddressOf(iVariable);
-				STACK[--REGS.RSP] = iAddress;
+				int32_t iValue = getValueIn(iVariable);
+				STACK[--REGS.RSP] = iValue;
 			}
 		}
 		break;
@@ -238,23 +241,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		{
 			int32_t iVariable = READ_OPERAND(eOpCode);
 			{
-				int16_t iVariablePos = (iVariable & 0x0000FFFF);
-				E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
-
-				// Local Var or Function Argument ==> saved on the STACK
-				if (eVariableType == E_VARIABLETYPE::ARGUMENT
-					||
-					eVariableType == E_VARIABLETYPE::LOCAL
-				) {
-					if (eVariableType == E_VARIABLETYPE::ARGUMENT)
-						iVariablePos *= -1;
-
-					STACK[REGS.RBP - iVariablePos] = STACK[REGS.RSP++];
-				}
-				else // STATIC variable saved on the HEAP
-				{
-					GLOBALS[iVariablePos] = STACK[REGS.RSP++];
-				}
+				storeValueFromStackIn(iVariable);
 			}
 		}
 		break;
@@ -536,20 +523,21 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::STA:
 		{
 			// STA - Store Value in Accumulator(in our case, the STACK) to memory address
-			int32_t iVariable = READ_OPERAND(eOpCode);		// Pointer Variable.
+			int32_t iVariable = READ_OPERAND(eOpCode);			// Pointer Variable.
 
 			int32_t iVarType = STACK[REGS.RSP++];				// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
 			int32_t iArrayIndex = STACK[REGS.RSP++];			// ArrayIndex.
 			int32_t iRValue = STACK[REGS.RSP++];				// RValue to be stored, picked up from the STACK.
 
-			int32_t iAddress = getAddressOf(iVariable);
+			int32_t iAddress = getValueIn(iVariable);
 			{
 				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
 				pAddress_8 += (iArrayIndex*iVarType);
 				int32_t* pAddress = (int32_t*)pAddress_8;
 				*pAddress = iRValue;
-
-				printf("Stored %d @[%d]\n", iRValue, iArrayIndex);
+#if (VERBOSE == 1)
+				std::cout << "\t\t\t\t\t\t[HEAP] " << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
+#endif
 			}
 		}
 		break;
@@ -566,7 +554,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 
 			// Clear Memory
 			{
-				int32_t iAddress = getAddressOf(iOperand1_Variable);
+				int32_t iAddress = getValueIn(iOperand1_Variable);
 
 				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
 				pAddress_8 += (iOperand2_ArrayIndex * iOperand5_VarType);
@@ -624,16 +612,17 @@ void VirtualMachine::eval(OPCODE eOpCode)
 
 			int32_t iAddress = malloc(iTemp1);
 			assert(iAddress >= 0);
-			printf("Allocated %d bytes @ %d\n", iTemp1, iAddress);
-
 			STACK[--REGS.RSP] = iAddress;
+#if (VERBOSE == 1)
+			std::cout << "\t\t\t\t\t\t[HEAP] Malloc(" << iTemp1 << ") @ " << iAddress << std::endl;
+#endif
 		}
 		break;
 		case OPCODE::FREE:
 		{
 			int32_t iVariable = READ_OPERAND(eOpCode);
 			{
-				int32_t iAddress = getAddressOf(iVariable);
+				int32_t iAddress = getValueIn(iVariable);
 				dealloc(iAddress);
 			}
 		}
@@ -724,12 +713,15 @@ bool sortList(const HeapNode& first, const HeapNode& second)
 void VirtualMachine::dealloc(int32_t pAddress)
 {
 	std::vector<HeapNode>::iterator itrAllocList = m_vAllocatedList.begin();
-
+	bool bMemoryReclaimed = false;
 	for (; itrAllocList != m_vAllocatedList.end();  ++itrAllocList)
 	{
 		HeapNode& pAllocHeapNode = *itrAllocList;
 		if (pAddress == pAllocHeapNode.m_pAddress)
 		{
+#if (VERBOSE == 1)
+			std::cout << "\t\t\t\t\t\t[HEAP] Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << std::endl;
+#endif
 			bool bFoundPrecedingNode = false;
 			for (HeapNode& pUnAllocHeapNode : m_vUnAllocatedList)
 			{
@@ -757,11 +749,14 @@ void VirtualMachine::dealloc(int32_t pAddress)
 				}
 
 				m_vAllocatedList.erase(itrAllocList);
+				bMemoryReclaimed = true;
 			}
 
 			break;
 		}
 	}
+
+	assert(bMemoryReclaimed);
 }
 
 int32_t VirtualMachine::getAddressOf(int32_t iVariable)
@@ -780,6 +775,11 @@ int32_t VirtualMachine::getAddressOf(int32_t iVariable)
 
 		iAddress = STACK[REGS.RBP - iVariablePos];
 	}
+	else
+	if (eVariableType == E_VARIABLETYPE::MEMBER)
+	{
+		iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
+	}
 	else // STATIC variable saved on the HEAP
 	{
 		iAddress = GLOBALS[iVariablePos];
@@ -788,3 +788,61 @@ int32_t VirtualMachine::getAddressOf(int32_t iVariable)
 	return iAddress;
 }
 
+int32_t VirtualMachine::getValueIn(int32_t iVariable)
+{
+	int32_t iValue = 0;
+	int16_t iVariablePos = (iVariable & 0x0000FFFF);
+	E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
+
+	// Local Var or Function Argument ==> saved on the STACK
+	if (eVariableType == E_VARIABLETYPE::ARGUMENT
+		||
+		eVariableType == E_VARIABLETYPE::LOCAL
+	) {
+		if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+			iVariablePos *= -1;
+
+		iValue = STACK[REGS.RBP - iVariablePos];
+	}
+	else
+	if (eVariableType == E_VARIABLETYPE::MEMBER)
+	{
+		int32_t iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
+		int32_t* pIntPtr = (int32_t*)(HEAP + iAddress);
+		iValue = (*pIntPtr);
+	}
+	else // STATIC variable saved on the HEAP
+	{
+		iValue = GLOBALS[iVariablePos];
+	}
+
+	return iValue;
+}
+
+void VirtualMachine::storeValueFromStackIn(int32_t iVariable)
+{
+	int16_t iVariablePos = (iVariable & 0x0000FFFF);
+	E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
+
+	// Local Var or Function Argument ==> saved on the STACK
+	if (eVariableType == E_VARIABLETYPE::ARGUMENT
+		||
+		eVariableType == E_VARIABLETYPE::LOCAL
+	) {
+		if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+			iVariablePos *= -1;
+
+		STACK[REGS.RBP - iVariablePos] = STACK[REGS.RSP++];
+	}
+	else
+	if (eVariableType == E_VARIABLETYPE::MEMBER)
+	{
+		int32_t* iIntPtr = (int32_t*)(HEAP + REGS.RCX);
+		iIntPtr += iVariablePos;
+		*iIntPtr = STACK[REGS.RSP++];
+	}
+	else // STATIC variable saved on the HEAP
+	{
+		GLOBALS[iVariablePos] = STACK[REGS.RSP++];
+	}
+}

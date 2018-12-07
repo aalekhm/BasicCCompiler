@@ -21,6 +21,7 @@
 																
 																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
 																m_pASTCurrentNode->addChild(pStructDefNode);
+																addStructType(sStructName);
 															"</code>"
 										'{'					"<code>"
 																Tree* pTemp = nullptr;
@@ -54,6 +55,12 @@
 <primitiveType>					::=		"<code>"
 											std::string sType = GrammerUtils::m_pToken.getText(); 
 											return isValidType(sType);
+										"</code>"
+										;
+
+<structType>					::=		"<code>"
+											std::string sType = GrammerUtils::m_pToken.getText(); 
+											return isValidStructType(sType);
 										"</code>"
 										;
 
@@ -157,6 +164,8 @@
 											<assignmentDerefArray>
 											| 
 											<newPtrOrArrayOrInt> 
+											|
+											<newStructPtr> 
 											|
 											<assignmentRHS>
 											| 
@@ -680,6 +689,53 @@
 															"</code>"
 										;
 
+<newStructPtr>					::=		<structType>			// Person pPersonObj0;			// OR Person* pPersonObj0;
+																// Person pPersonObj1();		// OR Person* pPersonObj1();
+																// Person pPersonObj2(10);		// OR Person* pPersonObj2(10);
+																// Person pPersonObjs[4];		// OR Person* pPersonObjs[4];
+
+															"<code>"
+																std::string sStructType = GrammerUtils::m_pPrevToken.getText();
+															"</code>"
+										[ '*' ]
+										TK_IDENTIFIER		"<code>"
+																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedVariableName;
+																sFullyQualifiedVariableName.append(getBlockString());
+																sFullyQualifiedVariableName.append(sVariableName);
+																
+																Tree* pStructPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPESTRUCT, sFullyQualifiedVariableName.c_str());
+																Tree* pTemp = nullptr;
+																{
+																	pStructPtrNode->m_sAdditionalInfo.append(sVariableName);
+																	pStructPtrNode->m_bIsPointerType = true;
+																	pStructPtrNode->setAdditionalInfo("type", sStructType);
+																	pStructPtrNode->m_pParentNode = m_pASTCurrentNode;
+																	
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pStructPtrNode;
+																}
+															"</code>"
+										[ '=' "new" <functionCall> ]
+															"<code>"
+																// Add DUMMY Constructor call if "ASTNode_FUNCTIONCALL" not found !
+																if(!hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL))
+																{
+																	Tree* pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
+																	Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sStructType.c_str());
+																	pFunctionCallNode->addChild(pFuncCallEndNode);
+																	m_pASTCurrentNode->addChild(pFunctionCallNode);
+																}
+																
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pStructPtrNode);
+															"</code>"
+										;
+										
+<userDefinedConstructorCall>	::=		'('
+										[ <functionArgumentList> ]
+										')' ;
+										
 <newPtrOrArrayOrInt>			::= 	<primitiveType> <primPtrOrArrayOrInt>;		// 1. 	Primitive Pointer:
 																					//		int8_t* pPtr;
 																					// 		int8_t* pPtr = malloc(32);
@@ -719,8 +775,7 @@
 															pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
 															m_pASTCurrentNode = pPrimPtrNode;
 														}
-													"</code>"
-													
+													"</code>"													
 										[ <primPtrOptionalRHS> ]
 													"<code>"
 														m_pASTCurrentNode = pTemp;
@@ -1089,7 +1144,7 @@
 																//		iRet = 10 + retFunc(); // where retFunc return type is "int32_t".
 																//		This will create a dummy code as follows:
 																//			int32_t iRet = 10;
-																//			int32_t iRet_retFunc = retFunc;	// This line of code will be inserted by the following piece of code.
+																//			int32_t iRet_retFunc = retFunc();	// This line of code will be inserted by the following piece of code.
 																//			iRet = 10 + iRet_retFunc;
 																
 																Tree* pExpressionNode = m_pASTCurrentNode;

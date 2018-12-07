@@ -9,6 +9,7 @@ Token									GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1
 
 std::vector<std::string>				GrammerUtils::m_vKeywords;
 std::vector<std::string>				GrammerUtils::m_vTypes;
+std::vector<std::string>				GrammerUtils::m_vUserDefinedTypes;
 
 StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
 int										GrammerUtils::iTabCount = 0;
@@ -230,284 +231,302 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 
 	switch (pNode->m_eASTNodeType)
 	{
-	case ASTNodeType::ASTNode_STRUCTDEF:
-	{
-		std::cout << "struct " << pNode->m_sText << std::endl;
-		std::cout << "{" << std::endl;
-		iTabCount++;
-
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_TYPESTATIC:
-	{
-		std::cout << "static ";
-		std::string sType = pNode->getAdditionalInfoFor("type");
-		std::cout << sType << "* " << pNode->m_sText << ";";
-	}
-	break;
-	case ASTNodeType::ASTNode_FUNCTIONDEF:
-	{
-		Tree* pReturnTypeNode = pNode->m_pLeftNode;
-		Tree* pArgListNode = pNode->m_pRightNode;
-
-		std::cout << pReturnTypeNode->m_sText << " " << pNode->m_sText << "(";
-
-		// Arg List
-		for (Tree* pArgNode : pArgListNode->m_vStatements)
+		case ASTNodeType::ASTNode_STRUCTDEF:
 		{
-			std::cout << pArgNode->getAdditionalInfoFor("type") << " " << pArgNode->m_sAdditionalInfo << ", ";
+			std::cout << "struct " << pNode->m_sText << std::endl;
+			std::cout << "{" << std::endl;
+			iTabCount++;
+
+			bProcessChildren = true;
 		}
-
-		std::cout << ") {" << std::endl;
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_FUNCTIONCALL:
-	{
-		std::cout << pNode->m_sText << "(";
-
-		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-		for (Tree* pChildNode : *vStatements)
+		break;
+		case ASTNodeType::ASTNode_TYPESTATIC:
 		{
-			if (pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
-				std::cout << pChildNode->m_sText << ", ";
+			std::cout << "static ";
+			std::string sType = pNode->getAdditionalInfoFor("type");
+			std::cout << sType << "* " << pNode->m_sText << ";";
 		}
-		std::cout << ");";
-
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_TYPE:
-	{
-		std::cout << pNode->getAdditionalInfoFor("type");
-		std::cout << (pNode->m_bIsPointerType ? "*" : "");
-		std::cout << " ";
-		std::cout << pNode->m_sText;
-
-		Tree* pExpressionNode = pNode->m_pLeftNode;
-		if (pExpressionNode != nullptr)
+		break;
+		case ASTNodeType::ASTNode_FUNCTIONDEF:
 		{
-			std::cout << " = ";
+			Tree* pReturnTypeNode = pNode->m_pLeftNode;
+			Tree* pArgListNode = pNode->m_pRightNode;
+
+			std::cout << pReturnTypeNode->m_sText << " " << pNode->m_sText << "(";
+
+			// Arg List
+			for (Tree* pArgNode : pArgListNode->m_vStatements)
+			{
+				std::cout << pArgNode->getAdditionalInfoFor("type") << " " << pArgNode->m_sAdditionalInfo << ", ";
+			}
+
+			std::cout << ") {" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_FUNCTIONCALL:
+		{
+			std::cout << pNode->m_sText << "(";
+
+			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+			for (Tree* pChildNode : *vStatements)
+			{
+				if (pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+					std::cout << pChildNode->m_sText << ", ";
+			}
+			std::cout << ");";
+
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_TYPE:
+		{
+			std::cout << pNode->getAdditionalInfoFor("type");
+			std::cout << (pNode->m_bIsPointerType ? "*" : "");
+			std::cout << " ";
+			std::cout << pNode->m_sText;
+
+			Tree* pExpressionNode = pNode->m_pLeftNode;
+			if (pExpressionNode != nullptr)
+			{
+				std::cout << " = ";
+
+				if (pExpressionNode->m_vStatements.size() > 0)
+				{
+					for (Tree* pChild : pExpressionNode->m_vStatements)
+					{
+						std::cout << pChild->m_sText << " ";
+					}
+				}
+				else
+					if (pExpressionNode != nullptr)
+						std::cout << pExpressionNode->m_sText;
+			}
+		}
+		break;
+		case ASTNodeType::ASTNode_TYPEARRAY:
+		{
+			Tree* pArraySizeLeaf = pNode->m_pLeftNode;
+			Tree* pArrayElementsLeaf = pNode->m_pRightNode;
+
+			std::cout << pNode->getAdditionalInfoFor("type") << " " << pNode->m_sAdditionalInfo << "[";
+			if (pArraySizeLeaf != nullptr)
+			{
+				std::cout << pArraySizeLeaf->m_sText;
+			}
+
+			std::cout << "]";
+
+			if (pArrayElementsLeaf != nullptr)
+			{
+				std::cout << " " << "=" << " ";
+				std::cout << "{";
+
+				for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
+				{
+					std::cout << " " << pArrayElement->m_sText << ",";
+				}
+
+				std::cout << "}";
+			}
+
+			std::cout << ";";
+		}
+		break;
+		case ASTNodeType::ASTNode_TYPESTRUCT:
+		{
+			std::string sStructType = pNode->getAdditionalInfoFor("type");
+			std::cout << sStructType << "* " << pNode->m_sText << " = new " << sStructType << "(";
+
+			Tree* pConstructorCallNode = pNode->m_vStatements[0];
+			for (Tree* pChild : pConstructorCallNode->m_vStatements)
+			{
+				if(pChild->m_eASTNodeType != ASTNodeType::ASTNode_CONSTRUCTORCALLEND)
+					std::cout << pChild->m_sText << ",";
+			}
+
+			std::cout << ")";
+			std::cout << ";";
+
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_MALLOC:
+		{
+			std::cout << "malloc(";
+
+			Tree* pExpressionNode = pNode->m_pLeftNode;
+			std::cout << pExpressionNode->m_sText;
+
+			std::cout << ");";
+		}
+		break;
+		case ASTNodeType::ASTNode_PREDECR:
+		case ASTNodeType::ASTNode_PREINCR:
+		{
+			std::cout << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << pNode->m_sText << ";";
+		}
+		break;
+		case ASTNodeType::ASTNode_POSTDECR:
+		case ASTNodeType::ASTNode_POSTINCR:
+		{
+			std::cout << pNode->m_sText << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";";
+		}
+		break;
+		case ASTNodeType::ASTNode_ASSIGN:
+		{
+			Tree* pIdentifierNode = pRightNode;
+			Tree* pExpressionNode = pLeftNode;
+
+			// PreFix
+			if (pExpressionNode->m_pLeftNode != nullptr)
+			{
+				for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
+			}
+
+			std::string sIdentifierText = (pIdentifierNode->m_eASTNodeType == ASTNodeType::ASTNode_IDENTIFIER) ? "" : "@";
+			sIdentifierText += pIdentifierNode->m_sText;
 
 			if (pExpressionNode->m_vStatements.size() > 0)
 			{
-				for (Tree* pChild : pExpressionNode->m_vStatements)
+				std::cout << sIdentifierText << " = ";
+				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
 				{
-					std::cout << pChild->m_sText << " ";
+					printAST(pChildNode, false);
 				}
 			}
 			else
-				if (pExpressionNode != nullptr)
-					std::cout << pExpressionNode->m_sText;
-		}
-	}
-	break;
-	case ASTNodeType::ASTNode_TYPEARRAY:
-	{
-		Tree* pArraySizeLeaf = pNode->m_pLeftNode;
-		Tree* pArrayElementsLeaf = pNode->m_pRightNode;
+				std::cout << sIdentifierText << " = " << pExpressionNode->m_sText << ";" << std::endl;
 
-		std::cout << pNode->getAdditionalInfoFor("type") << " " << pNode->m_sAdditionalInfo << "[";
-		if (pArraySizeLeaf != nullptr)
-		{
-			std::cout << pArraySizeLeaf->m_sText;
-		}
-
-		std::cout << "]";
-
-		if (pArrayElementsLeaf != nullptr)
-		{
-			std::cout << " " << "=" << " ";
-			std::cout << "{";
-
-			for (Tree* pArrayElement : pArrayElementsLeaf->m_vStatements)
+			// PostFix
+			if (pExpressionNode->m_pRightNode != nullptr)
 			{
-				std::cout << " " << pArrayElement->m_sText << ",";
+				for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
 			}
 
-			std::cout << "}";
+			bProcessChildren = false;
 		}
-
-		std::cout << ";";
-	}
-	break;
-	case ASTNodeType::ASTNode_MALLOC:
-	{
-		std::cout << "malloc(";
-
-		Tree* pExpressionNode = pNode->m_pLeftNode;
-		std::cout << pExpressionNode->m_sText;
-
-		std::cout << ");";
-	}
-	break;
-	case ASTNodeType::ASTNode_PREDECR:
-	case ASTNodeType::ASTNode_PREINCR:
-	{
-		std::cout << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << pNode->m_sText << ";";
-	}
-	break;
-	case ASTNodeType::ASTNode_POSTDECR:
-	case ASTNodeType::ASTNode_POSTINCR:
-	{
-		std::cout << pNode->m_sText << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";";
-	}
-	break;
-	case ASTNodeType::ASTNode_ASSIGN:
-	{
-		Tree* pIdentifierNode = pRightNode;
-		Tree* pExpressionNode = pLeftNode;
-
-		// PreFix
-		if (pExpressionNode->m_pLeftNode != nullptr)
+		break;
+		case ASTNodeType::ASTNode_IF:
 		{
-			for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
+			std::cout << "if(" << pLeftNode->m_sText << ") {" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_ELSE:
+		{
+			std::cout << "else" << "{\n";
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_WHILE:
+		{
+			Tree* pExpressionNode = pLeftNode;
+
+			// PreFix
+			if (pExpressionNode->m_pLeftNode != nullptr)
 			{
-				printAST(pChildNode);
+				for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
 			}
+
+			std::cout << "while(" << pLeftNode->m_sText << ") {" << std::endl;
+
+			iTabCount++;
 		}
-
-		std::string sIdentifierText = (pIdentifierNode->m_eASTNodeType == ASTNodeType::ASTNode_IDENTIFIER) ? "" : "@";
-		sIdentifierText += pIdentifierNode->m_sText;
-
-		if (pExpressionNode->m_vStatements.size() > 0)
+		break;
+		case ASTNodeType::ASTNode_SWITCH:
 		{
-			std::cout << sIdentifierText << " = ";
-			for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
+			std::cout << "switch(" << pNode->m_pLeftNode->m_sText << ") {" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHCASE:
+		{
+			std::cout << "case " << pNode->m_sText << ":" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHDEFAULT:
+		{
+			std::cout << "default:" << std::endl;
+			iTabCount++;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHBREAK:
+		{
+			std::cout << "break;";
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_PRINT:
+		{
+			std::cout << "print(";
+			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+			for (Tree* pChildNode : *vStatements)
 			{
-				printAST(pChildNode, false);
+				std::cout << pChildNode->m_sText << ", ";
 			}
-		}
-		else
-			std::cout << sIdentifierText << " = " << pExpressionNode->m_sText << ";" << std::endl;
+			std::cout << ");";
 
-		// PostFix
-		if (pExpressionNode->m_pRightNode != nullptr)
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_PUTC:
 		{
-			for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
+			std::cout << "putc(";
+			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+			for (Tree* pChildNode : *vStatements)
 			{
-				printAST(pChildNode);
+				std::cout << pChildNode->m_sText;
 			}
+			std::cout << ");";
+
+			bProcessChildren = false;
 		}
-
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_IF:
-	{
-		std::cout << "if(" << pLeftNode->m_sText << ") {" << std::endl;
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_ELSE:
-	{
-		std::cout << "else" << "{\n";
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_WHILE:
-	{
-		Tree* pExpressionNode = pLeftNode;
-
-		// PreFix
-		if (pExpressionNode->m_pLeftNode != nullptr)
+		break;
+		case ASTNodeType::ASTNode_STRING:
 		{
-			for (Tree* pChildNode : pExpressionNode->m_pLeftNode->m_vStatements)
+			std::cout << pNode->m_sText << " ";
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_EXPRESSION:
+		{
+			std::cout << pNode->m_sText << " ";
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_RETURNSTMT:
+		{
+			std::cout << "return" << " ";
+
+			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
+			for (Tree* pChildNode : *vStatements)
 			{
-				printAST(pChildNode);
+				std::cout << pChildNode->m_sText << ", ";
 			}
+			std::cout << ";";
+
+			bProcessChildren = false;
 		}
-
-		std::cout << "while(" << pLeftNode->m_sText << ") {" << std::endl;
-
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCH:
-	{
-		std::cout << "switch(" << pNode->m_pLeftNode->m_sText << ") {" << std::endl;
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCHCASE:
-	{
-		std::cout << "case " << pNode->m_sText << ":" << std::endl;
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCHDEFAULT:
-	{
-		std::cout << "default:" << std::endl;
-		iTabCount++;
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCHBREAK:
-	{
-		std::cout << "break;";
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_PRINT:
-	{
-		std::cout << "print(";
-		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-		for (Tree* pChildNode : *vStatements)
+		break;
+		case ASTNodeType::ASTNode_FREE:
 		{
-			std::cout << pChildNode->m_sText << ", ";
+			std::cout << "free(" << pNode->m_sText.c_str() << ")";
+			std::cout << ";";
+
+			bProcessChildren = false;
 		}
-		std::cout << ");";
-
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_PUTC:
-	{
-		std::cout << "putc(";
-		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-		for (Tree* pChildNode : *vStatements)
-		{
-			std::cout << pChildNode->m_sText;
-		}
-		std::cout << ");";
-
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_STRING:
-	{
-		std::cout << pNode->m_sText << " ";
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_EXPRESSION:
-	{
-		std::cout << pNode->m_sText << " ";
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_RETURNSTMT:
-	{
-		std::cout << "return" << " ";
-
-		std::vector<Tree*>* vStatements = &pNode->m_vStatements;
-		for (Tree* pChildNode : *vStatements)
-		{
-			std::cout << pChildNode->m_sText << ", ";
-		}
-		std::cout << ";";
-
-		bProcessChildren = false;
-	}
-	break;
-	case ASTNodeType::ASTNode_FREE:
-	{
-		std::cout << "free(" << pNode->m_sText.c_str() << ")";
-		std::cout << ";";
-
-		bProcessChildren = false;
-	}
-	break;
+		break;
 	}
 
 	if (bProcessChildren)
@@ -521,83 +540,83 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 
 	switch (pNode->m_eASTNodeType)
 	{
-	case ASTNodeType::ASTNode_STRUCTDEF:
-	case ASTNodeType::ASTNode_FUNCTIONDEF:
-	{
-		if (iTabCount >= 0)
-			iTabCount--;
-
-		printTabs();  std::cout << "}";
-	}
-	break;
-	case ASTNodeType::ASTNode_IF:
-	{
-		if (iTabCount >= 0)
-			iTabCount--;
-
-		printTabs();  std::cout << "}" << std::endl;
-		// Else
-		if (pRightNode != nullptr)
-			printAST(pRightNode);
-
-		std::cout << std::endl;
-	}
-	break;
-	case ASTNodeType::ASTNode_ELSE:
-	{
-		if (iTabCount >= 0)
-			iTabCount--;
-
-		printTabs(); std::cout << "}";
-	}
-	break;
-	case ASTNodeType::ASTNode_WHILE:
-	{
-		Tree* pExpressionNode = pLeftNode;
-
-		// PostFix
-		if (pExpressionNode->m_pRightNode != nullptr)
+		case ASTNodeType::ASTNode_STRUCTDEF:
+		case ASTNodeType::ASTNode_FUNCTIONDEF:
 		{
-			for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
-			{
-				printAST(pChildNode);
-			}
+			if (iTabCount >= 0)
+				iTabCount--;
+
+			printTabs();  std::cout << "}";
 		}
+		break;
+		case ASTNodeType::ASTNode_IF:
+		{
+			if (iTabCount >= 0)
+				iTabCount--;
 
-		if (iTabCount >= 0)
-			iTabCount--;
+			printTabs();  std::cout << "}" << std::endl;
+			// Else
+			if (pRightNode != nullptr)
+				printAST(pRightNode);
 
-		printTabs(); std::cout << "}";
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCH:
-	{
-		if (iTabCount >= 0)
-			iTabCount--;
+			std::cout << std::endl;
+		}
+		break;
+		case ASTNodeType::ASTNode_ELSE:
+		{
+			if (iTabCount >= 0)
+				iTabCount--;
 
-		printTabs(); std::cout << "}";
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCHCASE:
-	{
-		if (iTabCount >= 0)
-			iTabCount--;
-	}
-	break;
-	case ASTNodeType::ASTNode_SWITCHDEFAULT:
-	{
-		printTabs();
-		std::cout << "break;" << std::endl;
+			printTabs(); std::cout << "}";
+		}
+		break;
+		case ASTNodeType::ASTNode_WHILE:
+		{
+			Tree* pExpressionNode = pLeftNode;
 
-		if (iTabCount >= 0)
-			iTabCount--;
-	}
-	break;
-	case ASTNodeType::ASTNode_TYPE:
-	{
-		std::cout << ";";
-	}
-	break;
+			// PostFix
+			if (pExpressionNode->m_pRightNode != nullptr)
+			{
+				for (Tree* pChildNode : pExpressionNode->m_pRightNode->m_vStatements)
+				{
+					printAST(pChildNode);
+				}
+			}
+
+			if (iTabCount >= 0)
+				iTabCount--;
+
+			printTabs(); std::cout << "}";
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCH:
+		{
+			if (iTabCount >= 0)
+				iTabCount--;
+
+			printTabs(); std::cout << "}";
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHCASE:
+		{
+			if (iTabCount >= 0)
+				iTabCount--;
+		}
+		break;
+		case ASTNodeType::ASTNode_SWITCHDEFAULT:
+		{
+			printTabs();
+			std::cout << "break;" << std::endl;
+
+			if (iTabCount >= 0)
+				iTabCount--;
+		}
+		break;
+		case ASTNodeType::ASTNode_TYPE:
+		{
+			std::cout << ";";
+		}
+		break;
 	}
 
 	std::cout << std::endl;
@@ -681,38 +700,39 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 		{
 			switch (pNode->m_eASTNodeType)
 			{
-			case ASTNodeType::ASTNode_FUNCTIONDEF:
-			case ASTNodeType::ASTNode_FUNCTIONCALL:
-			case ASTNodeType::ASTNode_WHILE:
-			case ASTNodeType::ASTNode_PRINT:
-			{
-				populateStrings(pNode, sVector);
-			}
-			break;
-			case ASTNodeType::ASTNode_STRING:
-			case ASTNodeType::ASTNode_CHARACTER:
-			{
-				addString(pNode->m_sText, sVector);
-			}
-			break;
-			case ASTNodeType::ASTNode_IF:
-			{
-				populateStrings(pNode, sVector);
-				Tree* pElseNode = pNode->m_pRightNode;
-				if (pElseNode != nullptr)
+				case ASTNodeType::ASTNode_FUNCTIONDEF:
+				case ASTNodeType::ASTNode_FUNCTIONCALL:
+				case ASTNodeType::ASTNode_WHILE:
+				case ASTNodeType::ASTNode_PRINT:
+				case ASTNodeType::ASTNode_STRUCTDEF:
 				{
-					populateStrings(pElseNode, sVector);
+					populateStrings(pNode, sVector);
 				}
-			}
-			break;
-			case ASTNodeType::ASTNode_SWITCH:
-			{
-				for (Tree* pSwitchCaseNode : pNode->m_vStatements)
+				break;
+				case ASTNodeType::ASTNode_STRING:
+				case ASTNodeType::ASTNode_CHARACTER:
 				{
-					populateStrings(pSwitchCaseNode, sVector);
+					addString(pNode->m_sText, sVector);
 				}
-			}
-			break;
+				break;
+				case ASTNodeType::ASTNode_IF:
+				{
+					populateStrings(pNode, sVector);
+					Tree* pElseNode = pNode->m_pRightNode;
+					if (pElseNode != nullptr)
+					{
+						populateStrings(pElseNode, sVector);
+					}
+				}
+				break;
+				case ASTNodeType::ASTNode_SWITCH:
+				{
+					for (Tree* pSwitchCaseNode : pNode->m_vStatements)
+					{
+						populateStrings(pSwitchCaseNode, sVector);
+					}
+				}
+				break;
 			}
 		}
 	}
@@ -794,6 +814,12 @@ void GrammerUtils::populateCode(Tree* pNode)
 			case ASTNodeType::ASTNode_TYPESTATIC:
 			{
 				handleStatics(pNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_TYPESTRUCT:
+			{
+				handleTypeStructs(pNode);
+				bProcessStatements = false;
 			}
 			break;
 			case ASTNodeType::ASTNode_FUNCTIONDEF:
@@ -1204,6 +1230,17 @@ Tree* GrammerUtils::createFunctionWithNoArguments(const char* sFunctionName, con
 	return pFunctionDefNode;
 }
 
+Tree* GrammerUtils::createFunctionCallWithNoArguments(const char* sFunctionName)
+{
+	Tree* pFunctionCallNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONCALL, sFunctionName);
+	{
+		Tree* pFuncCallEndNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONCALLEND, sFunctionName);
+		pFunctionCallNode->addChild(pFuncCallEndNode);
+	}
+
+	return pFunctionCallNode;
+}
+
 Tree* GrammerUtils::createNodeOfType(ASTNodeType eASTNodeType, const char* sText)
 {
 	Tree* pASTNode = TinyCReader::makeLeaf(eASTNodeType, sText);
@@ -1349,13 +1386,101 @@ void GrammerUtils::handleFunctionEnd(Tree* pNode)
 	m_pCurrentFunction = nullptr;
 }
 
+FunctionInfo* GrammerUtils::getFunctionInfo(Tree* pNode)
+{
+	FunctionInfo* pRETURN_FunctionInfo = nullptr;
+
+	std::string sFuncCallee = pNode->m_sText;
+	Tree* pParent_FunctionCall = pNode->m_pParentNode;
+	if (pParent_FunctionCall != nullptr)
+	{
+		std::string sCallee_Signature = pParent_FunctionCall->m_sAdditionalInfo;
+		int32_t iCallee_ArgCount = pParent_FunctionCall->m_vStatements.size() - 1;
+
+		//////////////////////////////////////////////////////////
+		// 1. Check if the function() is in a STRUCT.
+		//Tree* pGrandParent_TypeStruct = pParent_FunctionCall->m_pParentNode;
+		//if (pGrandParent_TypeStruct != nullptr)
+		{
+			//ASTNodeType eGrandParent_ASTNodeType = pGrandParent_TypeStruct->m_eASTNodeType;
+			//if (eGrandParent_ASTNodeType == ASTNodeType::ASTNode_TYPESTRUCT)
+			{
+				std::map<std::string, StructInfo*>::const_iterator itrStruct = m_MapGlobalStructs.begin();
+				for (; itrStruct != m_MapGlobalStructs.end(); ++itrStruct)
+				{
+					StructInfo* pStructInfo = itrStruct->second;
+					{
+						if (pStructInfo != nullptr)
+						{
+							for (void* pVoidPtr : pStructInfo->m_vMemberFunctions)
+							{
+								FunctionInfo* pFunctionInfo = (FunctionInfo*)pVoidPtr;
+								if (pFunctionInfo != nullptr)
+								{
+									std::string sFUNCDEF_Name = pFunctionInfo->m_sFunctionName;
+									Tree* pFUNCDEF_ArgListNode = pFunctionInfo->m_pFunctionArguments;
+									int iFUNCDEF_ArgCount = pFUNCDEF_ArgListNode->m_vStatements.size();
+									std::string sFUNCDEF_Signature = pFUNCDEF_ArgListNode->m_sAdditionalInfo;
+
+									if (sFuncCallee == sFUNCDEF_Name
+										&&
+										iCallee_ArgCount == iFUNCDEF_ArgCount
+										&&
+										sCallee_Signature == sFUNCDEF_Signature
+									) {
+										pRETURN_FunctionInfo = pFunctionInfo;
+										break;
+									}
+								}
+							}
+
+							if (pRETURN_FunctionInfo != nullptr)
+								break;
+						}
+					}
+				}
+			}
+		}
+
+		//////////////////////////////////////////////////////////
+		// 2. Check if its a global function().
+		if (pRETURN_FunctionInfo == nullptr)
+		{
+			std::map<std::string, FunctionInfo*>::const_iterator itrFunction = m_MapGlobalFunctions.begin();
+			for (; itrFunction != m_MapGlobalFunctions.end(); ++itrFunction)
+			{
+				FunctionInfo* pFunctionInfo = itrFunction->second;
+				if (pFunctionInfo != nullptr)
+				{
+					std::string sFUNCDEF_Name = pFunctionInfo->m_sFunctionName;
+					Tree* pFUNCDEF_ArgListNode = pFunctionInfo->m_pFunctionArguments;
+					int iFUNCDEF_ArgCount = pFUNCDEF_ArgListNode->m_vStatements.size();
+					std::string sFUNCDEF_Signature = pFUNCDEF_ArgListNode->m_sAdditionalInfo;
+
+					if (sFuncCallee == sFUNCDEF_Name
+						&&
+						iCallee_ArgCount == iFUNCDEF_ArgCount
+						&&
+						sCallee_Signature == sFUNCDEF_Signature
+					) {
+						pRETURN_FunctionInfo = pFunctionInfo;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	return pRETURN_FunctionInfo;
+}
+
 void GrammerUtils::handleFunctionCall(Tree* pNode)
 {
 	// Callee function name
 	std::string sFuncCallee = pNode->m_sText;
 
 	// Check if the 'Callee' is our list !
-	FunctionInfo* pCalleeFunctionInfo = m_MapGlobalFunctions[sFuncCallee];
+	FunctionInfo* pCalleeFunctionInfo = getFunctionInfo(pNode);
 
 	assert(pCalleeFunctionInfo != nullptr);
 	if (pCalleeFunctionInfo != nullptr)
@@ -1425,7 +1550,10 @@ void GrammerUtils::handleFunctionCall(Tree* pNode)
 			// Call
 			int iCalleeFunctionAddress = pCalleeFunctionInfo->m_iStartOffsetInCode;
 
-			EMIT_1(OPCODE::CALL, iCalleeFunctionAddress);
+			EMIT_1(OPCODE::CALL, iCalleeFunctionAddress); 
+#if (VERBOSE == 1)
+			std::cout << "\t\t\t\t\t\tCALL " << "[" << sFuncCallee << "]" << std::endl;
+#endif
 
 			//////////////////////////////////////////////////////
 			// Patch the return address
@@ -1762,6 +1890,15 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 			int32_t iOperand5_ArrayType = sizeOf(sType);										// 5. sizeof(Type) i.e bytes to get to access subsequent "arr" elements.
 			int32_t iOperand6_CastValue = castValueFor(sType);									// 6. Cast Value of Type "arr" to perform relevant 'CAST'
 
+			std::cout	<< CURRENT_OFFSET << ". " << opCodeMap[(int)OPCODE::CLR].sOpCode 
+						<< " " << iOperand1_PointerVariable
+						<< " " << iOperand2_StartPos
+						<< " " << iOperand3_LastPos
+						<< " " << iOperand4_Value
+						<< " " << iOperand5_ArrayType
+						<< " " << iOperand6_CastValue
+						<< std::endl;
+
 			EMIT_BYTE(OPCODE::CLR);
 			EMIT_INT(iOperand1_PointerVariable);
 			EMIT_INT(iOperand2_StartPos);
@@ -2074,12 +2211,123 @@ void GrammerUtils::handleMalloc(Tree* pNode)
 
 void GrammerUtils::handleFree(Tree* pNode)
 {
-	EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+	////////////////////////////////////////////////////////////////////
+	// I. Search for the 'Pointer Variable' AST Node; 
+	////////////////////////////////////////////////////////////////////
+	std::string sPointerName = pNode->m_sText;
+	Tree* pPointerNode = nullptr;
+	if (m_pCurrentFunction != nullptr)
+	{
+		// 1. Search through the Local variable list.
+		for (Tree* pLocalVar : m_pCurrentFunction->m_vLocalVariables)
+		{
+			if (pLocalVar->m_sText == sPointerName)
+			{
+				pPointerNode = pLocalVar;
+				break;
+			}
+		}
+
+		// 2. Search through the Static variable list.
+		if (pPointerNode == nullptr)
+		{
+			for (Tree* pStaticVar : m_pCurrentFunction->m_vStaticVariables)
+			{
+				if (pStaticVar->m_sText == sPointerName)
+				{
+					pPointerNode = pStaticVar;
+					break;
+				}
+			}
+		}
+	}
+
+	if (pPointerNode == nullptr)
+	{
+		if (m_pCurrentStruct != nullptr)
+		{
+			// 3. Search through the Member variable list.
+			for (Tree* pMemberVar : m_pCurrentStruct->m_vMemberVariables)
+			{
+				if (pMemberVar->m_sText == sPointerName)
+				{
+					pPointerNode = pMemberVar;
+					break;
+				}
+			}
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////
+	// II. Once found emit asm; 
+	////////////////////////////////////////////////////////////////////
+	assert(pPointerNode != nullptr);
+	if (pPointerNode != nullptr)			// Pointer Variable AST found !
+	{
+		std::string sType = pPointerNode->getAdditionalInfoFor("type");
+		if (sType == "int8_t"
+			||
+			sType == "int16_t"
+			||
+			sType == "int32_t"
+		) {
+			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
+		}
+		else
+		{
+			// 1. Fetch 'this' into 'ECX'
+			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
+			EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+																					
+			// 2. Free the pointer itself first before calling the 'Destructor'
+			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
+
+			// 3. Call the 'Destructor' by creating a Dummy Destructor under the "free" ASTNode.
+			std::string sDestructor = "#" + sType;
+			Tree* pDefaultDestructor = createFunctionCallWithNoArguments(sDestructor.c_str());
+			pNode->addChild(pDefaultDestructor);
+
+			populateCode(pDefaultDestructor);
+
+			// 4. Clear off 'ECX'
+			EMIT_1(OPCODE::PUSH, 0);
+			EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
+		}
+	}
 }
 
 void GrammerUtils::handleStatics(Tree* pNode)
 {
 	FunctionInfo::addStaticVariable(pNode);
+}
+
+void GrammerUtils::handleTypeStructs(Tree* pNode)
+{
+	//////////////////////////////////////////////////////////////////
+	// 1. Allocate Memory on HEAP for the sizeOf(STRUCT)
+	//		- Remember all the object allocations happen on the HEAP & not on the STACK.
+	//		- No STACK based BUFFER OVERFLOW(BO) possible.
+	//		- The objects once allocated on the HEAP, should be freed when they go out of scope.
+	//////////////////////////////////////////////////////////////////
+	std::string sType = pNode->getAdditionalInfoFor("type");
+	EMIT_1(OPCODE::PUSHI, sizeOf(sType));									// Push variable size of STRUCT onto the STACK as it will be pulled in by MALLOC @ RT.
+
+	EMIT_1(OPCODE::MALLOC, 0);												// MALLOC will pull the amount of bytes to allocate from the STACK & reserve memory on the HEAP.
+																			// The address of allocated memory location will be pushed onto the STACK.
+
+	EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Save the Memory Address Loc in 'ECX', also called as "this" pointer.
+	EMIT_1(OPCODE::PUSHR, EREGISTERS::RCX);									// Push the Memory Address again onto the STACK to STORE it in a variable.
+
+	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));	// Store the memory address in the pointer(STRUCT*) variable.
+
+	Tree* pConstructorCallNode = pNode->m_vStatements[0];
+	if (pConstructorCallNode != nullptr && pConstructorCallNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
+	{
+		populateCode(pConstructorCallNode);
+	}
+
+	EMIT_1(OPCODE::PUSHI, 0);												// Clear off 'ECX'.
+	EMIT_1(OPCODE::POPR, EREGISTERS::RCX);
 }
 
 void GrammerUtils::handleStatements(Tree* pNode)
@@ -2142,6 +2390,19 @@ int32_t GrammerUtils::sizeOf(std::string sType)
 	else
 	if (sType == "int32_t")
 		return sizeof(int32_t);
+	else
+	{
+		std::map<std::string, StructInfo*>::const_iterator itrStruct = m_MapGlobalStructs.begin();
+		for (; itrStruct != m_MapGlobalStructs.end(); ++itrStruct)
+		{
+			std::string sStructName = itrStruct->first;
+			if (sStructName == sType)
+			{
+				StructInfo* pStructInfo = itrStruct->second;
+				return pStructInfo->sizeOf();
+			}
+		}
+	}
 
 	return 1;
 }

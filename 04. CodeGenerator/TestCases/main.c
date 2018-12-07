@@ -36,15 +36,23 @@ struct Example1
 struct Person
 {
 	// * Member Variables should be declared before the functions.
+	int8_t	m_iTest = 18;
 	int8_t 	m_sName[16] = {'A', 'a', 'r', 'i', 'v' };
 	int8_t 	m_sAddress[32];
 	int8_t 	m_sEmail[32] = {'a', 'a', 'l', 'e', 'k', 'h', 'm', '@', 'g', 'm', 'a', 'i', 'l', '.', 'c', 'o', 'm' };
-	int8_t	m_iAge = 18 * 2;
 	int8_t*	m_pDesignation;
+	int8_t	m_iAge = 20;
 		
 	inline void Person(int8_t iAge)
 	{
 		print("In Person Constructor with 1 argument");
+		putc(10);
+		
+		print("m_iAge = ", m_iAge, ", m_iTest = ", m_iTest);
+		putc(10);
+        
+		m_iAge = iAge;
+		print("m_iAge after assignment = ", m_iAge);
 		putc(10);
 	}
 	
@@ -79,10 +87,21 @@ static int32_t* pStaticPtr_3;
 static int8_t* pStaticPtr_0_Start;
 int32_t retNewFunc()
 {
-	//int32_t arr1[10];
-	//int32_t arr[] = {10, 20, 30, 40};
-	//int32_t arr[6] = {10, 20, 30, 40};
-	int8_t arr1[10] = {111, 222, 333, 444, 555};
+	print("In retNewFunc................");
+	putc(10);
+
+	Example1 pExampleObj0;					// OR Person* pPersonObj0;
+	Person pPersonObj1 = new Person();		// OR Person* pPersonObj1();
+	Person pPersonObj2 = new Person(10);	// OR Person* pPersonObj2(10);
+	//Person pPersonObjs[4];				// OR Person* pPersonObjs[4];
+	
+	print("Struct pPersonObj2 Created................");
+	putc(10);
+
+	int8_t arr1[10] = {111, 222, 333, 444, 555};	//int32_t arr1[10];
+													//int32_t arr[] = {10, 20, 30, 40};
+													//int32_t arr[6] = {10, 20, 30, 40};
+
 	
 	for(int32_t ii = 0; ii < 10; ii++)
 	{
@@ -90,9 +109,6 @@ int32_t retNewFunc()
 		putc(10);		
 	}
 	
-	print("In retNewFunc................");
-	putc(10);
-
 	int8_t ch = 'A';
 	ch = 'B';
 	print("int8_t = ", ch);
@@ -217,8 +233,12 @@ int32_t retNewFunc()
 	free(pPtr_0);
 	
 	// ToDo
+	free(pExampleObj0);
+	free(pPersonObj1);
+	free(pPersonObj2);
+
 	free(arr1);		// Need to to this automatically for arrays !
-	
+
 	int32_t iReturnValue = 1977;
 	
 	return iReturnValue;

@@ -342,3 +342,45 @@ bool TinyCReader::isValidType(std::string sType)
 	
 	return false;
 }
+
+void TinyCReader::addStructType(std::string sType)
+{
+	GrammerUtils::m_vUserDefinedTypes.push_back(sType);
+}
+
+bool TinyCReader::isValidStructType(std::string sType)
+{
+	for(std::string sInBuiltType : GrammerUtils::m_vUserDefinedTypes)
+	{
+		if(sType == sInBuiltType)
+		{
+			GrammerUtils::m_pPrevToken = GrammerUtils::m_pToken;
+			GrammerUtils::getNextToken();
+
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+bool TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
+{
+	bool bYes = false;
+	if(pNode != nullptr)
+	{
+		for(Tree* pChild : pNode->m_vStatements)
+		{
+			if(pChild != nullptr)
+			{
+				if(pChild->m_eASTNodeType == eASTNodeType)
+				{
+					bYes = true;
+					break;
+				}
+			}
+		}
+	}
+	
+	return bYes;
+}

@@ -450,6 +450,10 @@ enum class ASTNodeType
 	ASTNode_STRUCTDEF,
 	ASTNode_STRUCTSTART,
 	ASTNode_STRUCTEND,
+	ASTNode_TYPESTRUCT,
+	ASTNode_CONSTRUCTORCALL,
+	ASTNode_CONSTRUCTORCALLEND,
+
 };
 
 typedef struct Tree
@@ -570,6 +574,11 @@ typedef struct StructInfo
 		scanStructForMemberVariables(pNode);
 	}
 
+	int32_t sizeOf()
+	{
+		return sizeof(int32_t) * m_vMemberVariables.size();
+	}
+
 	void scanStructForMemberVariables(Tree* pNode)
 	{
 		for (Tree* pChild : pNode->m_vStatements)
@@ -639,25 +648,26 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-			case ASTNodeType::ASTNode_TYPE:
-			case ASTNodeType::ASTNode_TYPEARRAY:
-			{
-				m_vLocalVariables.push_back(pChild);
-			}
-			break;
-			case ASTNodeType::ASTNode_IF:
-			{
-				scanFunctionForLocals(pChild);
-				Tree* pElseNode = pChild->m_pRightNode;
-				if (pElseNode != nullptr)
-					scanFunctionForLocals(pElseNode);
-			}
-			break;
-			case ASTNodeType::ASTNode_WHILE:
-			{
-				scanFunctionForLocals(pChild);
-			}
-			break;
+				case ASTNodeType::ASTNode_TYPE:
+				case ASTNodeType::ASTNode_TYPEARRAY:
+				case ASTNodeType::ASTNode_TYPESTRUCT:
+				{
+					m_vLocalVariables.push_back(pChild);
+				}
+				break;
+				case ASTNodeType::ASTNode_IF:
+				{
+					scanFunctionForLocals(pChild);
+					Tree* pElseNode = pChild->m_pRightNode;
+					if (pElseNode != nullptr)
+						scanFunctionForLocals(pElseNode);
+				}
+				break;
+				case ASTNodeType::ASTNode_WHILE:
+				{
+					scanFunctionForLocals(pChild);
+				}
+				break;
 			}
 		}
 	}
@@ -740,7 +750,7 @@ typedef struct FunctionInfo
 
 		assert(eVariableType != E_VARIABLETYPE::INVALID);
 
-		int iPosition = 0;
+		int32_t iPosition = 0;
 
 		iPosition = (int32_t)eVariableType;
 		iPosition <<= sizeof(int16_t) * 8;
