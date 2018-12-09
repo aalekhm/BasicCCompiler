@@ -17,7 +17,7 @@
 										TK_IDENTIFIER
 															"<code>"
 																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
-																updateBlockString(sStructName);
+																__START_BLOCK_STRING__(sStructName)
 																
 																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
 																m_pASTCurrentNode->addChild(pStructDefNode);
@@ -33,7 +33,7 @@
 															"</code>"
 											{ <structObjectList> [';'] }
 										'}'					"<code>"
-																removeLastFromBlockString();
+																__END_CURRENT_BLOCK__
 																
 																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
 																m_pASTCurrentNode->addChild(pStructEndNode);
@@ -85,7 +85,7 @@
 															"</code>"
 										TK_FUNCTIONCALL		"<code>"
 																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
-																updateBlockString(sFunctionName);
+																__START_BLOCK_STRING__(sFunctionName)
 																
 																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
 																Tree* pReturnTypeNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType.c_str());
@@ -121,7 +121,7 @@
 															"</code>"
 										<stmt_list>
 										'}'					"<code>"
-																removeLastFromBlockString();
+																__END_CURRENT_BLOCK__
 																
 																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
 																m_pASTCurrentNode->addChild(pFuncEndNode);
@@ -233,7 +233,10 @@
 
 <returnStatement>				::=		"return"
 													"<code>"
-														updateBlockString("return");
+														__END_CURRENT_BLOCK__					// Sort of a hack, as this will be the last statement of the function,
+																								// all the array pointers need to be freed before 'return expr;'.
+														
+														__START_BLOCK_STRING__("return")
 														
 														Tree* pReturnStmtNode = makeLeaf(ASTNodeType::ASTNode_RETURNSTMT, "return");
 														{
@@ -250,7 +253,7 @@
 														}
 													"</code>"
 										<expr>		"<code>"
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														
 														m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 														pReturnStmtNode->addChild(pExpressionLeftLeaf);
@@ -325,7 +328,7 @@
 <ifelseStatement>				::= 	<ifStatement>;
 <ifStatement>					::=		"if"
 										'('				"<code>"
-															updateBlockString("if");
+															__START_BLOCK_STRING__("if")
 
 															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, "if");
 															{
@@ -350,7 +353,7 @@
 										['{']
 										<stmt_list>
 										['}'] 			"<code>"
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 														"</code>"
 										[ <elseStatement> ]		
 														"<code>"
@@ -360,7 +363,7 @@
 										;
 										
 <elseStatement>					::=		"else" 			"<code>"
-															updateBlockString("else");
+															__START_BLOCK_STRING__("else")
 															
 															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
 															Tree* pIfNode = nullptr;
@@ -374,7 +377,7 @@
 										['{']
 										<stmt_list>
 										['}'] 			"<code>"
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 															
 															pIfNode->m_pRightNode = pElseNode;
 															{
@@ -385,7 +388,7 @@
 
 <whileStatement>				::= 	"while"
 										'('				"<code>"
-															updateBlockString("while");
+															__START_BLOCK_STRING__("while")
 															
 															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
 															{
@@ -410,7 +413,7 @@
 										['{']
 										<stmt_list> 
 										['}'] 			"<code>"
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 															
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pWhileNode);
@@ -419,7 +422,7 @@
 
 <switchStatement>				::=		"switch"
 										'('			"<code>"
-														updateBlockString("switch");
+														__START_BLOCK_STRING__("switch")
 														
 														Tree* pTemp = nullptr;
 														Tree* pSwitchNode = makeLeaf(ASTNodeType::ASTNode_SWITCH, "switch");
@@ -435,10 +438,10 @@
 										'{'
 										<oneOrMoreCasesOrDefault>
 										'}'			"<code>"
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														
-															m_pASTCurrentNode = pTemp;
-															m_pASTCurrentNode->addChild(pSwitchNode);
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pSwitchNode);
 													"</code>"
 										;
 										
@@ -466,7 +469,7 @@
 <switchCase>					::= 	"case"
 										TK_INTEGER
 													"<code>"
-														updateBlockString("switchcase");
+														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
 														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
@@ -487,14 +490,14 @@
 													"</code>"
 										';' ]
 													"<code>"
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														m_pASTCurrentNode = pTemp;
 													"</code>"
 										;
 
 <defaultCase>					::=		"default"
 													"<code>"
-														updateBlockString("switchcase");
+														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
 														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
@@ -509,7 +512,7 @@
 										<stmt_list>
 										[ '}' ]
 													"<code>"
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														m_pASTCurrentNode = pTemp;
 													"</code>"
 										"break"
@@ -517,7 +520,7 @@
 										
 <forStatement>					::= 	"for"
 										'('				"<code>"
-															updateBlockString("for");
+															__START_BLOCK_STRING__("for")
 															
 															////////////////////////////////
 															// for ( init-expression ; cond-expression ; loop-expression ) 
@@ -573,7 +576,7 @@
 										[ '{' ]
 										<stmt_list>
 										[ '}' ]			"<code>"
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 															
 															for(Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
 															{
@@ -681,11 +684,11 @@
 										);
 
 <bracesstmtlist>				::= 	'{' 				"<code>"
-																updateBlockString("{");
+																__START_BLOCK_STRING__("{")
 															"</code>"
 										<stmt_list> 
 										'}'					"<code>"
-																removeLastFromBlockString();
+																__END_CURRENT_BLOCK__
 															"</code>"
 										;
 
@@ -801,6 +804,9 @@
 																sFullyQualifiedVariableName.append(sVariableName);
 															"</code>"
 										'['					"<code>"
+																if(m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
+																	pushLocalHeapVar(sFullyQualifiedVariableName);
+
 																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPEARRAY;
 																Tree* pPrimTypeArrayNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;

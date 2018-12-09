@@ -214,6 +214,16 @@ int32_t retNewFunc()
 		break;
 	}
 	
+	if(mmi == 11)
+	{
+		// Arrays will be deleted automatically at the END_OF_BLOCK
+		int8_t arr2[8] = {111, 222, 333, 444, 555};		//int32_t arr2[8];
+														//int32_t arr2[] = {10, 20, 30, 40};
+														//int32_t arr2[6] = {10, 20, 30, 40};
+		
+		print("arr2 inside if == ", arr2[0]);
+	}
+	
 	int32_t j = 0;
 	++j;
 	
@@ -236,8 +246,6 @@ int32_t retNewFunc()
 	free(pExampleObj0);
 	free(pPersonObj1);
 	free(pPersonObj2);
-
-	free(arr1);		// Need to to this automatically for arrays !
 
 	int32_t iReturnValue = 1977;
 	

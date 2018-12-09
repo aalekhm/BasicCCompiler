@@ -1,6 +1,14 @@
 #include "TinyCReader.h"
 #include "GrammerUtils.h"
 
+#define __START_BLOCK_STRING__(_BLOCKNAME_) \
+	updateBlockString(_BLOCKNAME_); \
+	startBlockMarker(); \
+	
+#define __END_CURRENT_BLOCK__ \
+	removeLastFromBlockString(); \
+	endBlockMarker(); \
+
 TinyCReader::TinyCReader()
 {
 	GrammerUtils::init();
@@ -260,6 +268,8 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 			if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 				|
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+				|
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPESTRUCT
 			) {
 				if (pChild->m_sAdditionalInfo == sVariable)
 				{
@@ -383,4 +393,38 @@ bool TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
 	}
 	
 	return bYes;
+}
+
+void TinyCReader::startBlockMarker()
+{
+	m_vLocalHeapVarStack.push("{");
+}
+
+void TinyCReader::pushLocalHeapVar(std::string sVariableName)
+{
+	if (NOT sVariableName.empty())
+	{
+		m_vLocalHeapVarStack.push(sVariableName);
+	}
+}
+
+void TinyCReader::endBlockMarker()
+{
+	while (NOT m_vLocalHeapVarStack.empty())
+	{
+		std::string sLocalHeapVar = m_vLocalHeapVarStack.top();
+		m_vLocalHeapVarStack.pop();
+		if (sLocalHeapVar == "{")
+		{
+			break;
+		}
+		else
+		{
+			Tree* pFreeASTNode = GrammerUtils::createNodeOfType(ASTNodeType::ASTNode_FREE, sLocalHeapVar.c_str());
+			if (pFreeASTNode != nullptr)
+			{
+				m_pASTCurrentNode->addChild(pFreeASTNode);
+			}
+		}
+	}
 }

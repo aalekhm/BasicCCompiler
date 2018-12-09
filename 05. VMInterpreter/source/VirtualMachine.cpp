@@ -714,14 +714,19 @@ void VirtualMachine::dealloc(int32_t pAddress)
 {
 	std::vector<HeapNode>::iterator itrAllocList = m_vAllocatedList.begin();
 	bool bMemoryReclaimed = false;
+
+	// 1. Iterate through the 'Allocated' list.
 	for (; itrAllocList != m_vAllocatedList.end();  ++itrAllocList)
 	{
 		HeapNode& pAllocHeapNode = *itrAllocList;
+
+		// 2. Check if the address to be freed matches with any HeapNode.
 		if (pAddress == pAllocHeapNode.m_pAddress)
 		{
 #if (VERBOSE == 1)
 			std::cout << "\t\t\t\t\t\t[HEAP] Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << std::endl;
 #endif
+			// 3. Merge it with any preceding HeapNode.
 			bool bFoundPrecedingNode = false;
 			for (HeapNode& pUnAllocHeapNode : m_vUnAllocatedList)
 			{
@@ -746,6 +751,14 @@ void VirtualMachine::dealloc(int32_t pAddress)
 				{
 					m_vUnAllocatedList.push_back(HeapNode(pAllocHeapNode.m_pAddress, pAllocHeapNode.m_iSize));
 					std::sort(m_vUnAllocatedList.begin(), m_vUnAllocatedList.end(), sortList);
+
+					// HeapNodes can be optimized to be merged periodically,
+					// depending on various factors, one of which can be:
+					//		- If 'UnAllocated List' increases to a certain number.
+					if (m_vUnAllocatedList.size() > 5)
+					{
+						merge();
+					}
 				}
 
 				m_vAllocatedList.erase(itrAllocList);
@@ -757,6 +770,32 @@ void VirtualMachine::dealloc(int32_t pAddress)
 	}
 
 	assert(bMemoryReclaimed);
+}
+
+void VirtualMachine::merge()
+{
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// If 2 Heap Blocks are contiguous, Merge the "Later" into the "Former".
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	std::vector<HeapNode>::iterator itrUnAllocList = m_vUnAllocatedList.begin();
+	int32_t iCount = 0;
+	while(iCount < m_vUnAllocatedList.size())
+	{
+		HeapNode& pUnAllocHeapNode = m_vUnAllocatedList.at(iCount);
+		if (iCount > 0)
+		{
+			HeapNode& pPrevUnAllocHeapNode = m_vUnAllocatedList.at(iCount - 1);
+			if (pPrevUnAllocHeapNode.m_pAddress + pPrevUnAllocHeapNode.m_iSize == pUnAllocHeapNode.m_pAddress)
+			{
+				pPrevUnAllocHeapNode.m_iSize += pUnAllocHeapNode.m_iSize;
+				m_vUnAllocatedList.erase(itrUnAllocList + iCount);
+				iCount--;
+			}
+		}
+
+		iCount++;
+	}
 }
 
 int32_t VirtualMachine::getAddressOf(int32_t iVariable)

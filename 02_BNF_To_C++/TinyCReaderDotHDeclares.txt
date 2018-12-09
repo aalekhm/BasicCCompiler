@@ -18,11 +18,17 @@
 		void 						addStructType(std::string sType);
 		bool 						isValidStructType(std::string sType);
 		bool 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
+		
+		void						pushLocalHeapVar(std::string sVariableName);
+		void						startBlockMarker();
+		void						endBlockMarker();
 	protected:
 		
 	private:
 		std::stack<std::string>		m_vOperatorStack;
 		std::vector<std::string>	m_vPostFix;
+		
+		std::stack<std::string>		m_vLocalHeapVarStack;
 		
 		Tree*						m_pASTRootNode;
 		Tree*						m_pASTCurrentNode;

@@ -1,6 +1,14 @@
 #include "TinyCReader.h"
 #include "GrammerUtils.h"
 
+#define __START_BLOCK_STRING__(_BLOCKNAME_) \
+	updateBlockString(_BLOCKNAME_); \
+	startBlockMarker(); \
+	
+#define __END_CURRENT_BLOCK__ \
+	removeLastFromBlockString(); \
+	endBlockMarker(); \
+
 TinyCReader::TinyCReader()
 {
 	GrammerUtils::init();
@@ -260,6 +268,8 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 			if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 				|
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
+				|
+				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPESTRUCT
 			) {
 				if (pChild->m_sAdditionalInfo == sVariable)
 				{
@@ -385,6 +395,40 @@ bool TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
 	return bYes;
 }
 
+void TinyCReader::startBlockMarker()
+{
+	m_vLocalHeapVarStack.push("{");
+}
+
+void TinyCReader::pushLocalHeapVar(std::string sVariableName)
+{
+	if (NOT sVariableName.empty())
+	{
+		m_vLocalHeapVarStack.push(sVariableName);
+	}
+}
+
+void TinyCReader::endBlockMarker()
+{
+	while (NOT m_vLocalHeapVarStack.empty())
+	{
+		std::string sLocalHeapVar = m_vLocalHeapVarStack.top();
+		m_vLocalHeapVarStack.pop();
+		if (sLocalHeapVar == "{")
+		{
+			break;
+		}
+		else
+		{
+			Tree* pFreeASTNode = GrammerUtils::createNodeOfType(ASTNodeType::ASTNode_FREE, sLocalHeapVar.c_str());
+			if (pFreeASTNode != nullptr)
+			{
+				m_pASTCurrentNode->addChild(pFreeASTNode);
+			}
+		}
+	}
+}
+
 
 bool TinyCReader::def() {
 
@@ -429,7 +473,7 @@ if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
 																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
-																updateBlockString(sStructName);
+																__START_BLOCK_STRING__(sStructName)
 																
 																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
 																m_pASTCurrentNode->addChild(pStructDefNode);
@@ -463,7 +507,7 @@ break;
 if(!GrammerUtils::match('}', MANDATORY))
 return false;
 
-																removeLastFromBlockString();
+																__END_CURRENT_BLOCK__
 																
 																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
 																m_pASTCurrentNode->addChild(pStructEndNode);
@@ -567,7 +611,7 @@ if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
 return false;
 
 																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
-																updateBlockString(sFunctionName);
+																__START_BLOCK_STRING__(sFunctionName)
 																
 																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
 																Tree* pReturnTypeNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType.c_str());
@@ -615,7 +659,7 @@ return false;
 if(!GrammerUtils::match('}', MANDATORY))
 return false;
 
-																removeLastFromBlockString();
+																__END_CURRENT_BLOCK__
 																
 																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
 																m_pASTCurrentNode->addChild(pFuncEndNode);
@@ -849,7 +893,10 @@ bool TinyCReader::returnStatement() {
 if(!GrammerUtils::match("return", MANDATORY))
 return false;
 
-														updateBlockString("return");
+														__END_CURRENT_BLOCK__					// Sort of a hack, as this will be the last statement of the function,
+																								// all the array pointers need to be freed before 'return expr;'.
+														
+														__START_BLOCK_STRING__("return")
 														
 														Tree* pReturnStmtNode = makeLeaf(ASTNodeType::ASTNode_RETURNSTMT, "return");
 														{
@@ -868,7 +915,7 @@ return false;
 if(!expr())
 return false;
 
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														
 														m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 														pReturnStmtNode->addChild(pExpressionLeftLeaf);
@@ -1009,7 +1056,7 @@ return false;
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
 
-															updateBlockString("if");
+															__START_BLOCK_STRING__("if")
 
 															Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, "if");
 															{
@@ -1053,7 +1100,7 @@ else {
 }
 
 
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 														
 if(!elseStatement()) {
 }
@@ -1072,7 +1119,7 @@ bool TinyCReader::elseStatement() {
 if(!GrammerUtils::match("else", MANDATORY))
 return false;
 
-															updateBlockString("else");
+															__START_BLOCK_STRING__("else")
 															
 															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
 															Tree* pIfNode = nullptr;
@@ -1102,7 +1149,7 @@ else {
 }
 
 
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 															
 															pIfNode->m_pRightNode = pElseNode;
 															{
@@ -1119,7 +1166,7 @@ return false;
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
 
-															updateBlockString("while");
+															__START_BLOCK_STRING__("while")
 															
 															Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
 															{
@@ -1163,7 +1210,7 @@ else {
 }
 
 
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 															
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pWhileNode);
@@ -1178,7 +1225,7 @@ return false;
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
 
-														updateBlockString("switch");
+														__START_BLOCK_STRING__("switch")
 														
 														Tree* pTemp = nullptr;
 														Tree* pSwitchNode = makeLeaf(ASTNodeType::ASTNode_SWITCH, "switch");
@@ -1200,10 +1247,10 @@ return false;
 if(!GrammerUtils::match('}', MANDATORY))
 return false;
 
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														
-															m_pASTCurrentNode = pTemp;
-															m_pASTCurrentNode->addChild(pSwitchNode);
+														m_pASTCurrentNode = pTemp;
+														m_pASTCurrentNode->addChild(pSwitchNode);
 													
 return true;
 
@@ -1269,7 +1316,7 @@ return false;
 if(!GrammerUtils::match(TokenType::Type::TK_INTEGER, MANDATORY))
 return false;
 
-														updateBlockString("switchcase");
+														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
 														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
@@ -1314,7 +1361,7 @@ return false;
 }
 
 
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														m_pASTCurrentNode = pTemp;
 													
 return true;
@@ -1325,7 +1372,7 @@ bool TinyCReader::defaultCase() {
 if(!GrammerUtils::match("default", MANDATORY))
 return false;
 
-														updateBlockString("switchcase");
+														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
 														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
@@ -1356,7 +1403,7 @@ else {
 }
 
 
-														removeLastFromBlockString();
+														__END_CURRENT_BLOCK__
 														m_pASTCurrentNode = pTemp;
 													
 if(!GrammerUtils::match("break", MANDATORY))
@@ -1373,7 +1420,7 @@ return false;
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
 
-															updateBlockString("for");
+															__START_BLOCK_STRING__("for")
 															
 															////////////////////////////////
 															// for ( init-expression ; cond-expression ; loop-expression ) 
@@ -1461,7 +1508,7 @@ else {
 }
 
 
-															removeLastFromBlockString();
+															__END_CURRENT_BLOCK__
 															
 															for(Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
 															{
@@ -1696,14 +1743,14 @@ bool TinyCReader::bracesstmtlist() {
 if(!GrammerUtils::match('{', MANDATORY))
 return false;
 
-																updateBlockString("{");
+																__START_BLOCK_STRING__("{")
 															
 if(!stmt_list())
 return false;
 if(!GrammerUtils::match('}', MANDATORY))
 return false;
 
-																removeLastFromBlockString();
+																__END_CURRENT_BLOCK__
 															
 return true;
 
@@ -1888,6 +1935,9 @@ return false;
 															
 if(!GrammerUtils::match('[', MANDATORY))
 return false;
+
+																if(m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
+																	pushLocalHeapVar(sFullyQualifiedVariableName);
 
 																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPEARRAY;
 																Tree* pPrimTypeArrayNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());

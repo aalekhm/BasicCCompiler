@@ -1,6 +1,14 @@
 #include "TinyCReader.h"
 #include "GrammerUtils.h"
 
+#define __START_BLOCK_STRING__(_BLOCKNAME_) \
+	updateBlockString(_BLOCKNAME_); \
+	startBlockMarker(); \
+
+#define __END_CURRENT_BLOCK__ \
+	removeLastFromBlockString(); \
+	endBlockMarker(); \
+
 TinyCReader::TinyCReader()
 {
 	GrammerUtils::init();
@@ -260,9 +268,9 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 			if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 				|
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
-				||
+				|
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPESTRUCT
-			) {
+				) {
 				if (pChild->m_sAdditionalInfo == sVariable)
 				{
 					sFullyQualifiedName = pChild->m_sText;
@@ -297,7 +305,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 				if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 					||
 					pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
-				) {
+					) {
 					if (pChildNode->m_sAdditionalInfo == sVariable)
 					{
 						sFullyQualifiedName = pChildNode->m_sText;
@@ -387,6 +395,40 @@ bool TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
 	return bYes;
 }
 
+void TinyCReader::startBlockMarker()
+{
+	m_vLocalHeapVarStack.push("{");
+}
+
+void TinyCReader::pushLocalHeapVar(std::string sVariableName)
+{
+	if (NOT sVariableName.empty())
+	{
+		m_vLocalHeapVarStack.push(sVariableName);
+	}
+}
+
+void TinyCReader::endBlockMarker()
+{
+	while (NOT m_vLocalHeapVarStack.empty())
+	{
+		std::string sLocalHeapVar = m_vLocalHeapVarStack.top();
+		m_vLocalHeapVarStack.pop();
+		if (sLocalHeapVar == "{")
+		{
+			break;
+		}
+		else
+		{
+			Tree* pFreeASTNode = GrammerUtils::createNodeOfType(ASTNodeType::ASTNode_FREE, sLocalHeapVar.c_str());
+			if (pFreeASTNode != nullptr)
+			{
+				m_pASTCurrentNode->addChild(pFreeASTNode);
+			}
+		}
+	}
+}
+
 
 bool TinyCReader::def() {
 
@@ -431,9 +473,9 @@ bool TinyCReader::structDeclaration() {
 		return false;
 
 	std::string sStructName = GrammerUtils::m_pPrevToken.getText();
-	updateBlockString(sStructName);
+	__START_BLOCK_STRING__(sStructName)
 
-	Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
+		Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
 	m_pASTCurrentNode->addChild(pStructDefNode);
 	addStructType(sStructName);
 
@@ -465,9 +507,9 @@ bool TinyCReader::structDeclaration() {
 	if (!GrammerUtils::match('}', MANDATORY))
 		return false;
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
+		Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
 	m_pASTCurrentNode->addChild(pStructEndNode);
 
 	m_pASTCurrentNode = pTemp;
@@ -569,9 +611,9 @@ bool TinyCReader::functionDef() {
 		return false;
 
 	std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
-	updateBlockString(sFunctionName);
+	__START_BLOCK_STRING__(sFunctionName)
 
-	Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
+		Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
 	Tree* pReturnTypeNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType.c_str());
 	Tree* pArgListNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONARGLIST, "");
 	{
@@ -617,9 +659,9 @@ bool TinyCReader::functionDef() {
 	if (!GrammerUtils::match('}', MANDATORY))
 		return false;
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
+		Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
 	m_pASTCurrentNode->addChild(pFuncEndNode);
 
 	m_pASTCurrentNode = pTemp;
@@ -851,9 +893,12 @@ bool TinyCReader::returnStatement() {
 	if (!GrammerUtils::match("return", MANDATORY))
 		return false;
 
-	updateBlockString("return");
+	__END_CURRENT_BLOCK__					// Sort of a hack, as this will be the last statement of the function,
+											// all the array pointers need to be freed before 'return expr;'.
 
-	Tree* pReturnStmtNode = makeLeaf(ASTNodeType::ASTNode_RETURNSTMT, "return");
+		__START_BLOCK_STRING__("return")
+
+		Tree* pReturnStmtNode = makeLeaf(ASTNodeType::ASTNode_RETURNSTMT, "return");
 	{
 		pReturnStmtNode->m_pParentNode = m_pASTCurrentNode;
 	}
@@ -870,9 +915,9 @@ bool TinyCReader::returnStatement() {
 	if (!expr())
 		return false;
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+		m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 	pReturnStmtNode->addChild(pExpressionLeftLeaf);
 
 	m_pASTCurrentNode = pTemp;
@@ -1011,9 +1056,9 @@ bool TinyCReader::ifStatement() {
 	if (!GrammerUtils::match('(', MANDATORY))
 		return false;
 
-	updateBlockString("if");
+	__START_BLOCK_STRING__("if")
 
-	Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, "if");
+		Tree* pIfNode = makeLeaf(ASTNodeType::ASTNode_IF, "if");
 	{
 		pIfNode->m_pParentNode = m_pASTCurrentNode;
 	}
@@ -1055,18 +1100,18 @@ bool TinyCReader::ifStatement() {
 	}
 
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	if (!elseStatement()) {
-	}
-	else {
-	}
+		if (!elseStatement()) {
+		}
+		else {
+		}
 
 
-	m_pASTCurrentNode = pTemp;
-	m_pASTCurrentNode->addChild(pIfNode);
+		m_pASTCurrentNode = pTemp;
+		m_pASTCurrentNode->addChild(pIfNode);
 
-	return true;
+		return true;
 
 }
 
@@ -1074,9 +1119,9 @@ bool TinyCReader::elseStatement() {
 	if (!GrammerUtils::match("else", MANDATORY))
 		return false;
 
-	updateBlockString("else");
+	__START_BLOCK_STRING__("else")
 
-	Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
+		Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
 	Tree* pIfNode = nullptr;
 	{
 		pIfNode = m_pASTCurrentNode;
@@ -1104,9 +1149,9 @@ bool TinyCReader::elseStatement() {
 	}
 
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	pIfNode->m_pRightNode = pElseNode;
+		pIfNode->m_pRightNode = pElseNode;
 	{
 		m_pASTCurrentNode = pIfNode;
 	}
@@ -1121,9 +1166,9 @@ bool TinyCReader::whileStatement() {
 	if (!GrammerUtils::match('(', MANDATORY))
 		return false;
 
-	updateBlockString("while");
+	__START_BLOCK_STRING__("while")
 
-	Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
+		Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
 	{
 		pWhileNode->m_pParentNode = m_pASTCurrentNode;
 	}
@@ -1165,9 +1210,9 @@ bool TinyCReader::whileStatement() {
 	}
 
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	m_pASTCurrentNode = pTemp;
+		m_pASTCurrentNode = pTemp;
 	m_pASTCurrentNode->addChild(pWhileNode);
 
 	return true;
@@ -1180,9 +1225,9 @@ bool TinyCReader::switchStatement() {
 	if (!GrammerUtils::match('(', MANDATORY))
 		return false;
 
-	updateBlockString("switch");
+	__START_BLOCK_STRING__("switch")
 
-	Tree* pTemp = nullptr;
+		Tree* pTemp = nullptr;
 	Tree* pSwitchNode = makeLeaf(ASTNodeType::ASTNode_SWITCH, "switch");
 	{
 		pSwitchNode->m_pParentNode = m_pASTCurrentNode;
@@ -1202,9 +1247,9 @@ bool TinyCReader::switchStatement() {
 	if (!GrammerUtils::match('}', MANDATORY))
 		return false;
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	m_pASTCurrentNode = pTemp;
+		m_pASTCurrentNode = pTemp;
 	m_pASTCurrentNode->addChild(pSwitchNode);
 
 	return true;
@@ -1271,9 +1316,9 @@ bool TinyCReader::switchCase() {
 	if (!GrammerUtils::match(TokenType::Type::TK_INTEGER, MANDATORY))
 		return false;
 
-	updateBlockString("switchcase");
+	__START_BLOCK_STRING__("switchcase")
 
-	Tree* pTemp = nullptr;
+		Tree* pTemp = nullptr;
 	Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
 	m_pASTCurrentNode->addChild(pSwitchCaseNode);
 	{
@@ -1316,8 +1361,8 @@ bool TinyCReader::switchCase() {
 	}
 
 
-	removeLastFromBlockString();
-	m_pASTCurrentNode = pTemp;
+	__END_CURRENT_BLOCK__
+		m_pASTCurrentNode = pTemp;
 
 	return true;
 
@@ -1327,9 +1372,9 @@ bool TinyCReader::defaultCase() {
 	if (!GrammerUtils::match("default", MANDATORY))
 		return false;
 
-	updateBlockString("switchcase");
+	__START_BLOCK_STRING__("switchcase")
 
-	Tree* pTemp = nullptr;
+		Tree* pTemp = nullptr;
 	Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
 	m_pASTCurrentNode->addChild(pSwitchDefaultNode);
 	{
@@ -1358,8 +1403,8 @@ bool TinyCReader::defaultCase() {
 	}
 
 
-	removeLastFromBlockString();
-	m_pASTCurrentNode = pTemp;
+	__END_CURRENT_BLOCK__
+		m_pASTCurrentNode = pTemp;
 
 	if (!GrammerUtils::match("break", MANDATORY))
 		return false;
@@ -1375,105 +1420,105 @@ bool TinyCReader::forStatement() {
 	if (!GrammerUtils::match('(', MANDATORY))
 		return false;
 
-	updateBlockString("for");
+	__START_BLOCK_STRING__("for")
 
-	////////////////////////////////
-	// for ( init-expression ; cond-expression ; loop-expression ) 
-	// {
-	//		statement;
-	// }
-	////////////////////////////////
-	// init-expression;
-	// while(cond-expression)
-	// {
-	//   	...
-	//		...
-	//		loop-expression
-	// }
-	////////////////////////////////
-	// A "for" loop is an extended "while" loop where:
-	// 		- The "init-expression" list forms a set of statements before the "while" block.
-	//		- The "cond-expression" forms the "cond-expression" of the "while" block.
-	//		- And the "loop-expression" are the set of statements that are at the tail-end of the "while" block.
-	////////////////////////////////
+		////////////////////////////////
+		// for ( init-expression ; cond-expression ; loop-expression ) 
+		// {
+		//		statement;
+		// }
+		////////////////////////////////
+		// init-expression;
+		// while(cond-expression)
+		// {
+		//   	...
+		//		...
+		//		loop-expression
+		// }
+		////////////////////////////////
+		// A "for" loop is an extended "while" loop where:
+		// 		- The "init-expression" list forms a set of statements before the "while" block.
+		//		- The "cond-expression" forms the "cond-expression" of the "while" block.
+		//		- And the "loop-expression" are the set of statements that are at the tail-end of the "while" block.
+		////////////////////////////////
 
-	if (!oneOrMoreInitExprs()) {
-	}
-	else {
-	}
+		if (!oneOrMoreInitExprs()) {
+		}
+		else {
+		}
 
-	if (!GrammerUtils::match(';', MANDATORY))
-		return false;
+		if (!GrammerUtils::match(';', MANDATORY))
+			return false;
 
-	Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
-	{
-		pWhileNode->m_pParentNode = m_pASTCurrentNode;
-	}
+		Tree* pWhileNode = makeLeaf(ASTNodeType::ASTNode_WHILE, "while");
+		{
+			pWhileNode->m_pParentNode = m_pASTCurrentNode;
+		}
 
-	Tree* pTemp = nullptr;
-	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
-	{
-		pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
-		pExpressionLeftLeaf->m_pParentNode = pWhileNode;
+		Tree* pTemp = nullptr;
+		Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+		{
+			pWhileNode->m_pLeftNode = pExpressionLeftLeaf;
+			pExpressionLeftLeaf->m_pParentNode = pWhileNode;
 
-		pTemp = m_pASTCurrentNode;
-		m_pASTCurrentNode = pExpressionLeftLeaf;
-	}
+			pTemp = m_pASTCurrentNode;
+			m_pASTCurrentNode = pExpressionLeftLeaf;
+		}
 
-	if (!expr())
-		return false;
+		if (!expr())
+			return false;
 
-	m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
+		m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 
-	if (!GrammerUtils::match(';', MANDATORY))
-		return false;
+		if (!GrammerUtils::match(';', MANDATORY))
+			return false;
 
-	Tree* pFor_LoopExpressionsLeaf = makeLeaf(ASTNodeType::ASTNode_INVALID, "");
-	{
-		pFor_LoopExpressionsLeaf->m_pParentNode = pWhileNode;
-		m_pASTCurrentNode = pFor_LoopExpressionsLeaf;
-	}
+		Tree* pFor_LoopExpressionsLeaf = makeLeaf(ASTNodeType::ASTNode_INVALID, "");
+		{
+			pFor_LoopExpressionsLeaf->m_pParentNode = pWhileNode;
+			m_pASTCurrentNode = pFor_LoopExpressionsLeaf;
+		}
 
-	if (!oneOrMoreLoopExprs()) {
-	}
-	else {
-	}
+		if (!oneOrMoreLoopExprs()) {
+		}
+		else {
+		}
 
-	if (!GrammerUtils::match(')', MANDATORY))
-		return false;
+		if (!GrammerUtils::match(')', MANDATORY))
+			return false;
 
-	m_pASTCurrentNode = pWhileNode;
+		m_pASTCurrentNode = pWhileNode;
 
-	if (!GrammerUtils::match('{', OPTIONAL)) {
+		if (!GrammerUtils::match('{', OPTIONAL)) {
 
-	}
+		}
 
-	else {
+		else {
 
-	}
+		}
 
-	if (!stmt_list())
-		return false;
-	if (!GrammerUtils::match('}', OPTIONAL)) {
+		if (!stmt_list())
+			return false;
+		if (!GrammerUtils::match('}', OPTIONAL)) {
 
-	}
+		}
 
-	else {
+		else {
 
-	}
+		}
 
 
-	removeLastFromBlockString();
+		__END_CURRENT_BLOCK__
 
-	for (Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
-	{
-		pWhileNode->addChild(pLoopExpr);
-	}
+			for (Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
+			{
+				pWhileNode->addChild(pLoopExpr);
+			}
 
-	m_pASTCurrentNode = pTemp;
-	m_pASTCurrentNode->addChild(pWhileNode);
+		m_pASTCurrentNode = pTemp;
+		m_pASTCurrentNode->addChild(pWhileNode);
 
-	return true;
+		return true;
 
 }
 
@@ -1698,16 +1743,16 @@ bool TinyCReader::bracesstmtlist() {
 	if (!GrammerUtils::match('{', MANDATORY))
 		return false;
 
-	updateBlockString("{");
+	__START_BLOCK_STRING__("{")
 
-	if (!stmt_list())
-		return false;
+		if (!stmt_list())
+			return false;
 	if (!GrammerUtils::match('}', MANDATORY))
 		return false;
 
-	removeLastFromBlockString();
+	__END_CURRENT_BLOCK__
 
-	return true;
+		return true;
 
 }
 
@@ -1890,6 +1935,9 @@ bool TinyCReader::primArray() {
 
 	if (!GrammerUtils::match('[', MANDATORY))
 		return false;
+
+	if (m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
+		pushLocalHeapVar(sFullyQualifiedVariableName);
 
 	ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPEARRAY;
 	Tree* pPrimTypeArrayNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
