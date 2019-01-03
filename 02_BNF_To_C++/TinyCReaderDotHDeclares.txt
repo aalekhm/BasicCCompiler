@@ -22,6 +22,9 @@
 		void						pushLocalHeapVar(std::string sVariableName);
 		void						startBlockMarker();
 		void						endBlockMarker();
+		
+		E_VARIABLESCOPE 			getCurrentScope();
+		std::string 				getCurrentScopeString();
 	protected:
 		
 	private:
@@ -34,3 +37,5 @@
 		Tree*						m_pASTCurrentNode;
 		
 		std::vector<std::string>	m_sBlockStringList;
+		bool						m_bStructInProcess;
+		bool						m_bFunctionInProcess;

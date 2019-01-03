@@ -9,7 +9,15 @@
 	removeLastFromBlockString(); \
 	endBlockMarker(); \
 
+#define __START_STRUCT__ m_bStructInProcess = true;
+#define __END_STRUCT__ m_bStructInProcess = false;
+
+#define __START_FUNCTION__ m_bFunctionInProcess = true;
+#define __END_FUNCTION__ m_bFunctionInProcess = false;
+	
 TinyCReader::TinyCReader()
+: m_bStructInProcess(false)
+, m_bFunctionInProcess(false)
 {
 	GrammerUtils::init();
 }
@@ -427,4 +435,38 @@ void TinyCReader::endBlockMarker()
 			}
 		}
 	}
+}
+
+E_VARIABLESCOPE TinyCReader::getCurrentScope()
+{
+	E_VARIABLESCOPE eCurrentScope = E_VARIABLESCOPE::INVALID;
+	if (m_bStructInProcess)
+	{
+		if (m_bFunctionInProcess)
+		{
+			eCurrentScope = E_VARIABLESCOPE::LOCAL;
+		}
+		else
+		{
+			eCurrentScope = E_VARIABLESCOPE::MEMBER;
+		}
+	}
+	else
+	{
+		if (m_bFunctionInProcess)
+		{
+			eCurrentScope = E_VARIABLESCOPE::LOCAL;
+		}
+		else
+		{
+			eCurrentScope = E_VARIABLESCOPE::STATIC;
+		}
+	}
+
+	return eCurrentScope;
+}
+
+std::string TinyCReader::getCurrentScopeString()
+{
+	return toString(getCurrentScope());
 }

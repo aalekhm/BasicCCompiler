@@ -2279,17 +2279,17 @@ void GrammerUtils::handleFree(Tree* pNode)
 			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
 			EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
 																					
-			// 2. Free the pointer itself first before calling the 'Destructor'
-			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
-
-			// 3. Call the 'Destructor' by creating a Dummy Destructor under the "free" ASTNode.
+			// 2. Call the 'Destructor' by creating a Dummy Destructor under the "free" ASTNode.
 			std::string sDestructor = "#" + sType;
 			Tree* pDefaultDestructor = createFunctionCallWithNoArguments(sDestructor.c_str());
 			pNode->addChild(pDefaultDestructor);
 
 			populateCode(pDefaultDestructor);
 
-			// 4. Clear off 'ECX'
+			// 3. Free the pointer itself that holds 'this' object.
+			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
+
+			// 4. Clear off 'ECX' that hols the address of 'this'
 			EMIT_1(OPCODE::PUSH, 0);
 			EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
 		}

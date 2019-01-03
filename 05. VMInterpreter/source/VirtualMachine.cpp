@@ -16,7 +16,7 @@ enum class PRIMIIVETYPE
 	INT_64
 };
 
-enum class E_VARIABLETYPE
+enum class E_VARIABLESCOPE
 {
 	INVALID = -1,
 	ARGUMENT,
@@ -802,20 +802,20 @@ int32_t VirtualMachine::getAddressOf(int32_t iVariable)
 {
 	int32_t iAddress = 0;
 	int16_t iVariablePos = (iVariable & 0x0000FFFF);
-	E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
+	E_VARIABLESCOPE eVariableType = (E_VARIABLESCOPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
 
 	// Local Var or Function Argument ==> saved on the STACK
-	if (eVariableType == E_VARIABLETYPE::ARGUMENT
+	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||
-		eVariableType == E_VARIABLETYPE::LOCAL
+		eVariableType == E_VARIABLESCOPE::LOCAL
 	) {
-		if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+		if (eVariableType == E_VARIABLESCOPE::ARGUMENT)
 			iVariablePos *= -1;
 
 		iAddress = STACK[REGS.RBP - iVariablePos];
 	}
 	else
-	if (eVariableType == E_VARIABLETYPE::MEMBER)
+	if (eVariableType == E_VARIABLESCOPE::MEMBER)
 	{
 		iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
 	}
@@ -831,20 +831,20 @@ int32_t VirtualMachine::getValueIn(int32_t iVariable)
 {
 	int32_t iValue = 0;
 	int16_t iVariablePos = (iVariable & 0x0000FFFF);
-	E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
+	E_VARIABLESCOPE eVariableType = (E_VARIABLESCOPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
 
 	// Local Var or Function Argument ==> saved on the STACK
-	if (eVariableType == E_VARIABLETYPE::ARGUMENT
+	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||
-		eVariableType == E_VARIABLETYPE::LOCAL
+		eVariableType == E_VARIABLESCOPE::LOCAL
 	) {
-		if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+		if (eVariableType == E_VARIABLESCOPE::ARGUMENT)
 			iVariablePos *= -1;
 
 		iValue = STACK[REGS.RBP - iVariablePos];
 	}
 	else
-	if (eVariableType == E_VARIABLETYPE::MEMBER)
+	if (eVariableType == E_VARIABLESCOPE::MEMBER)
 	{
 		int32_t iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
 		int32_t* pIntPtr = (int32_t*)(HEAP + iAddress);
@@ -861,20 +861,20 @@ int32_t VirtualMachine::getValueIn(int32_t iVariable)
 void VirtualMachine::storeValueFromStackIn(int32_t iVariable)
 {
 	int16_t iVariablePos = (iVariable & 0x0000FFFF);
-	E_VARIABLETYPE eVariableType = (E_VARIABLETYPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
+	E_VARIABLESCOPE eVariableType = (E_VARIABLESCOPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
 
 	// Local Var or Function Argument ==> saved on the STACK
-	if (eVariableType == E_VARIABLETYPE::ARGUMENT
+	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||
-		eVariableType == E_VARIABLETYPE::LOCAL
+		eVariableType == E_VARIABLESCOPE::LOCAL
 	) {
-		if (eVariableType == E_VARIABLETYPE::ARGUMENT)
+		if (eVariableType == E_VARIABLESCOPE::ARGUMENT)
 			iVariablePos *= -1;
 
 		STACK[REGS.RBP - iVariablePos] = STACK[REGS.RSP++];
 	}
 	else
-	if (eVariableType == E_VARIABLETYPE::MEMBER)
+	if (eVariableType == E_VARIABLESCOPE::MEMBER)
 	{
 		int32_t* iIntPtr = (int32_t*)(HEAP + REGS.RCX);
 		iIntPtr += iVariablePos;

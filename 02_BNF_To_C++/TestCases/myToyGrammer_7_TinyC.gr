@@ -16,6 +16,7 @@
 <structDeclaration>				::		"struct"
 										TK_IDENTIFIER
 															"<code>"
+																__START_STRUCT__
 																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
 																__START_BLOCK_STRING__(sStructName)
 																
@@ -33,6 +34,7 @@
 															"</code>"
 											{ <structObjectList> [';'] }
 										'}'					"<code>"
+																__END_STRUCT__
 																__END_CURRENT_BLOCK__
 																
 																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
@@ -75,6 +77,8 @@
 																Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
 																pStaticPtrNode->m_bIsPointerType = true;
 																pStaticPtrNode->setAdditionalInfo("type", sPointerType);
+																pStaticPtrNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::STATIC));
+																
 																m_pASTCurrentNode->addChild(pStaticPtrNode);
 																FunctionInfo::addStaticVariable(pStaticPtrNode);
 															"</code>"
@@ -84,6 +88,7 @@
 																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
 															"</code>"
 										TK_FUNCTIONCALL		"<code>"
+																__START_FUNCTION__
 																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
 																__START_BLOCK_STRING__(sFunctionName)
 																
@@ -121,6 +126,7 @@
 															"</code>"
 										<stmt_list>
 										'}'					"<code>"
+																__END_FUNCTION__
 																__END_CURRENT_BLOCK__
 																
 																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
@@ -148,6 +154,7 @@
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sArgName);
 																	pPrimIntNode->setAdditionalInfo("type", sType);
+																	pPrimIntNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::ARGUMENT));
 																	
 																	m_pASTCurrentNode->addChild(pPrimIntNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
@@ -713,6 +720,7 @@
 																	pStructPtrNode->m_sAdditionalInfo.append(sVariableName);
 																	pStructPtrNode->m_bIsPointerType = true;
 																	pStructPtrNode->setAdditionalInfo("type", sStructType);
+																	pStructPtrNode->setAdditionalInfo("scope", getCurrentScopeString());
 																	pStructPtrNode->m_pParentNode = m_pASTCurrentNode;
 																	
 																	pTemp = m_pASTCurrentNode;
@@ -775,7 +783,9 @@
 															pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 															pPrimPtrNode->m_bIsPointerType = true;
 															pPrimPtrNode->setAdditionalInfo("type", sPointerType);
+															pPrimPtrNode->setAdditionalInfo("scope", getCurrentScopeString());
 															pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
+															
 															m_pASTCurrentNode = pPrimPtrNode;
 														}
 													"</code>"													
@@ -816,6 +826,7 @@
 																	pPrimTypeArrayNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimTypeArrayNode->m_bIsPointerType = true;
 																	pPrimTypeArrayNode->setAdditionalInfo("type", sPrimitiveType);
+																	pPrimTypeArrayNode->setAdditionalInfo("scope", getCurrentScopeString());
 																	pPrimTypeArrayNode->m_pParentNode = m_pASTCurrentNode;
 																}
 															"</code>"
@@ -881,6 +892,7 @@
 																
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimIntNode->setAdditionalInfo("type", sPrimitiveType);
+																	pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
 																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																	
 																	m_pASTCurrentNode = pPrimIntNode;
@@ -1172,6 +1184,7 @@
 																	{
 																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 																		pPrimIntNode->setAdditionalInfo("type", "int32_t");
+																		pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
 																		pBlockNode->addChild(pPrimIntNode);
 																	}
 																	
@@ -1187,6 +1200,8 @@
 															"</code>"
 											|
 											<tk_identifier>
+											|
+											<tkStructMember>
 											| 
 											TK_INTEGER		"<code>"
 																sOperand = GrammerUtils::m_pPrevToken.getText();
@@ -1218,6 +1233,10 @@
 																m_vPostFix.push_back(sOperand);
 															"</code>"
 										);
+										
+<tkStructMember>				::=		TK_IDENTIFIER
+										"->"
+										TK_IDENTIFIER;
 										
 <unary_expr>					::=		<unary_oper> <expr>;
 

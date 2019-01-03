@@ -36,6 +36,7 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back(">=");
 			GrammerUtils::m_vKeywords.push_back("<<");
 			GrammerUtils::m_vKeywords.push_back(">>");
+			GrammerUtils::m_vKeywords.push_back("->");
 		}
 
 		bool def();
@@ -119,6 +120,7 @@ class TinyCReader {
 		bool primary();
 		bool operands();
 		bool tk_identifier();
+		bool tkStructMember();
 		bool unary_expr();
 		bool unary_oper();
 		bool preFixInExpr();
@@ -150,6 +152,9 @@ class TinyCReader {
 		void						pushLocalHeapVar(std::string sVariableName);
 		void						startBlockMarker();
 		void						endBlockMarker();
+		
+		E_VARIABLESCOPE 			getCurrentScope();
+		std::string 				getCurrentScopeString();
 	protected:
 		
 	private:
@@ -162,5 +167,7 @@ class TinyCReader {
 		Tree*						m_pASTCurrentNode;
 		
 		std::vector<std::string>	m_sBlockStringList;
+		bool						m_bStructInProcess;
+		bool						m_bFunctionInProcess;
 
 };

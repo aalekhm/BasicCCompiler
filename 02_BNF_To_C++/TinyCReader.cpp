@@ -9,7 +9,15 @@
 	removeLastFromBlockString(); \
 	endBlockMarker(); \
 
+#define __START_STRUCT__ m_bStructInProcess = true;
+#define __END_STRUCT__ m_bStructInProcess = false;
+
+#define __START_FUNCTION__ m_bFunctionInProcess = true;
+#define __END_FUNCTION__ m_bFunctionInProcess = false;
+	
 TinyCReader::TinyCReader()
+: m_bStructInProcess(false)
+, m_bFunctionInProcess(false)
 {
 	GrammerUtils::init();
 }
@@ -429,6 +437,40 @@ void TinyCReader::endBlockMarker()
 	}
 }
 
+E_VARIABLESCOPE TinyCReader::getCurrentScope()
+{
+	E_VARIABLESCOPE eCurrentScope = E_VARIABLESCOPE::INVALID;
+	if (m_bStructInProcess)
+	{
+		if (m_bFunctionInProcess)
+		{
+			eCurrentScope = E_VARIABLESCOPE::LOCAL;
+		}
+		else
+		{
+			eCurrentScope = E_VARIABLESCOPE::MEMBER;
+		}
+	}
+	else
+	{
+		if (m_bFunctionInProcess)
+		{
+			eCurrentScope = E_VARIABLESCOPE::LOCAL;
+		}
+		else
+		{
+			eCurrentScope = E_VARIABLESCOPE::STATIC;
+		}
+	}
+
+	return eCurrentScope;
+}
+
+std::string TinyCReader::getCurrentScopeString()
+{
+	return toString(getCurrentScope());
+}
+
 
 bool TinyCReader::def() {
 
@@ -472,6 +514,7 @@ return false;
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
+																__START_STRUCT__
 																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
 																__START_BLOCK_STRING__(sStructName)
 																
@@ -507,6 +550,7 @@ break;
 if(!GrammerUtils::match('}', MANDATORY))
 return false;
 
+																__END_STRUCT__
 																__END_CURRENT_BLOCK__
 																
 																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
@@ -592,6 +636,8 @@ return false;
 																Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
 																pStaticPtrNode->m_bIsPointerType = true;
 																pStaticPtrNode->setAdditionalInfo("type", sPointerType);
+																pStaticPtrNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::STATIC));
+																
 																m_pASTCurrentNode->addChild(pStaticPtrNode);
 																FunctionInfo::addStaticVariable(pStaticPtrNode);
 															
@@ -610,6 +656,7 @@ return false;
 if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
 return false;
 
+																__START_FUNCTION__
 																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
 																__START_BLOCK_STRING__(sFunctionName)
 																
@@ -659,6 +706,7 @@ return false;
 if(!GrammerUtils::match('}', MANDATORY))
 return false;
 
+																__END_FUNCTION__
 																__END_CURRENT_BLOCK__
 																
 																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
@@ -716,6 +764,7 @@ return false;
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sArgName);
 																	pPrimIntNode->setAdditionalInfo("type", sType);
+																	pPrimIntNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::ARGUMENT));
 																	
 																	m_pASTCurrentNode->addChild(pPrimIntNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
@@ -1784,6 +1833,7 @@ return false;
 																	pStructPtrNode->m_sAdditionalInfo.append(sVariableName);
 																	pStructPtrNode->m_bIsPointerType = true;
 																	pStructPtrNode->setAdditionalInfo("type", sStructType);
+																	pStructPtrNode->setAdditionalInfo("scope", getCurrentScopeString());
 																	pStructPtrNode->m_pParentNode = m_pASTCurrentNode;
 																	
 																	pTemp = m_pASTCurrentNode;
@@ -1880,7 +1930,9 @@ return false;
 															pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 															pPrimPtrNode->m_bIsPointerType = true;
 															pPrimPtrNode->setAdditionalInfo("type", sPointerType);
+															pPrimPtrNode->setAdditionalInfo("scope", getCurrentScopeString());
 															pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
+															
 															m_pASTCurrentNode = pPrimPtrNode;
 														}
 													
@@ -1948,6 +2000,7 @@ return false;
 																	pPrimTypeArrayNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimTypeArrayNode->m_bIsPointerType = true;
 																	pPrimTypeArrayNode->setAdditionalInfo("type", sPrimitiveType);
+																	pPrimTypeArrayNode->setAdditionalInfo("scope", getCurrentScopeString());
 																	pPrimTypeArrayNode->m_pParentNode = m_pASTCurrentNode;
 																}
 															
@@ -2049,6 +2102,7 @@ return false;
 																
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimIntNode->setAdditionalInfo("type", sPrimitiveType);
+																	pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
 																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																	
 																	m_pASTCurrentNode = pPrimIntNode;
@@ -2641,6 +2695,7 @@ if(functionCall()) {
 																	{
 																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 																		pPrimIntNode->setAdditionalInfo("type", "int32_t");
+																		pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
 																		pBlockNode->addChild(pPrimIntNode);
 																	}
 																	
@@ -2658,6 +2713,10 @@ return true;
 }
 else
 if(tk_identifier()) {
+return true;
+}
+else
+if(tkStructMember()) {
 return true;
 }
 else
@@ -2712,6 +2771,17 @@ return true;
 else
 return false;
 
+return true;
+
+}
+
+bool TinyCReader::tkStructMember() {
+if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+return false;
+if(!GrammerUtils::match("->", MANDATORY))
+return false;
+if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+return false;
 return true;
 
 }

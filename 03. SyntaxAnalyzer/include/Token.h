@@ -1,7 +1,10 @@
 #pragma once
+
 #include <string>
 #include <map>
 #include <assert.h>
+
+#define NOT !
 
 namespace TokenType
 {
@@ -466,7 +469,10 @@ typedef struct Tree
 		, m_sText("")
 		, m_sAdditionalInfo("")
 		, m_bIsPointerType(false)
-	{}
+	{
+		// Reset the "variablePos" info to "-1"
+		setAdditionalInfo("variablePos", "-1");
+	}
 
 	void addChild(Tree* pNode)
 	{
@@ -518,7 +524,6 @@ typedef struct Tree
 		std::map<std::string, std::string>::const_iterator itr = m_MapAdditionalInfo.find(sKey);
 		if (itr != m_MapAdditionalInfo.end())
 		{
-			//itr->second = sValue;
 			m_MapAdditionalInfo[sKey] = sValue;
 		}
 		else
@@ -554,7 +559,7 @@ typedef struct Tree
 	std::map<std::string, std::string>	m_MapAdditionalInfo;
 } Tree;
 
-enum class E_VARIABLETYPE
+enum class E_VARIABLESCOPE
 {
 	INVALID = -1,
 	ARGUMENT,
@@ -562,6 +567,40 @@ enum class E_VARIABLETYPE
 	STATIC,
 	MEMBER
 };
+
+static std::string toString(E_VARIABLESCOPE eE_VARIABLESCOPE)
+{
+	std::string sE_VARIABLESCOPE = "";
+	switch (eE_VARIABLESCOPE)
+	{
+		case E_VARIABLESCOPE::INVALID:
+			sE_VARIABLESCOPE = "INVALID";
+		break;
+		case E_VARIABLESCOPE::ARGUMENT:
+			sE_VARIABLESCOPE = "ARGUMENT";
+		break;
+		case E_VARIABLESCOPE::LOCAL:
+			sE_VARIABLESCOPE = "LOCAL";
+		break;
+		case E_VARIABLESCOPE::STATIC:
+			sE_VARIABLESCOPE = "STATIC";
+		break;
+		case E_VARIABLESCOPE::MEMBER:
+			sE_VARIABLESCOPE = "MEMBER";
+		break;
+	}
+
+	return sE_VARIABLESCOPE;
+}
+
+static E_VARIABLESCOPE toScope(std::string sE_VARIABLESCOPE)
+{
+	if (sE_VARIABLESCOPE == "INVALID") return E_VARIABLESCOPE::INVALID;
+	else if (sE_VARIABLESCOPE == "ARGUMENT") return E_VARIABLESCOPE::ARGUMENT;
+	else if (sE_VARIABLESCOPE == "LOCAL") return E_VARIABLESCOPE::LOCAL;
+	else if (sE_VARIABLESCOPE == "STATIC") return E_VARIABLESCOPE::STATIC;
+	else if (sE_VARIABLESCOPE == "MEMBER") return E_VARIABLESCOPE::MEMBER;
+}
 
 typedef struct StructInfo
 {
@@ -628,6 +667,8 @@ typedef struct StructInfo
 	bool									m_bHasDestructor;
 } StructInfo;
 
+static std::map<std::string, Tree*>		m_MapVariableToASTNodeCache;
+
 typedef struct FunctionInfo
 {
 	FunctionInfo(Tree* pNode, int iOffset)
@@ -687,133 +728,132 @@ typedef struct FunctionInfo
 		}
 	}
 
+	Tree* getVariableASTNode(const char* sVariableName)
+	{
+		Tree* pASTNode = nullptr;
+		std::map<std::string, Tree*>::const_iterator itr = m_MapVariableToASTNodeCache.find(sVariableName);
+		if (itr != m_MapVariableToASTNodeCache.end())
+		{
+			pASTNode = m_MapVariableToASTNodeCache[sVariableName];
+		}
+		else
+		{
+			short iShortPosition = 0;
+			bool bFound = false;
+
+			// Check for 'Locals'
+			for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
+			{
+				iShortPosition++;
+				if (pLocalVar->m_sText == sVariableName)
+				{
+					pASTNode = pLocalVar;
+					bFound = true;
+					break;
+				}
+			}
+
+			// Check for 'Arguments'
+			if (NOT bFound)
+			{
+				iShortPosition = 0;
+				for (Tree* pArgVar : m_vArguments) // Starts with index 0
+				{
+					if (pArgVar->m_sText == sVariableName)
+					{
+						pASTNode = pArgVar;
+						bFound = true;
+						break;
+					}
+
+					iShortPosition++;
+				}
+			}
+
+			// Check for 'Member Variables'
+			if (NOT bFound && m_pParentStructInfo != nullptr)
+			{
+				iShortPosition = 0;
+				for (Tree* pMemberVar : m_pParentStructInfo->m_vMemberVariables) // Starts with index 0
+				{
+					if (pMemberVar->m_sText == sVariableName)
+					{
+						pASTNode = pMemberVar;
+						bFound = true;
+						break;
+					}
+
+					iShortPosition++;
+				}
+			}
+
+			// Check for 'Static'
+			if (NOT bFound)
+			{
+				iShortPosition = 0;
+				for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
+				{
+					if (pStaticVar->m_sText == sVariableName)
+					{
+						pASTNode = pStaticVar;
+						break;
+					}
+
+					iShortPosition++;
+				}
+			}
+
+			assert(pASTNode != nullptr);
+			if (pASTNode != nullptr)
+			{
+				// While scanning for the variable, find its position in the respective block & set it.
+				std::string sVariablePos = pASTNode->getAdditionalInfoFor("variablePos");
+				if (sVariablePos == "-1")
+				{
+					char sVariablePosFound[255] = { 0 };
+					_itoa(iShortPosition, sVariablePosFound, 10);
+					pASTNode->setAdditionalInfo("variablePos", sVariablePosFound);
+				}
+
+				m_MapVariableToASTNodeCache[sVariableName] = pASTNode;
+			}
+		}
+
+		return pASTNode;
+	}
+
 	int32_t getLocalVariablePosition(const char* sLocalVariableName)
 	{
-		short iShortPosition = 0;
-		E_VARIABLETYPE eVariableType = E_VARIABLETYPE::INVALID;
-
-		// Check for 'Locals'
-		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
+		int32_t iPositionOperand = 0;
+		
+		Tree* pASTNode = getVariableASTNode(sLocalVariableName);
+		assert(pASTNode != nullptr);
+		if (pASTNode != nullptr)
 		{
-			iShortPosition++;
-			if (pLocalVar->m_sText == sLocalVariableName)
-			{
-				eVariableType = E_VARIABLETYPE::LOCAL;
-				break;
-			}
+			std::string sVariablePos = pASTNode->getAdditionalInfoFor("variablePos");
+			short iShortPosition = atoi(sVariablePos.c_str());
+
+			E_VARIABLESCOPE eVARIABLESCOPE = E_VARIABLESCOPE::INVALID;
+			eVARIABLESCOPE = toScope(pASTNode->getAdditionalInfoFor("scope"));
+			assert(eVARIABLESCOPE != E_VARIABLESCOPE::INVALID);
+
+			iPositionOperand = (int32_t)eVARIABLESCOPE;
+			iPositionOperand <<= sizeof(int16_t) * 8;
+			iPositionOperand |= (iShortPosition & 0x0000FFFF);
 		}
 
-		// Check for 'Arguments'
-		if (eVariableType == E_VARIABLETYPE::INVALID)
-		{
-			iShortPosition = 0;
-			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
-			{
-				if (pLocalVar->m_sText == sLocalVariableName)
-				{
-					eVariableType = E_VARIABLETYPE::ARGUMENT;
-					break;
-				}
-				iShortPosition++;
-			}
-		}
-
-		// Check for 'Member Variables'
-		if (eVariableType == E_VARIABLETYPE::INVALID && m_pParentStructInfo != nullptr)
-		{
-			iShortPosition = 0;
-			for (Tree* pMemberVar : m_pParentStructInfo->m_vMemberVariables) // Starts with index 0
-			{
-				if (pMemberVar->m_sText == sLocalVariableName)
-				{
-					eVariableType = E_VARIABLETYPE::MEMBER;
-					break;
-				}
-				iShortPosition++;
-			}
-		}
-
-		// Check for 'Static'
-		if (eVariableType == E_VARIABLETYPE::INVALID)
-		{
-			iShortPosition = 0;
-			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
-			{
-				if (pStaticVar->m_sText == sLocalVariableName)
-				{
-					eVariableType = E_VARIABLETYPE::STATIC;
-					break;
-				}
-				iShortPosition++;
-			}
-		}
-
-		assert(eVariableType != E_VARIABLETYPE::INVALID);
-
-		int32_t iPosition = 0;
-
-		iPosition = (int32_t)eVariableType;
-		iPosition <<= sizeof(int16_t) * 8;
-		iPosition |= (iShortPosition & 0x0000FFFF);
-
-		return iPosition;
+		return iPositionOperand;
 	}
 
 	std::string getVariableNodeType(const char* sLocalVariableName)
 	{
 		std::string sType;
-		bool bFound = false;
 
-		// Check for 'Locals'
-		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
+		Tree* pVariableASTNode = getVariableASTNode(sLocalVariableName);
+		assert(pVariableASTNode != nullptr);
+		if (pVariableASTNode != nullptr)
 		{
-			if (pLocalVar->m_sText == sLocalVariableName)
-			{
-				sType = pLocalVar->getAdditionalInfoFor("type");
-				bFound = true;
-				break;
-			}
-		}
-
-		// Check for 'Arguments'
-		if (!bFound)
-		{
-			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
-			{
-				if (pLocalVar->m_sText == sLocalVariableName)
-				{
-					sType = pLocalVar->getAdditionalInfoFor("type");
-					bFound = true;
-					break;
-				}
-			}
-		}
-
-		// Check for 'Member Variables'
-		if (!bFound && m_pParentStructInfo != nullptr)
-		{
-			for (Tree* pMemberVar : m_pParentStructInfo->m_vMemberVariables) // Starts with index 0
-			{
-				if (pMemberVar->m_sText == sLocalVariableName)
-				{
-					sType = pMemberVar->getAdditionalInfoFor("type");
-					bFound = true;
-					break;
-				}
-			}
-		}
-
-		// Check for 'Static'
-		if (!bFound)
-		{
-			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
-			{
-				if (pStaticVar->m_sText == sLocalVariableName)
-				{
-					sType = pStaticVar->getAdditionalInfoFor("type");
-					break;
-				}
-			}
+			sType = pVariableASTNode->getAdditionalInfoFor("type");
 		}
 
 		return sType;
@@ -821,62 +861,14 @@ typedef struct FunctionInfo
 
 	bool IsVariableAPointerType(const char* sLocalVariableName)
 	{
-		bool bIsPointerType = false, bFound = false;
+		bool bIsPointerType = false;
 
-		// Check for 'Locals'
-		for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
+		Tree* pVariableASTNode = getVariableASTNode(sLocalVariableName);
+		assert(pVariableASTNode != nullptr);
+		if (pVariableASTNode != nullptr)
 		{
-			if (pLocalVar->m_sText == sLocalVariableName)
-			{
-				bIsPointerType = pLocalVar->m_bIsPointerType;
-				bFound = true;
-				break;
-			}
+			bIsPointerType = pVariableASTNode->m_bIsPointerType;
 		}
-
-		// Check for 'Arguments'
-		if (!bFound)
-		{
-			for (Tree* pLocalVar : m_vArguments) // Starts with index 0
-			{
-				if (pLocalVar->m_sText == sLocalVariableName)
-				{
-					bIsPointerType = pLocalVar->m_bIsPointerType;
-					bFound = true;
-					break;
-				}
-			}
-		}
-
-		// Check for 'Member Variables'
-		if (!bFound && m_pParentStructInfo != nullptr)
-		{
-			for (Tree* pMemberVar : m_pParentStructInfo->m_vMemberVariables) // Starts with index 0
-			{
-				if (pMemberVar->m_sText == sLocalVariableName)
-				{
-					bIsPointerType = pMemberVar->m_bIsPointerType;
-					bFound = true;
-					break;
-				}
-			}
-		}
-
-		// Check for 'Static'
-		if (!bFound)
-		{
-			for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
-			{
-				if (pStaticVar->m_sText == sLocalVariableName)
-				{
-					bIsPointerType = pStaticVar->m_bIsPointerType;
-					bFound = true;
-					break;
-				}
-			}
-		}
-
-		assert(bFound);
 
 		return bIsPointerType;
 	}
