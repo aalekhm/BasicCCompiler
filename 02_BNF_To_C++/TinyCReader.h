@@ -36,7 +36,6 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back(">=");
 			GrammerUtils::m_vKeywords.push_back("<<");
 			GrammerUtils::m_vKeywords.push_back(">>");
-			GrammerUtils::m_vKeywords.push_back("->");
 		}
 
 		bool def();
@@ -96,6 +95,8 @@ class TinyCReader {
 		bool ptrAssign();
 		bool malloc();
 		bool assignmentDerefArray();
+		bool structMemberVariableAssignmentOrFunctionCall();
+		bool structMemberVariableLValueOrFunctionCall();
 		bool assignmentRHS();
 		bool freePtrStatement();
 		bool expr();
@@ -120,7 +121,9 @@ class TinyCReader {
 		bool primary();
 		bool operands();
 		bool tk_identifier();
-		bool tkStructMember();
+		bool structMemberAccess();
+		bool structMemberVariableOrFunctionCall_RValue();
+		bool structMemberFunctionCallInAnExpr();
 		bool unary_expr();
 		bool unary_oper();
 		bool preFixInExpr();
@@ -147,7 +150,7 @@ class TinyCReader {
 		bool						isValidType(std::string sType);
 		void 						addStructType(std::string sType);
 		bool 						isValidStructType(std::string sType);
-		bool 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
+		Tree* 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
 		
 		void						pushLocalHeapVar(std::string sVariableName);
 		void						startBlockMarker();

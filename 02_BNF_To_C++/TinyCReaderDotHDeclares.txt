@@ -17,7 +17,7 @@
 		bool						isValidType(std::string sType);
 		void 						addStructType(std::string sType);
 		bool 						isValidStructType(std::string sType);
-		bool 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
+		Tree* 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
 		
 		void						pushLocalHeapVar(std::string sVariableName);
 		void						startBlockMarker();

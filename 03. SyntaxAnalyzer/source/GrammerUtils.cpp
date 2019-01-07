@@ -240,6 +240,25 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			bProcessChildren = true;
 		}
 		break;
+		case ASTNodeType::ASTNode_MEMBERACCESS:
+		{
+			std::cout << pNode->m_sText << "->";
+			if (pNode->m_vStatements.size() > 0)
+			{
+				Tree* pFirstChild = pNode->m_vStatements[0];
+				if (pFirstChild != nullptr)
+				{
+					ASTNodeType eChilsASTNodeType = pFirstChild->m_eASTNodeType;
+					if (eChilsASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
+					{
+						printAST(pFirstChild, false);
+					}
+				}
+			}
+
+			bProcessChildren = false;
+		}
+		break;
 		case ASTNodeType::ASTNode_TYPESTATIC:
 		{
 			std::cout << "static ";
@@ -295,7 +314,10 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 				{
 					for (Tree* pChild : pExpressionNode->m_vStatements)
 					{
-						std::cout << pChild->m_sText << " ";
+						if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_MEMBERACCESS)
+							printAST(pChild, false);
+						else
+							std::cout << pChild->m_sText << " ";
 					}
 				}
 				else
@@ -377,6 +399,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		{
 			Tree* pIdentifierNode = pRightNode;
 			Tree* pExpressionNode = pLeftNode;
+			bool bPrintExpressionChilds = true;
 
 			// PreFix
 			if (pExpressionNode->m_pLeftNode != nullptr)
@@ -387,10 +410,33 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 				}
 			}
 
-			std::string sIdentifierText = (pIdentifierNode->m_eASTNodeType == ASTNodeType::ASTNode_IDENTIFIER) ? "" : "@";
-			sIdentifierText += pIdentifierNode->m_sText;
+			std::string sIdentifierText = "";
+			switch (pIdentifierNode->m_eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_IDENTIFIER:
+				{
+					sIdentifierText += pIdentifierNode->m_sText;
+				}
+				break;
+				case ASTNodeType::ASTNode_DEREF:
+				case ASTNodeType::ASTNode_DEREFARRAY:
+				{
+					sIdentifierText = "@";
+					sIdentifierText += pIdentifierNode->m_sText;
+				}
+				break;
+				case ASTNodeType::ASTNode_MEMBERACCESS:
+				{
+					sIdentifierText = pNode->m_sText;
+					sIdentifierText += "->";
+					sIdentifierText += pIdentifierNode->m_sText;
 
-			if (pExpressionNode->m_vStatements.size() > 0)
+					bPrintExpressionChilds = false;
+				}
+				break;
+			}
+
+			if (pExpressionNode->m_vStatements.size() > 0 && bPrintExpressionChilds)
 			{
 				std::cout << sIdentifierText << " = ";
 				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
@@ -842,6 +888,38 @@ void GrammerUtils::populateCode(Tree* pNode)
 				handleFunctionCall(pNode);
 			}
 			break;
+			case ASTNodeType::ASTNode_MEMBERACCESS:
+			{
+				std::string sPointerName = pNode->m_sText;
+				if(pNode->m_vStatements.size() > 0)
+				{
+					Tree* pFunctionCallNode = pNode->m_vStatements[0];
+					if (pFunctionCallNode != nullptr)
+					{
+						ASTNodeType eChilsASTNodeType = pFunctionCallNode->m_eASTNodeType;
+						if (eChilsASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
+						{
+							std::string sType = GET_VARIABLE_NODETYPE(sPointerName.c_str());
+							pFunctionCallNode->setAdditionalInfo("memberFunctionOf", sType);
+
+							// 1. Fetch 'this' into 'ECX'
+							EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
+							EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+							
+							// 2. Make the function call.
+							populateCode(pFunctionCallNode);
+
+							//// 3. Clear off 'ECX' that holds the address of 'this'
+							//EMIT_1(OPCODE::PUSH, 0);
+							//EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
+						}
+					}
+				}
+
+				bProcessStatements = false;
+			}
+			break;
+
 			case ASTNodeType::ASTNode_PREDECR:
 			case ASTNodeType::ASTNode_PREINCR:
 			{
@@ -1390,6 +1468,7 @@ FunctionInfo* GrammerUtils::getFunctionInfo(Tree* pNode)
 {
 	FunctionInfo* pRETURN_FunctionInfo = nullptr;
 
+	std::string sType = "";
 	std::string sFuncCallee = pNode->m_sText;
 	Tree* pParent_FunctionCall = pNode->m_pParentNode;
 	if (pParent_FunctionCall != nullptr)
@@ -1399,43 +1478,34 @@ FunctionInfo* GrammerUtils::getFunctionInfo(Tree* pNode)
 
 		//////////////////////////////////////////////////////////
 		// 1. Check if the function() is in a STRUCT.
-		//Tree* pGrandParent_TypeStruct = pParent_FunctionCall->m_pParentNode;
-		//if (pGrandParent_TypeStruct != nullptr)
+		sType = pParent_FunctionCall->getAdditionalInfoFor("memberFunctionOf");
+		if (NOT sType.empty())
 		{
-			//ASTNodeType eGrandParent_ASTNodeType = pGrandParent_TypeStruct->m_eASTNodeType;
-			//if (eGrandParent_ASTNodeType == ASTNodeType::ASTNode_TYPESTRUCT)
+LABEL1:
+			StructInfo* pStructInfo = m_MapGlobalStructs[sType];
+			if (pStructInfo != nullptr)
 			{
-				std::map<std::string, StructInfo*>::const_iterator itrStruct = m_MapGlobalStructs.begin();
-				for (; itrStruct != m_MapGlobalStructs.end(); ++itrStruct)
+				if (pStructInfo != nullptr)
 				{
-					StructInfo* pStructInfo = itrStruct->second;
+					for (void* pVoidPtr : pStructInfo->m_vMemberFunctions)
 					{
-						if (pStructInfo != nullptr)
+						FunctionInfo* pFunctionInfo = (FunctionInfo*)pVoidPtr;
+						if (pFunctionInfo != nullptr)
 						{
-							for (void* pVoidPtr : pStructInfo->m_vMemberFunctions)
-							{
-								FunctionInfo* pFunctionInfo = (FunctionInfo*)pVoidPtr;
-								if (pFunctionInfo != nullptr)
-								{
-									std::string sFUNCDEF_Name = pFunctionInfo->m_sFunctionName;
-									Tree* pFUNCDEF_ArgListNode = pFunctionInfo->m_pFunctionArguments;
-									int iFUNCDEF_ArgCount = pFUNCDEF_ArgListNode->m_vStatements.size();
-									std::string sFUNCDEF_Signature = pFUNCDEF_ArgListNode->m_sAdditionalInfo;
+							std::string sFUNCDEF_Name = pFunctionInfo->m_sFunctionName;
+							Tree* pFUNCDEF_ArgListNode = pFunctionInfo->m_pFunctionArguments;
+							int iFUNCDEF_ArgCount = pFUNCDEF_ArgListNode->m_vStatements.size();
+							std::string sFUNCDEF_Signature = pFUNCDEF_ArgListNode->m_sAdditionalInfo;
 
-									if (sFuncCallee == sFUNCDEF_Name
-										&&
-										iCallee_ArgCount == iFUNCDEF_ArgCount
-										&&
-										sCallee_Signature == sFUNCDEF_Signature
-									) {
-										pRETURN_FunctionInfo = pFunctionInfo;
-										break;
-									}
-								}
-							}
-
-							if (pRETURN_FunctionInfo != nullptr)
+							if (sFuncCallee == sFUNCDEF_Name
+								&&
+								iCallee_ArgCount == iFUNCDEF_ArgCount
+								&&
+								sCallee_Signature == sFUNCDEF_Signature
+							) {
+								pRETURN_FunctionInfo = pFunctionInfo;
 								break;
+							}
 						}
 					}
 				}
@@ -1467,6 +1537,18 @@ FunctionInfo* GrammerUtils::getFunctionInfo(Tree* pNode)
 						break;
 					}
 				}
+			}
+		}
+
+		//////////////////////////////////////////////////////////
+		// 3. If even here 'pRETURN_FunctionInfo' is nullptr, then maybe its a member function call from inside another member function of a struct.
+		if (pRETURN_FunctionInfo == nullptr)
+		{
+			if (m_pCurrentStruct != nullptr && m_pCurrentFunction != nullptr)
+			{
+				// Disguise this function call made inside 'm_pCurrentStruct'
+				sType = m_pCurrentStruct->m_sStructName;
+				goto LABEL1;
 			}
 		}
 	}
@@ -1721,6 +1803,31 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				EMIT_1(OPCODE::LDA, iCastValue);
 			}
 			break;
+			case TokenType::Type::TK_MEMBERACCESS:
+			{
+				// Member Access has the following notation:
+				//		==> sObjectName->variableName
+				std::string sObjectName = tok.getText();	// sObjectName
+				Token tok = st->nextToken();				// "-"
+				tok = st->nextToken();						// ">"
+				tok = st->nextToken();						// variableName
+
+				std::string sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+				StructInfo* pStructInfo = m_MapGlobalStructs[sStructType];
+				assert(pStructInfo != nullptr);
+				if (pStructInfo != nullptr)
+				{
+					// 1. Fetch 'this' into 'ECX'
+					EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName.c_str()));		// Get the 'this' pointer value
+					EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+
+					// 2. Fetch the value in the objects variable & push it onto the STACK.
+					std::string sFullyQualifiedVariableName = sStructType + "_" + tok.getText();
+					int32_t iPosition = pStructInfo->getMemberVariablePosition(sFullyQualifiedVariableName.c_str());
+					EMIT_1(OPCODE::FETCH, iPosition);
+				}
+			}
+			break;
 		}
 	}
 }
@@ -1968,6 +2075,30 @@ void GrammerUtils::handleAssign(Tree* pNode)
 																// required to access the array pointer.
 
 					EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(pNode->m_sText.c_str()));
+				}
+			}
+			break;
+			case ASTNodeType::ASTNode_MEMBERACCESS:
+			{
+				std::string sObjectName = pNode->m_sText;
+				std::string sVariableName = pIdentifiedNode->m_sText;
+				std::string sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+				StructInfo* pStructInfo = m_MapGlobalStructs[sStructType];
+				assert(pStructInfo != nullptr);
+				if (pStructInfo != nullptr)
+				{
+					// 1. Fetch 'this' into 'ECX'
+					EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName.c_str()));		// Get the 'this' pointer value
+					EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+
+					std::string sFullyQualifiedVariableName = sStructType + "_" + sVariableName;
+					Tree* pVariableNode = pStructInfo->getMemberVariableASTNode(sFullyQualifiedVariableName.c_str());
+					sType = pVariableNode->getAdditionalInfoFor("type");
+					int32_t iPosition = pStructInfo->getMemberVariablePosition(sFullyQualifiedVariableName.c_str());
+
+					// 2. Perform relevant cast before storing the value in objects variable.
+					cast(castValueFor(sType));					// Perform relevant 'CAST'
+					EMIT_1(OPCODE::STORE, iPosition);			// Store the rvalue in the variable.
 				}
 			}
 			break;
@@ -2282,6 +2413,7 @@ void GrammerUtils::handleFree(Tree* pNode)
 			// 2. Call the 'Destructor' by creating a Dummy Destructor under the "free" ASTNode.
 			std::string sDestructor = "#" + sType;
 			Tree* pDefaultDestructor = createFunctionCallWithNoArguments(sDestructor.c_str());
+			pDefaultDestructor->setAdditionalInfo("memberFunctionOf", sType);
 			pNode->addChild(pDefaultDestructor);
 
 			populateCode(pDefaultDestructor);
@@ -2289,7 +2421,7 @@ void GrammerUtils::handleFree(Tree* pNode)
 			// 3. Free the pointer itself that holds 'this' object.
 			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
 
-			// 4. Clear off 'ECX' that hols the address of 'this'
+			// 4. Clear off 'ECX' that holds the address of 'this'
 			EMIT_1(OPCODE::PUSH, 0);
 			EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
 		}
@@ -2440,6 +2572,18 @@ void GrammerUtils::cast(int32_t iCastValue)
 	// Cast the expresseion with relevant Type Value
 	EMIT_1(OPCODE::PUSHI, iCastValue);
 	EMIT_1(OPCODE::BITWISEAND, 0);
+}
+
+StructInfo* GrammerUtils::getStructOfObject(std::string sObjectName)
+{
+	StructInfo* pStructInfo = nullptr;
+	std::string sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+	if (NOT sStructType.empty())
+	{
+		pStructInfo = m_MapGlobalStructs[sStructType];
+	}
+
+	return pStructInfo;
 }
 
 void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vStrings)

@@ -67,6 +67,7 @@ namespace TokenType
 		TK_SWITCH,
 		TK_DEREF,
 		TK_DEREFARRAY,
+		TK_MEMBERACCESS,
 		TK_UNKNOWN
 	};
 
@@ -135,6 +136,7 @@ namespace TokenType
 			case Type::TK_SWITCH:				return "TK_SWITCH";
 			case Type::TK_DEREF:				return "TK_DEREF";
 			case Type::TK_DEREFARRAY:			return "TK_DEREFARRAY";
+			case Type::TK_MEMBERACCESS:			return "TK_MEMBERACCESS";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -204,9 +206,10 @@ namespace TokenType
 		else if(sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
 		else if(sTokenType == "TK_DEREF")				return Type::TK_DEREF;
 		else if(sTokenType == "TK_DEREFARRAY")			return Type::TK_DEREFARRAY;
+		else if(sTokenType == "TK_MEMBERACCESS")		return Type::TK_MEMBERACCESS;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
-		else return Type::TK_INVALID;
+		else											return Type::TK_INVALID;
 	}
 }
 

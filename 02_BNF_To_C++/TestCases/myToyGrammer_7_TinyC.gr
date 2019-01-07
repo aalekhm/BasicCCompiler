@@ -164,7 +164,9 @@
 										
 <stmt_list> 					::=		{ <stmt> [';'] };
 
-<stmt>      					::=   	( 	<functionCall> 
+<stmt>      					::=   	( 	<functionCall>
+											|
+											<structMemberVariableAssignmentOrFunctionCall>
 											|
 											<prePostFixedIncrDecr>
 											|
@@ -270,10 +272,9 @@
 													"</code>"
 										;
 
-<functionCall>					::=		TK_FUNCTIONCALL
-										"<code>"
-											std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
-										"</code>"
+<functionCall>					::=		TK_FUNCTIONCALL	"<code>"
+															std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
+														"</code>"
 										'('				"<code>"
 															Tree* pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sIdentifier.c_str());
 															Tree* pTemp = nullptr;
@@ -730,13 +731,16 @@
 										[ '=' "new" <functionCall> ]
 															"<code>"
 																// Add DUMMY Constructor call if "ASTNode_FUNCTIONCALL" not found !
-																if(!hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL))
+																Tree* pFunctionCallNode = hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL);
+																if (pFunctionCallNode == nullptr)
 																{
-																	Tree* pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
+																	pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
 																	Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sStructType.c_str());
 																	pFunctionCallNode->addChild(pFuncCallEndNode);
 																	m_pASTCurrentNode->addChild(pFunctionCallNode);
 																}
+																
+																pFunctionCallNode->setAdditionalInfo("memberFunctionOf", sStructType);
 																
 																m_pASTCurrentNode = pTemp;
 																m_pASTCurrentNode->addChild(pStructPtrNode);
@@ -999,8 +1003,69 @@
 													"</code>"
 										;
 										
+<structMemberVariableAssignmentOrFunctionCall>
+								::=		TK_MEMBERACCESS	"<code>"
+															std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
+															std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+															
+															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
+															{
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+															}
+
+															Tree* pTemp = nullptr;
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pAssignmentNode;
+														"</code>"
+										'-' '>'
+										<structMemberVariableLValueOrFunctionCall>	
+														"<code>"
+															Tree* pNode = hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL);
+															if(pNode != nullptr)									// Check if there was a object function call
+															{														// If Yes, then change the ASTNodeType to ASTNode_MEMBERACCESS.
+																pAssignmentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
+															}
+															else													// Else, its an object variable value assignment.
+															{
+																std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+																Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sVariableName.c_str());
+																{
+																	pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+																	pAssignmentNode->m_pRightNode = pIdentifierLeaf;
+																}
+															}
+														"</code>"
+										[
+										'='				"<code>"
+															Tree* pTemp = nullptr;
+															Tree* pRValueExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pAssignmentNode->m_pLeftNode = pRValueExpressionLeftLeaf;
+																pRValueExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pRValueExpressionLeftLeaf;
+															}
+														"</code>"
+										<expr>			"<code>"
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);															
+														"</code>"
+										]
+										
+														"<code>"
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pAssignmentNode);
+														"</code>"
+										;
+										
+<structMemberVariableLValueOrFunctionCall>
+								::=		(	<functionCall>
+											|
+											TK_IDENTIFIER
+										);
+
+										
 <assignmentRHS>					::=  	TK_IDENTIFIER	"<code>"
-															TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
 															std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 															assert(!sFullyQualifiedVariableName.empty());
@@ -1199,9 +1264,9 @@
 																}
 															"</code>"
 											|
-											<tk_identifier>
+											<structMemberAccess>
 											|
-											<tkStructMember>
+											<tk_identifier>
 											| 
 											TK_INTEGER		"<code>"
 																sOperand = GrammerUtils::m_pPrevToken.getText();
@@ -1234,9 +1299,89 @@
 															"</code>"
 										);
 										
-<tkStructMember>				::=		TK_IDENTIFIER
-										"->"
-										TK_IDENTIFIER;
+<structMemberAccess>			::=		TK_MEMBERACCESS		"<code>"
+																std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+																
+																Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
+																Tree* pTemp = nullptr;
+																{
+																	pObjectAccessNode->m_sAdditionalInfo.append(sObjectName);
+																	
+																	m_pASTCurrentNode->addChild(pObjectAccessNode);
+																
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pObjectAccessNode;
+																}
+															"</code>"
+										'-' '>'
+										<structMemberVariableOrFunctionCall_RValue>
+															"<code>"
+																m_pASTCurrentNode = pTemp;
+															"</code>"
+										;
+										
+<structMemberVariableOrFunctionCall_RValue>		
+								::=		(	<structMemberFunctionCallInAnExpr>		
+											|
+											TK_IDENTIFIER	"<code>"
+																{
+																	std::string sOperand = m_pASTCurrentNode->m_sText;
+																	sOperand.append("->");
+																	sOperand.append(GrammerUtils::m_pPrevToken.getText());
+																	
+																	m_vPostFix.push_back(sOperand);
+																}
+															"</code>"
+										);
+
+<structMemberFunctionCallInAnExpr>	
+								::= 	<functionCall>		"<code>"
+																// The idea here is to create a temporary variable of the type returned by the function
+																// & add it before the expression statement.
+																// The temporary variable is then inserted in the expression.
+																// Eg:
+																// 		int32_t iRet = 10;
+																//		iRet = 10 + obj1->retFunc(); // where retFunc return type is "int32_t".
+																//		This will create a dummy code as follows:
+																//			int32_t iRet = 10;
+																//			int32_t iRet_retFunc = obj1->retFunc();	// This line of code will be inserted by the following piece of code.
+																//			iRet = 10 + iRet_retFunc;
+																
+																Tree* pExpressionNode = m_pASTCurrentNode->m_pParentNode;		// In this case ASTNode_MEMBERACCESS's parent.
+																Tree* pAssignNode = pExpressionNode->m_pParentNode;
+																Tree* pBlockNode = pAssignNode->m_pParentNode;
+																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
+																{
+																	pFunctionCallNode->removeFromParent();
+																}
+																assert(pFunctionCallNode != nullptr);
+																{
+																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFullyQualifiedTempVariableName;
+																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append("_");
+																	sFullyQualifiedTempVariableName.append(sFuncName);
+																	
+																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
+																	{
+																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
+																		pPrimIntNode->setAdditionalInfo("type", "int32_t");
+																		pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
+																		pBlockNode->addChild(pPrimIntNode);
+																	}
+																	
+																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																	{
+																		pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
+																		pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																		pExpressionLeftLeaf->addChild(pFunctionCallNode);
+																	}
+																	
+																	m_vPostFix.push_back(sFullyQualifiedTempVariableName);
+																}
+															"</code>";
+										
 										
 <unary_expr>					::=		<unary_oper> <expr>;
 

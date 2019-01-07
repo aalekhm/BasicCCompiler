@@ -111,6 +111,7 @@ class GrammerUtils
 		static void									emitIntAtPos(int32_t iCode, uint32_t iOffset);
 
 		static FunctionInfo*						getFunctionInfo(Tree* pNode);
+		static StructInfo*							getStructOfObject(std::string sObjectName);
 
 		static std::vector<std::string>				m_vStrings;
 

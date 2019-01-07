@@ -20,6 +20,7 @@ struct Example1
 	// * Member Variables should be declared before the functions.
 	int8_t	m_aNumberList[8];
 	
+	// Note: "inline" keyword is mandatory before any function definition as of now.
 	inline void example1Func1()
 	{
 		print("In example1Func1");
@@ -42,7 +43,7 @@ struct Person
 	int8_t 	m_sEmail[32] = {'a', 'a', 'l', 'e', 'k', 'h', 'm', '@', 'g', 'm', 'a', 'i', 'l', '.', 'c', 'o', 'm' };
 	int8_t*	m_pDesignation;
 	int8_t	m_iAge = 20;
-		
+	
 	inline void Person(int8_t iAge)
 	{
 		print("In Person Constructor with 1 argument");
@@ -58,21 +59,36 @@ struct Person
 	
 	inline void func1()
 	{
-		print("In func1");
+		print("Entering func1");
+		putc(10);
+				
+		print("Before m_iAge = ", m_iAge);
 		putc(10);
 		
 		m_iAge = 1;
+
+		print("After m_iAge = ", m_iAge);
+		putc(10);
+
+		// Currently this call won't work as while parsing top-down to 'func1()', AST for 'getAge()' is not created, yet.
+		//int32_t iAge = getAge();
 		
-		print("m_iAge = ", m_iAge);
+		print("Exiting func1");
 		putc(10);
 	}
 	
-	inline void func2()
+	inline int32_t getAge()
 	{
-		print("In func2");
-		putc(10);		
+		print("Entering getAge");
+		putc(10);
+		
+		func1();		// This call would work as func1() AST is already created.
+		
+		return m_iAge;
 	}
 	
+	// Note: The destructor function has a peculiar prefix of '#' unlike the usual '~'.
+	//		 This is done just to make parsing easier as '~' is also bitwisenot.
 	inline void #Person()
 	{
 		print("In Person Destructor");
@@ -90,14 +106,39 @@ int32_t retNewFunc()
 	print("In retNewFunc................");
 	putc(10);
 
-	Example1 pExampleObj0;					// OR Person* pPersonObj0;
-	Person pPersonObj1 = new Person();		// OR Person* pPersonObj1();
-	Person pPersonObj2 = new Person(10);	// OR Person* pPersonObj2(10);
-	//Person pPersonObjs[4];				// OR Person* pPersonObjs[4];
+	Example1 pExampleObj0;					// OR (a) Person* pPersonObj0;
+	Person pPersonObj1 = new Person();		// OR (b) Person* pPersonObj1();
+	Person pPersonObj2 = new Person(10);	// OR (c) Person* pPersonObj2(10);
+	//Person pPersonObjs[4];				// OR (d) Person* pPersonObjs[4];
 	
 	print("Struct pPersonObj2 Created................");
 	putc(10);
-
+	
+	pExampleObj0->example1Func1();
+	pPersonObj2->func1();
+	
+	pExampleObj0->example1Func1();
+	
+	int32_t iAge = 10 + pPersonObj2->getAge();
+	print("1. iAge = ", iAge);
+	putc(10);
+	
+	pExampleObj0->example1Func1();
+	
+	iAge = 10 + pPersonObj2->m_iTest;
+	print("2. iAge = ", iAge);
+	putc(10);
+	
+	pExampleObj0->example1Func1();
+	
+	pPersonObj2->m_iAge = 90 + pPersonObj2->m_iTest;
+	
+	pExampleObj0->example1Func1();
+	
+	iAge = 10 + pPersonObj2->getAge();
+	print("3. iAge = ", iAge);
+	putc(10);
+	
 	int8_t arr1[10] = {111, 222, 333, 444, 555};	//int32_t arr1[10];
 													//int32_t arr[] = {10, 20, 30, 40};
 													//int32_t arr[6] = {10, 20, 30, 40};
@@ -242,7 +283,8 @@ int32_t retNewFunc()
 	free(pNew);
 	free(pPtr_0);
 	
-	// ToDo
+	// Objects created by the notation in (a), (b) & (c) are created on the HEAP & need to be deleted MANUALLY.
+	// Although, objects created by (a) & (d) need to be deleted AUTOMATICALLY.
 	free(pExampleObj0);
 	free(pPersonObj1);
 	free(pPersonObj2);

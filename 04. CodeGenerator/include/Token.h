@@ -71,6 +71,7 @@ namespace TokenType
 		TK_SWITCH,
 		TK_DEREF,
 		TK_DEREFARRAY,
+		TK_MEMBERACCESS,
 		TK_UNKNOWN
 	};
 
@@ -139,6 +140,7 @@ namespace TokenType
 		case Type::TK_SWITCH:				return "TK_SWITCH";
 		case Type::TK_DEREF:				return "TK_DEREF";
 		case Type::TK_DEREFARRAY:			return "TK_DEREFARRAY";
+		case Type::TK_MEMBERACCESS:			return "TK_MEMBERACCESS";
 
 		case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -148,23 +150,23 @@ namespace TokenType
 
 	inline TokenType::Type fromString(std::string sTokenType)
 	{
-		if (sTokenType == "TK_MUL")					return Type::TK_MUL;
+			 if (sTokenType == "TK_MUL")				return Type::TK_MUL;
 		else if (sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
-		else if (sTokenType == "TK_DIV")					return Type::TK_DIV;
+		else if (sTokenType == "TK_DIV")				return Type::TK_DIV;
 		else if (sTokenType == "TK_DIVEQ")				return Type::TK_DIVEQ;
-		else if (sTokenType == "TK_MOD")					return Type::TK_MOD;
-		else if (sTokenType == "TK_ADD")					return Type::TK_ADD;
+		else if (sTokenType == "TK_MOD")				return Type::TK_MOD;
+		else if (sTokenType == "TK_ADD")				return Type::TK_ADD;
 		else if (sTokenType == "TK_ADDEQ")				return Type::TK_ADDEQ;
-		else if (sTokenType == "TK_SUB")					return Type::TK_SUB;
+		else if (sTokenType == "TK_SUB")				return Type::TK_SUB;
 		else if (sTokenType == "TK_SUBEQ")				return Type::TK_SUBEQ;
 		else if (sTokenType == "TK_NEGATE")				return Type::TK_NEGATE;
-		else if (sTokenType == "TK_NOT")					return Type::TK_NOT;
+		else if (sTokenType == "TK_NOT")				return Type::TK_NOT;
 		else if (sTokenType == "TK_LT")					return Type::TK_LT;
 		else if (sTokenType == "TK_LTEQ")				return Type::TK_LTEQ;
 		else if (sTokenType == "TK_GT")					return Type::TK_GT;
 		else if (sTokenType == "TK_GTEQ")				return Type::TK_GTEQ;
 		else if (sTokenType == "TK_EQ")					return Type::TK_EQ;
-		else if (sTokenType == "TK_NEQ")					return Type::TK_NEQ;
+		else if (sTokenType == "TK_NEQ")				return Type::TK_NEQ;
 		else if (sTokenType == "TK_ASSIGN")				return Type::TK_ASSIGN;
 		else if (sTokenType == "TK_LOGICALAND")			return Type::TK_LOGICALAND;
 		else if (sTokenType == "TK_LOGICALOR")			return Type::TK_LOGICALOR;
@@ -176,7 +178,7 @@ namespace TokenType
 		else if (sTokenType == "TK_BITWISERIGHTSHIFT")	return Type::TK_BITWISERIGHTSHIFT;
 		else if (sTokenType == "TK_IF")					return Type::TK_IF;
 		else if (sTokenType == "TK_ELSE")				return Type::TK_ELSE;
-		else if (sTokenType == "TK_FOR")					return Type::TK_FOR;
+		else if (sTokenType == "TK_FOR")				return Type::TK_FOR;
 		else if (sTokenType == "TK_WHILE")				return Type::TK_WHILE;
 		else if (sTokenType == "TK_PRINT")				return Type::TK_PRINT;
 		else if (sTokenType == "TK_LPAREN")				return Type::TK_LPAREN;
@@ -185,32 +187,33 @@ namespace TokenType
 		else if (sTokenType == "TK_RBRACE")				return Type::TK_RBRACE;
 		else if (sTokenType == "TK_LSQBRACKET")			return Type::TK_LSQBRACKET;
 		else if (sTokenType == "TK_RSQBRACKET")			return Type::TK_RSQBRACKET;
-		else if (sTokenType == "TK_SEMICOL")				return Type::TK_SEMICOL;
+		else if (sTokenType == "TK_SEMICOL")			return Type::TK_SEMICOL;
 		else if (sTokenType == "TK_COMMA")				return Type::TK_COMMA;
 		else if (sTokenType == "TK_IDENTIFIER")			return Type::TK_IDENTIFIER;
-		else if (sTokenType == "TK_INTEGER")				return Type::TK_INTEGER;
+		else if (sTokenType == "TK_INTEGER")			return Type::TK_INTEGER;
 		else if (sTokenType == "TK_FLOAT")				return Type::TK_FLOAT;
 		else if (sTokenType == "TK_STRING")				return Type::TK_STRING;
 		else if (sTokenType == "TK_CHARACTER")			return Type::TK_CHARACTER;
-		else if (sTokenType == "TK_EOL")					return Type::TK_EOL;
-		else if (sTokenType == "TK_EOI")					return Type::TK_EOI;
+		else if (sTokenType == "TK_EOL")				return Type::TK_EOL;
+		else if (sTokenType == "TK_EOI")				return Type::TK_EOI;
 		else if (sTokenType == "TK_SINGLELINECOMMENT")	return Type::TK_SINGLELINECOMMENT;
 		else if (sTokenType == "TK_MULTILINECOMMENT")	return Type::TK_MULTILINECOMMENT;
 		else if (sTokenType == "TK_WHITESPACE")			return Type::TK_WHITESPACE;
 		else if (sTokenType == "TK_BNFNONTERMINAL")		return Type::TK_BNFNONTERMINAL;
 		else if (sTokenType == "TK_BNFASSIGNMENT")		return Type::TK_BNFASSIGNMENT;
-		else if (sTokenType == "TK_BNFCODE")				return Type::TK_BNFCODE;
+		else if (sTokenType == "TK_BNFCODE")			return Type::TK_BNFCODE;
 		else if (sTokenType == "TK_FUNCTIONCALL")		return Type::TK_FUNCTIONCALL;
 		else if (sTokenType == "TK_PREFIXDECR")			return Type::TK_PREFIXDECR;
 		else if (sTokenType == "TK_PREFIXINCR")			return Type::TK_PREFIXINCR;
-		else if (sTokenType == "TK_POSTFIXDECR")			return Type::TK_POSTFIXDECR;
-		else if (sTokenType == "TK_POSTFIXINCR")			return Type::TK_POSTFIXINCR;
+		else if (sTokenType == "TK_POSTFIXDECR")		return Type::TK_POSTFIXDECR;
+		else if (sTokenType == "TK_POSTFIXINCR")		return Type::TK_POSTFIXINCR;
 		else if (sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
 		else if (sTokenType == "TK_DEREF")				return Type::TK_DEREF;
 		else if (sTokenType == "TK_DEREFARRAY")			return Type::TK_DEREFARRAY;
+		else if (sTokenType == "TK_MEMBERACCESS")		return Type::TK_MEMBERACCESS;
 
-		else if (sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
-		else return Type::TK_INVALID;
+		else if (sTokenType == "TK_UNKNOWN")			return Type::TK_UNKNOWN;
+		else											return Type::TK_INVALID;
 	}
 }
 
@@ -456,7 +459,7 @@ enum class ASTNodeType
 	ASTNode_TYPESTRUCT,
 	ASTNode_CONSTRUCTORCALL,
 	ASTNode_CONSTRUCTORCALLEND,
-
+	ASTNode_MEMBERACCESS,
 };
 
 typedef struct Tree
@@ -657,6 +660,44 @@ typedef struct StructInfo
 		}
 
 		return bReturn;
+	}
+
+	Tree* getMemberVariableASTNode(const char* sVariableName)
+	{
+		Tree* pASTNode = nullptr;
+		for (Tree* pMemberVar : m_vMemberVariables) // Starts with index 0
+		{
+			if (pMemberVar->m_sText == sVariableName)
+			{
+				pASTNode = pMemberVar;
+				break;
+			}
+		}
+
+		return pASTNode;
+	}
+
+	int32_t getMemberVariablePosition(const char* sLocalVariableName)
+	{
+		int32_t iPositionOperand = 0;
+
+		Tree* pASTNode = getMemberVariableASTNode(sLocalVariableName);
+		assert(pASTNode != nullptr);
+		if (pASTNode != nullptr)
+		{
+			std::string sVariablePos = pASTNode->getAdditionalInfoFor("variablePos");
+			short iShortPosition = atoi(sVariablePos.c_str());
+
+			E_VARIABLESCOPE eVARIABLESCOPE = E_VARIABLESCOPE::INVALID;
+			eVARIABLESCOPE = toScope(pASTNode->getAdditionalInfoFor("scope"));
+			assert(eVARIABLESCOPE != E_VARIABLESCOPE::INVALID);
+
+			iPositionOperand = (int32_t)eVARIABLESCOPE;
+			iPositionOperand <<= sizeof(int16_t) * 8;
+			iPositionOperand |= (iShortPosition & 0x0000FFFF);
+		}
+
+		return iPositionOperand;
 	}
 
 	Tree*									m_pNode;

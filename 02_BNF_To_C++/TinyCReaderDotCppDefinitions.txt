@@ -382,25 +382,25 @@ bool TinyCReader::isValidStructType(std::string sType)
 	return false;
 }
 
-bool TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
+Tree* TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
 {
-	bool bYes = false;
-	if(pNode != nullptr)
+	Tree* pReturnNode = nullptr;
+	if (pNode != nullptr)
 	{
-		for(Tree* pChild : pNode->m_vStatements)
+		for (Tree* pChild : pNode->m_vStatements)
 		{
-			if(pChild != nullptr)
+			if (pChild != nullptr)
 			{
-				if(pChild->m_eASTNodeType == eASTNodeType)
+				if (pChild->m_eASTNodeType == eASTNodeType)
 				{
-					bYes = true;
+					pReturnNode = pChild;
 					break;
 				}
 			}
 		}
 	}
-	
-	return bYes;
+
+	return pReturnNode;
 }
 
 void TinyCReader::startBlockMarker()

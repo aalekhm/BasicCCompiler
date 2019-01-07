@@ -382,25 +382,25 @@ bool TinyCReader::isValidStructType(std::string sType)
 	return false;
 }
 
-bool TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
+Tree* TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
 {
-	bool bYes = false;
-	if(pNode != nullptr)
+	Tree* pReturnNode = nullptr;
+	if (pNode != nullptr)
 	{
-		for(Tree* pChild : pNode->m_vStatements)
+		for (Tree* pChild : pNode->m_vStatements)
 		{
-			if(pChild != nullptr)
+			if (pChild != nullptr)
 			{
-				if(pChild->m_eASTNodeType == eASTNodeType)
+				if (pChild->m_eASTNodeType == eASTNodeType)
 				{
-					bYes = true;
+					pReturnNode = pChild;
 					break;
 				}
 			}
 		}
 	}
-	
-	return bYes;
+
+	return pReturnNode;
 }
 
 void TinyCReader::startBlockMarker()
@@ -799,6 +799,10 @@ if(functionCall()) {
 return true;
 }
 else
+if(structMemberVariableAssignmentOrFunctionCall()) {
+return true;
+}
+else
 if(prePostFixedIncrDecr()) {
 return true;
 }
@@ -980,8 +984,8 @@ bool TinyCReader::functionCall() {
 if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
 return false;
 
-											std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
-										
+															std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
+														
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
 
@@ -1854,13 +1858,16 @@ return false;
 
 
 																// Add DUMMY Constructor call if "ASTNode_FUNCTIONCALL" not found !
-																if(!hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL))
+																Tree* pFunctionCallNode = hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL);
+																if (pFunctionCallNode == nullptr)
 																{
-																	Tree* pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
+																	pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
 																	Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sStructType.c_str());
 																	pFunctionCallNode->addChild(pFuncCallEndNode);
 																	m_pASTCurrentNode->addChild(pFunctionCallNode);
 																}
+																
+																pFunctionCallNode->setAdditionalInfo("memberFunctionOf", sStructType);
 																
 																m_pASTCurrentNode = pTemp;
 																m_pASTCurrentNode->addChild(pStructPtrNode);
@@ -2253,11 +2260,95 @@ return true;
 
 }
 
+bool TinyCReader::structMemberVariableAssignmentOrFunctionCall() {
+if(!GrammerUtils::match(TokenType::Type::TK_MEMBERACCESS, MANDATORY))
+return false;
+
+															std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
+															std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+															
+															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
+															{
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+															}
+
+															Tree* pTemp = nullptr;
+															pTemp = m_pASTCurrentNode;
+															m_pASTCurrentNode = pAssignmentNode;
+														
+if(!GrammerUtils::match('-', MANDATORY))
+return false;
+if(!GrammerUtils::match('>', MANDATORY))
+return false;
+if(!structMemberVariableLValueOrFunctionCall())
+return false;
+
+															Tree* pNode = hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL);
+															if(pNode != nullptr)									// Check if there was a object function call
+															{														// If Yes, then change the ASTNodeType to ASTNode_MEMBERACCESS.
+																pAssignmentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
+															}
+															else													// Else, its an object variable value assignment.
+															{
+																std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+																Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sVariableName.c_str());
+																{
+																	pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+																	pAssignmentNode->m_pRightNode = pIdentifierLeaf;
+																}
+															}
+														
+if(!GrammerUtils::match('=', OPTIONAL)) {
+
+}
+
+else {
+
+
+															Tree* pTemp = nullptr;
+															Tree* pRValueExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pAssignmentNode->m_pLeftNode = pRValueExpressionLeftLeaf;
+																pRValueExpressionLeftLeaf->m_pParentNode = pAssignmentNode;
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pRValueExpressionLeftLeaf;
+															}
+														
+if(!expr())
+return false;
+
+															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);															
+														
+}
+
+
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pAssignmentNode);
+														
+return true;
+
+}
+
+bool TinyCReader::structMemberVariableLValueOrFunctionCall() {
+if(functionCall()) {
+return true;
+}
+else
+if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
 bool TinyCReader::assignmentRHS() {
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-															TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
 															std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 															assert(!sFullyQualifiedVariableName.empty());
@@ -2712,11 +2803,11 @@ if(functionCall()) {
 return true;
 }
 else
-if(tk_identifier()) {
+if(structMemberAccess()) {
 return true;
 }
 else
-if(tkStructMember()) {
+if(tk_identifier()) {
 return true;
 }
 else
@@ -2775,13 +2866,109 @@ return true;
 
 }
 
-bool TinyCReader::tkStructMember() {
-if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+bool TinyCReader::structMemberAccess() {
+if(!GrammerUtils::match(TokenType::Type::TK_MEMBERACCESS, MANDATORY))
 return false;
-if(!GrammerUtils::match("->", MANDATORY))
+
+																std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+																
+																Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
+																Tree* pTemp = nullptr;
+																{
+																	pObjectAccessNode->m_sAdditionalInfo.append(sObjectName);
+																	
+																	m_pASTCurrentNode->addChild(pObjectAccessNode);
+																
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pObjectAccessNode;
+																}
+															
+if(!GrammerUtils::match('-', MANDATORY))
 return false;
-if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+if(!GrammerUtils::match('>', MANDATORY))
 return false;
+if(!structMemberVariableOrFunctionCall_RValue())
+return false;
+
+																m_pASTCurrentNode = pTemp;
+															
+return true;
+
+}
+
+bool TinyCReader::structMemberVariableOrFunctionCall_RValue() {
+if(structMemberFunctionCallInAnExpr()) {
+return true;
+}
+else
+if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
+
+																{
+																	std::string sOperand = m_pASTCurrentNode->m_sText;
+																	sOperand.append("->");
+																	sOperand.append(GrammerUtils::m_pPrevToken.getText());
+																	
+																	m_vPostFix.push_back(sOperand);
+																}
+															
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::structMemberFunctionCallInAnExpr() {
+if(!functionCall())
+return false;
+
+																// The idea here is to create a temporary variable of the type returned by the function
+																// & add it before the expression statement.
+																// The temporary variable is then inserted in the expression.
+																// Eg:
+																// 		int32_t iRet = 10;
+																//		iRet = 10 + obj1->retFunc(); // where retFunc return type is "int32_t".
+																//		This will create a dummy code as follows:
+																//			int32_t iRet = 10;
+																//			int32_t iRet_retFunc = obj1->retFunc();	// This line of code will be inserted by the following piece of code.
+																//			iRet = 10 + iRet_retFunc;
+																
+																Tree* pExpressionNode = m_pASTCurrentNode->m_pParentNode;		// In this case ASTNode_MEMBERACCESS's parent.
+																Tree* pAssignNode = pExpressionNode->m_pParentNode;
+																Tree* pBlockNode = pAssignNode->m_pParentNode;
+																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
+																{
+																	pFunctionCallNode->removeFromParent();
+																}
+																assert(pFunctionCallNode != nullptr);
+																{
+																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFullyQualifiedTempVariableName;
+																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append("_");
+																	sFullyQualifiedTempVariableName.append(sFuncName);
+																	
+																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
+																	{
+																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
+																		pPrimIntNode->setAdditionalInfo("type", "int32_t");
+																		pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
+																		pBlockNode->addChild(pPrimIntNode);
+																	}
+																	
+																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																	{
+																		pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
+																		pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+																		pExpressionLeftLeaf->addChild(pFunctionCallNode);
+																	}
+																	
+																	m_vPostFix.push_back(sFullyQualifiedTempVariableName);
+																}
+															
 return true;
 
 }
