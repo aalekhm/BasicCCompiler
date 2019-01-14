@@ -17,7 +17,7 @@
 										TK_IDENTIFIER
 															"<code>"
 																__START_STRUCT__
-																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
+																std::string sStructName = PREV_TOKEN_TEXT;
 																__START_BLOCK_STRING__(sStructName)
 																
 																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
@@ -67,14 +67,11 @@
 										;
 
 <staticPtr>						::=		<primitiveType>		"<code>"
-																std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+																std::string sPointerType = PREV_TOKEN_TEXT;
 															"</code>"
 										'*'
 										TK_IDENTIFIER		"<code>"
-																std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
-																
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPESTATIC;																
-																Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
+																Tree* pStaticPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPESTATIC, PREV_TOKEN_TEXT);
 																pStaticPtrNode->m_bIsPointerType = true;
 																pStaticPtrNode->setAdditionalInfo("type", sPointerType);
 																pStaticPtrNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::STATIC));
@@ -85,11 +82,11 @@
 										';';
 
 <functionDef>					::=		TK_IDENTIFIER		"<code>"
-																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
+																std::string sReturnType = PREV_TOKEN_TEXT;
 															"</code>"
 										TK_FUNCTIONCALL		"<code>"
 																__START_FUNCTION__
-																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFunctionName = PREV_TOKEN_TEXT;
 																__START_BLOCK_STRING__(sFunctionName)
 																
 																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
@@ -141,16 +138,15 @@
 										[','];
 																				
 <primitiveTypeInt>				::= 	<primitiveType>		"<code>"
-																std::string sType = GrammerUtils::m_pPrevToken.getText();
+																std::string sType = PREV_TOKEN_TEXT;
 															"</code>"
 										TK_IDENTIFIER		"<code>"
-																std::string sArgName = GrammerUtils::m_pPrevToken.getText();
+																std::string sArgName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedArgName;
 																sFullyQualifiedArgName.append(getBlockString());
 																sFullyQualifiedArgName.append(sArgName);
 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedArgName.c_str());
+																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedArgName.c_str());
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sArgName);
 																	pPrimIntNode->setAdditionalInfo("type", sType);
@@ -273,7 +269,7 @@
 										;
 
 <functionCall>					::=		TK_FUNCTIONCALL	"<code>"
-															std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
+															std::string sIdentifier = PREV_TOKEN_TEXT;
 														"</code>"
 										'('				"<code>"
 															Tree* pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sIdentifier.c_str());
@@ -297,7 +293,7 @@
 										
 <functionArgumentList>			::=		{ <functionArgumentItem> } ;
 <functionArgumentItem>			::=		( 	TK_STRING  	"<code>"
-															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, GrammerUtils::m_pPrevToken.getText());
+															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
 															{
 																m_pASTCurrentNode->addChild(pStringNode);
 																m_pASTCurrentNode->m_sAdditionalInfo.append("S");
@@ -317,7 +313,7 @@
 											[',']
 											|
 											TK_INTEGER	"<code>"
-																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pIntegerNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("C");
@@ -325,7 +321,7 @@
 															"</code>"
 											|
 											TK_CHARACTER	"<code>"
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pCharacterNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
@@ -373,9 +369,9 @@
 <elseStatement>					::=		"else" 			"<code>"
 															__START_BLOCK_STRING__("else")
 															
-															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
+															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, PREV_TOKEN_TEXT);
 															Tree* pIfNode = nullptr;
-															{	
+															{
 																pIfNode = m_pASTCurrentNode;
 																pElseNode->m_pParentNode = pIfNode->m_pParentNode;
 																
@@ -455,8 +451,7 @@
 										
 <switchArgument>				::= 	(	TK_IDENTIFIER
 													"<code>"
-														std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 														assert(!sFullyQualifiedVariableName.empty());
 
 														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
@@ -465,7 +460,7 @@
 											|
 											TK_INTEGER
 													"<code>"
-														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 														m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
 													"</code>"
 										);
@@ -480,7 +475,7 @@
 														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
-														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
+														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, PREV_TOKEN_TEXT);
 														m_pASTCurrentNode->addChild(pSwitchCaseNode);
 														{
 															pTemp = m_pASTCurrentNode;
@@ -508,7 +503,7 @@
 														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
-														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
+														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, PREV_TOKEN_TEXT);
 														m_pASTCurrentNode->addChild(pSwitchDefaultNode);
 														{
 															pTemp = m_pASTCurrentNode;
@@ -611,7 +606,7 @@
 
 <print>							::= 	"print" 
 										'(' 			"<code>"
-															Tree* pPrintNode = makeLeaf(ASTNodeType::ASTNode_PRINT, GrammerUtils::m_pPrevToken.getText());
+															Tree* pPrintNode = makeLeaf(ASTNodeType::ASTNode_PRINT, PREV_TOKEN_TEXT);
 															Tree* pTemp = nullptr;
 															{
 																m_pASTCurrentNode->addChild(pPrintNode);
@@ -629,7 +624,7 @@
 										
 <print_list>					::= 	{ <print_list_0> } ;
 <print_list_0>					::= 	( 	TK_STRING  	"<code>"
-															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, GrammerUtils::m_pPrevToken.getText());
+															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
 															{
 																m_pASTCurrentNode->addChild(pStringNode);
 															}
@@ -646,7 +641,7 @@
 											[',']
 											|
 											TK_CHARACTER	"<code>"
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pCharacterNode);
 																}
@@ -654,7 +649,7 @@
 										) ;
 
 <putc>							::=		"putc" 				"<code>"
-																Tree* pPutCNode = makeLeaf(ASTNodeType::ASTNode_PUTC, GrammerUtils::m_pPrevToken.getText());
+																Tree* pPutCNode = makeLeaf(ASTNodeType::ASTNode_PUTC, PREV_TOKEN_TEXT);
 																Tree* pTemp = nullptr;
 																{
 																	m_pASTCurrentNode->addChild(pPutCNode);
@@ -672,8 +667,7 @@
 										;
 										
 <putcList>						::=		( 	TK_IDENTIFIER 	"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 																assert(!sFullyQualifiedVariableName.empty());
 
 																Tree* pIdentifierNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
@@ -681,12 +675,12 @@
 															"</code>"
 											|
 											TK_INTEGER		"<code>"
-																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																m_pASTCurrentNode->addChild(pIntegerNode);
 															"</code>"
 											|
 											TK_CHARACTER 	"<code>"
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																m_pASTCurrentNode->addChild(pCharacterNode);
 															"</code>"
 										);
@@ -706,11 +700,11 @@
 																// Person pPersonObjs[4];		// OR Person* pPersonObjs[4];
 
 															"<code>"
-																std::string sStructType = GrammerUtils::m_pPrevToken.getText();
+																std::string sStructType = PREV_TOKEN_TEXT;
 															"</code>"
 										[ '*' ]
 										TK_IDENTIFIER		"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
@@ -736,6 +730,7 @@
 																{
 																	pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
 																	Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sStructType.c_str());
+																	
 																	pFunctionCallNode->addChild(pFuncCallEndNode);
 																	m_pASTCurrentNode->addChild(pFunctionCallNode);
 																}
@@ -768,18 +763,17 @@
 										);
 
 <primPtr>						::=					"<code>"
-														std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+														std::string sPointerType = PREV_TOKEN_TEXT;
 													"</code>"
 										'*'
 										TK_IDENTIFIER		
 													"<code>"
-														std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+														std::string sVariableName = PREV_TOKEN_TEXT;
 														std::string sFullyQualifiedVariableName;
 														sFullyQualifiedVariableName.append(getBlockString());
 														sFullyQualifiedVariableName.append(sVariableName);
 														
-														ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-														Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+														Tree* pPrimPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedVariableName.c_str());
 														Tree* pTemp = nullptr;
 														{
 															pTemp = m_pASTCurrentNode;
@@ -809,10 +803,10 @@
 										);
 										
 <primArray>						::= 						"<code>"
-																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+																std::string sPrimitiveType = PREV_TOKEN_TEXT;
 															"</code>"
 										TK_DEREFARRAY		"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
@@ -821,8 +815,7 @@
 																if(m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
 																	pushLocalHeapVar(sFullyQualifiedVariableName);
 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPEARRAY;
-																Tree* pPrimTypeArrayNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+																Tree* pPrimTypeArrayNode = makeLeaf(ASTNodeType::ASTNode_TYPEARRAY, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
@@ -837,7 +830,7 @@
 										[	// Optional Array Size
 											TK_INTEGER
 															"<code>"
-																Tree* pArraySizeLeaf = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pArraySizeLeaf = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																{
 																	pPrimTypeArrayNode->m_pLeftNode = pArraySizeLeaf;
 																	pArraySizeLeaf->m_pParentNode = pPrimTypeArrayNode;
@@ -880,16 +873,15 @@
 										'}';
 
 <primType>						::= 						"<code>"
-																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+																std::string sPrimitiveType = PREV_TOKEN_TEXT;
 															"</code>"
 										TK_IDENTIFIER 		"<code>"
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
 																
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
@@ -1005,8 +997,7 @@
 										
 <structMemberVariableAssignmentOrFunctionCall>
 								::=		TK_MEMBERACCESS	"<code>"
-															std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
-															std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+															std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 															
 															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
 															{
@@ -1103,8 +1094,7 @@
 <freePtrStatement>				::=		"free"
 										'('
 										TK_IDENTIFIER	"<code>"
-															std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 															assert(!sFullyQualifiedVariableName.empty());
 
 															Tree* pFreePtrLeaf = makeLeaf(ASTNodeType::ASTNode_FREE, sFullyQualifiedVariableName.c_str());
@@ -1239,9 +1229,9 @@
 																}
 																assert(pFunctionCallNode != nullptr);
 																{
-																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFuncName = pFunctionCallNode->getAdditionalInfoFor("text");
 																	std::string sFullyQualifiedTempVariableName;
-																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append(pAssignNode->getAdditionalInfoFor("text"));
 																	sFullyQualifiedTempVariableName.append("_");
 																	sFullyQualifiedTempVariableName.append(sFuncName);
 																	
@@ -1269,12 +1259,12 @@
 											<tk_identifier>
 											| 
 											TK_INTEGER		"<code>"
-																sOperand = GrammerUtils::m_pPrevToken.getText();
+																sOperand = PREV_TOKEN_TEXT;
 																m_vPostFix.push_back(sOperand);
 															"</code>"
 											|
 											TK_CHARACTER	"<code>"
-																sOperand = GrammerUtils::m_pPrevToken.getText();
+																sOperand = PREV_TOKEN_TEXT;
 																char pStr[255] = {0};
 																sprintf_s(pStr, "%d", sOperand.c_str()[0]);
 
@@ -1287,7 +1277,7 @@
 											<postFixIncrDecrInExpr>
 											|
 											TK_IDENTIFIER	"<code>"
-																std::string sOperand = GrammerUtils::m_pPrevToken.getText();
+																std::string sOperand = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
 																assert(!sFullyQualifiedVariableName.empty());
 																if(!sFullyQualifiedVariableName.empty())
@@ -1300,7 +1290,7 @@
 										);
 										
 <structMemberAccess>			::=		TK_MEMBERACCESS		"<code>"
-																std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
+																std::string sObjectName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
 																
 																Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
@@ -1326,9 +1316,9 @@
 											|
 											TK_IDENTIFIER	"<code>"
 																{
-																	std::string sOperand = m_pASTCurrentNode->m_sText;
+																	std::string sOperand = m_pASTCurrentNode->getAdditionalInfoFor("text");
 																	sOperand.append("->");
-																	sOperand.append(GrammerUtils::m_pPrevToken.getText());
+																	sOperand.append(PREV_TOKEN_TEXT);
 																	
 																	m_vPostFix.push_back(sOperand);
 																}
@@ -1357,9 +1347,9 @@
 																}
 																assert(pFunctionCallNode != nullptr);
 																{
-																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFuncName = pFunctionCallNode->getAdditionalInfoFor("text");
 																	std::string sFullyQualifiedTempVariableName;
-																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append(pAssignNode->getAdditionalInfoFor("text"));
 																	sFullyQualifiedTempVariableName.append("_");
 																	sFullyQualifiedTempVariableName.append(sFuncName);
 																	

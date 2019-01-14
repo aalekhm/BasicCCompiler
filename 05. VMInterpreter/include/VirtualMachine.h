@@ -180,9 +180,15 @@ class VirtualMachine
 		void						dealloc(int32_t pAddress);
 		void						merge();
 
-		int32_t						getAddressOf(int32_t iVariable);
 		int32_t						getValueIn(int32_t iVariable);
-		void						storeValueFromStackIn(int32_t iVariable);
+
+		void						store(OPCODE eOpCode);
+		void						pushr(OPCODE eOpCode);
+		void						popr(OPCODE eOpCode);
+		void						subreg(OPCODE eOpCode);
+		void						lda(OPCODE eOpCode);
+		void						sta(OPCODE eOpcode);
+		void						clrMem(OPCODE eOpCode);
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();

@@ -14,6 +14,8 @@
 
 #define __START_FUNCTION__ m_bFunctionInProcess = true;
 #define __END_FUNCTION__ m_bFunctionInProcess = false;
+
+#define PREV_TOKEN_TEXT GrammerUtils::m_pPrevToken.getText()
 	
 TinyCReader::TinyCReader()
 : m_bStructInProcess(false)
@@ -208,7 +210,7 @@ Tree* TinyCReader::createPostFixExpr(Tree* pLeaf /* = nullptr*/)
 	if (pLeaf == nullptr)
 		pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
 	else
-		pLeaf->m_sText = sPostFixExpr;
+		pLeaf->setAdditionalInfo("text", sPostFixExpr);
 
 	return pLeaf;
 }
@@ -218,7 +220,7 @@ Tree* TinyCReader::makeLeaf(ASTNodeType eASTNodeType, const char* sText)
 	Tree* pLeaf = new Tree();
 	{
 		pLeaf->m_eASTNodeType = eASTNodeType;
-		pLeaf->m_sText = sText;
+		pLeaf->setAdditionalInfo("text", sText);
 	}
 
 	return pLeaf;
@@ -281,7 +283,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 			) {
 				if (pChild->m_sAdditionalInfo == sVariable)
 				{
-					sFullyQualifiedName = pChild->m_sText;
+					sFullyQualifiedName = pChild->getAdditionalInfoFor("text");
 					bFound = true;
 					break;
 				}
@@ -293,9 +295,9 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 	{
 		for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
 		{
-			if (pStaticVar->m_sText == sVariable)
+			if (pStaticVar->getAdditionalInfoFor("text") == sVariable)
 			{
-				sFullyQualifiedName = pStaticVar->m_sText;
+				sFullyQualifiedName = pStaticVar->getAdditionalInfoFor("text");
 				bFound = true;
 				break;
 			}
@@ -316,7 +318,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 				) {
 					if (pChildNode->m_sAdditionalInfo == sVariable)
 					{
-						sFullyQualifiedName = pChildNode->m_sText;
+						sFullyQualifiedName = pChildNode->getAdditionalInfoFor("text");
 						bFound = true;
 						break;
 					}
@@ -515,7 +517,7 @@ if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
 																__START_STRUCT__
-																std::string sStructName = GrammerUtils::m_pPrevToken.getText();
+																std::string sStructName = PREV_TOKEN_TEXT;
 																__START_BLOCK_STRING__(sStructName)
 																
 																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
@@ -623,17 +625,14 @@ bool TinyCReader::staticPtr() {
 if(!primitiveType())
 return false;
 
-																std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+																std::string sPointerType = PREV_TOKEN_TEXT;
 															
 if(!GrammerUtils::match('*', MANDATORY))
 return false;
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-																std::string sStaticVariableName = GrammerUtils::m_pPrevToken.getText();
-																
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPESTATIC;																
-																Tree* pStaticPtrNode = makeLeaf(eASTNodeType, sStaticVariableName.c_str());
+																Tree* pStaticPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPESTATIC, PREV_TOKEN_TEXT);
 																pStaticPtrNode->m_bIsPointerType = true;
 																pStaticPtrNode->setAdditionalInfo("type", sPointerType);
 																pStaticPtrNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::STATIC));
@@ -651,13 +650,13 @@ bool TinyCReader::functionDef() {
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-																std::string sReturnType = GrammerUtils::m_pPrevToken.getText();
+																std::string sReturnType = PREV_TOKEN_TEXT;
 															
 if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
 return false;
 
 																__START_FUNCTION__
-																std::string sFunctionName = GrammerUtils::m_pPrevToken.getText();
+																std::string sFunctionName = PREV_TOKEN_TEXT;
 																__START_BLOCK_STRING__(sFunctionName)
 																
 																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
@@ -749,18 +748,17 @@ bool TinyCReader::primitiveTypeInt() {
 if(!primitiveType())
 return false;
 
-																std::string sType = GrammerUtils::m_pPrevToken.getText();
+																std::string sType = PREV_TOKEN_TEXT;
 															
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-																std::string sArgName = GrammerUtils::m_pPrevToken.getText();
+																std::string sArgName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedArgName;
 																sFullyQualifiedArgName.append(getBlockString());
 																sFullyQualifiedArgName.append(sArgName);
 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedArgName.c_str());
+																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedArgName.c_str());
 																{
 																	pPrimIntNode->m_sAdditionalInfo.append(sArgName);
 																	pPrimIntNode->setAdditionalInfo("type", sType);
@@ -984,7 +982,7 @@ bool TinyCReader::functionCall() {
 if(!GrammerUtils::match(TokenType::Type::TK_FUNCTIONCALL, MANDATORY))
 return false;
 
-															std::string sIdentifier = GrammerUtils::m_pPrevToken.getText();
+															std::string sIdentifier = PREV_TOKEN_TEXT;
 														
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
@@ -1030,7 +1028,7 @@ return true;
 bool TinyCReader::functionArgumentItem() {
 if(GrammerUtils::match(TokenType::Type::TK_STRING, OPTIONAL)) {
 
-															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, GrammerUtils::m_pPrevToken.getText());
+															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
 															{
 																m_pASTCurrentNode->addChild(pStringNode);
 																m_pASTCurrentNode->m_sAdditionalInfo.append("S");
@@ -1070,7 +1068,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
 
-																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pIntegerNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("C");
@@ -1081,7 +1079,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_CHARACTER, OPTIONAL)) {
 
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pCharacterNode);
 																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
@@ -1174,9 +1172,9 @@ return false;
 
 															__START_BLOCK_STRING__("else")
 															
-															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, GrammerUtils::m_pPrevToken.getText());
+															Tree* pElseNode = makeLeaf(ASTNodeType::ASTNode_ELSE, PREV_TOKEN_TEXT);
 															Tree* pIfNode = nullptr;
-															{	
+															{
 																pIfNode = m_pASTCurrentNode;
 																pElseNode->m_pParentNode = pIfNode->m_pParentNode;
 																
@@ -1312,8 +1310,7 @@ return true;
 bool TinyCReader::switchArgument() {
 if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
-														std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 														assert(!sFullyQualifiedVariableName.empty());
 
 														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
@@ -1324,7 +1321,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
 
-														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+														Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 														m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
 													
 return true;
@@ -1372,7 +1369,7 @@ return false;
 														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
-														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, GrammerUtils::m_pPrevToken.getText());
+														Tree* pSwitchCaseNode = makeLeaf(ASTNodeType::ASTNode_SWITCHCASE, PREV_TOKEN_TEXT);
 														m_pASTCurrentNode->addChild(pSwitchCaseNode);
 														{
 															pTemp = m_pASTCurrentNode;
@@ -1428,7 +1425,7 @@ return false;
 														__START_BLOCK_STRING__("switchcase")
 													
 														Tree* pTemp = nullptr;
-														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, GrammerUtils::m_pPrevToken.getText());
+														Tree* pSwitchDefaultNode = makeLeaf(ASTNodeType::ASTNode_SWITCHDEFAULT, PREV_TOKEN_TEXT);
 														m_pASTCurrentNode->addChild(pSwitchDefaultNode);
 														{
 															pTemp = m_pASTCurrentNode;
@@ -1645,7 +1642,7 @@ return false;
 if(!GrammerUtils::match('(', MANDATORY))
 return false;
 
-															Tree* pPrintNode = makeLeaf(ASTNodeType::ASTNode_PRINT, GrammerUtils::m_pPrevToken.getText());
+															Tree* pPrintNode = makeLeaf(ASTNodeType::ASTNode_PRINT, PREV_TOKEN_TEXT);
 															Tree* pTemp = nullptr;
 															{
 																m_pASTCurrentNode->addChild(pPrintNode);
@@ -1680,7 +1677,7 @@ return true;
 bool TinyCReader::print_list_0() {
 if(GrammerUtils::match(TokenType::Type::TK_STRING, OPTIONAL)) {
 
-															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, GrammerUtils::m_pPrevToken.getText());
+															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
 															{
 																m_pASTCurrentNode->addChild(pStringNode);
 															}
@@ -1717,7 +1714,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_CHARACTER, OPTIONAL)) {
 
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pCharacterNode);
 																}
@@ -1735,7 +1732,7 @@ bool TinyCReader::putc() {
 if(!GrammerUtils::match("putc", MANDATORY))
 return false;
 
-																Tree* pPutCNode = makeLeaf(ASTNodeType::ASTNode_PUTC, GrammerUtils::m_pPrevToken.getText());
+																Tree* pPutCNode = makeLeaf(ASTNodeType::ASTNode_PUTC, PREV_TOKEN_TEXT);
 																Tree* pTemp = nullptr;
 																{
 																	m_pASTCurrentNode->addChild(pPutCNode);
@@ -1760,8 +1757,7 @@ return true;
 bool TinyCReader::putcList() {
 if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 																assert(!sFullyQualifiedVariableName.empty());
 
 																Tree* pIdentifierNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
@@ -1772,7 +1768,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
 
-																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																m_pASTCurrentNode->addChild(pIntegerNode);
 															
 return true;
@@ -1780,7 +1776,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_CHARACTER, OPTIONAL)) {
 
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																m_pASTCurrentNode->addChild(pCharacterNode);
 															
 return true;
@@ -1813,7 +1809,7 @@ bool TinyCReader::newStructPtr() {
 if(!structType())
 return false;
 
-																std::string sStructType = GrammerUtils::m_pPrevToken.getText();
+																std::string sStructType = PREV_TOKEN_TEXT;
 															
 if(!GrammerUtils::match('*', OPTIONAL)) {
 
@@ -1826,7 +1822,7 @@ else {
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
@@ -1863,6 +1859,7 @@ return false;
 																{
 																	pFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALL, sStructType.c_str());
 																	Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sStructType.c_str());
+																	
 																	pFunctionCallNode->addChild(pFuncCallEndNode);
 																	m_pASTCurrentNode->addChild(pFunctionCallNode);
 																}
@@ -1916,20 +1913,19 @@ return true;
 
 bool TinyCReader::primPtr() {
 
-														std::string sPointerType = GrammerUtils::m_pPrevToken.getText();
+														std::string sPointerType = PREV_TOKEN_TEXT;
 													
 if(!GrammerUtils::match('*', MANDATORY))
 return false;
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-														std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+														std::string sVariableName = PREV_TOKEN_TEXT;
 														std::string sFullyQualifiedVariableName;
 														sFullyQualifiedVariableName.append(getBlockString());
 														sFullyQualifiedVariableName.append(sVariableName);
 														
-														ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-														Tree* pPrimPtrNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+														Tree* pPrimPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedVariableName.c_str());
 														Tree* pTemp = nullptr;
 														{
 															pTemp = m_pASTCurrentNode;
@@ -1982,12 +1978,12 @@ return true;
 
 bool TinyCReader::primArray() {
 
-																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+																std::string sPrimitiveType = PREV_TOKEN_TEXT;
 															
 if(!GrammerUtils::match(TokenType::Type::TK_DEREFARRAY, MANDATORY))
 return false;
 
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
@@ -1998,8 +1994,7 @@ return false;
 																if(m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
 																	pushLocalHeapVar(sFullyQualifiedVariableName);
 
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPEARRAY;
-																Tree* pPrimTypeArrayNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+																Tree* pPrimTypeArrayNode = makeLeaf(ASTNodeType::ASTNode_TYPEARRAY, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
@@ -2018,7 +2013,7 @@ if(!GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
 else {
 
 
-																Tree* pArraySizeLeaf = makeLeaf(ASTNodeType::ASTNode_INTEGER, GrammerUtils::m_pPrevToken.getText());
+																Tree* pArraySizeLeaf = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																{
 																	pPrimTypeArrayNode->m_pLeftNode = pArraySizeLeaf;
 																	pArraySizeLeaf->m_pParentNode = pPrimTypeArrayNode;
@@ -2091,18 +2086,17 @@ return true;
 
 bool TinyCReader::primType() {
 
-																std::string sPrimitiveType = GrammerUtils::m_pPrevToken.getText();
+																std::string sPrimitiveType = PREV_TOKEN_TEXT;
 															
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-																std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
+																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
 																sFullyQualifiedVariableName.append(getBlockString());
 																sFullyQualifiedVariableName.append(sVariableName);
 																
-																ASTNodeType eASTNodeType = ASTNodeType::ASTNode_TYPE;
-																Tree* pPrimIntNode = makeLeaf(eASTNodeType, sFullyQualifiedVariableName.c_str());
+																Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
@@ -2264,8 +2258,7 @@ bool TinyCReader::structMemberVariableAssignmentOrFunctionCall() {
 if(!GrammerUtils::match(TokenType::Type::TK_MEMBERACCESS, MANDATORY))
 return false;
 
-															std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
-															std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+															std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 															
 															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
 															{
@@ -2397,8 +2390,7 @@ return false;
 if(!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 return false;
 
-															std::string sVariableName = GrammerUtils::m_pPrevToken.getText();
-															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
+															std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 															assert(!sFullyQualifiedVariableName.empty());
 
 															Tree* pFreePtrLeaf = makeLeaf(ASTNodeType::ASTNode_FREE, sFullyQualifiedVariableName.c_str());
@@ -2776,9 +2768,9 @@ if(functionCall()) {
 																}
 																assert(pFunctionCallNode != nullptr);
 																{
-																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFuncName = pFunctionCallNode->getAdditionalInfoFor("text");
 																	std::string sFullyQualifiedTempVariableName;
-																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append(pAssignNode->getAdditionalInfoFor("text"));
 																	sFullyQualifiedTempVariableName.append("_");
 																	sFullyQualifiedTempVariableName.append(sFuncName);
 																	
@@ -2813,7 +2805,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_INTEGER, OPTIONAL)) {
 
-																sOperand = GrammerUtils::m_pPrevToken.getText();
+																sOperand = PREV_TOKEN_TEXT;
 																m_vPostFix.push_back(sOperand);
 															
 return true;
@@ -2821,7 +2813,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_CHARACTER, OPTIONAL)) {
 
-																sOperand = GrammerUtils::m_pPrevToken.getText();
+																sOperand = PREV_TOKEN_TEXT;
 																char pStr[255] = {0};
 																sprintf_s(pStr, "%d", sOperand.c_str()[0]);
 
@@ -2847,7 +2839,7 @@ return true;
 else
 if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
-																std::string sOperand = GrammerUtils::m_pPrevToken.getText();
+																std::string sOperand = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sOperand);
 																assert(!sFullyQualifiedVariableName.empty());
 																if(!sFullyQualifiedVariableName.empty())
@@ -2870,7 +2862,7 @@ bool TinyCReader::structMemberAccess() {
 if(!GrammerUtils::match(TokenType::Type::TK_MEMBERACCESS, MANDATORY))
 return false;
 
-																std::string sObjectName = GrammerUtils::m_pPrevToken.getText();
+																std::string sObjectName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
 																
 																Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
@@ -2905,9 +2897,9 @@ else
 if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
 																{
-																	std::string sOperand = m_pASTCurrentNode->m_sText;
+																	std::string sOperand = m_pASTCurrentNode->getAdditionalInfoFor("text");
 																	sOperand.append("->");
-																	sOperand.append(GrammerUtils::m_pPrevToken.getText());
+																	sOperand.append(PREV_TOKEN_TEXT);
 																	
 																	m_vPostFix.push_back(sOperand);
 																}
@@ -2945,9 +2937,9 @@ return false;
 																}
 																assert(pFunctionCallNode != nullptr);
 																{
-																	std::string sFuncName = pFunctionCallNode->m_sText;
+																	std::string sFuncName = pFunctionCallNode->getAdditionalInfoFor("text");
 																	std::string sFullyQualifiedTempVariableName;
-																	sFullyQualifiedTempVariableName.append(pAssignNode->m_sText);
+																	sFullyQualifiedTempVariableName.append(pAssignNode->getAdditionalInfoFor("text"));
 																	sFullyQualifiedTempVariableName.append("_");
 																	sFullyQualifiedTempVariableName.append(sFuncName);
 																	

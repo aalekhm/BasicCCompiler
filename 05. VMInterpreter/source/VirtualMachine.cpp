@@ -239,10 +239,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		break;
 		case OPCODE::STORE:
 		{
-			int32_t iVariable = READ_OPERAND(eOpCode);
-			{
-				storeValueFromStackIn(iVariable);
-			}
+			store(eOpCode);
 		}
 		break;
 		case OPCODE::PUSH:
@@ -251,67 +248,13 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			STACK[--REGS.RSP] = iOperand;
 		break;
 		case OPCODE::PUSHR:
-			iOperand = READ_OPERAND(eOpCode);
-			switch (iOperand)
-			{
-				case (int)EREGISTERS::RAX:	// Accumulator
-					STACK[--REGS.RSP] = REGS.RAX;
-				break;
-				case (int)EREGISTERS::RCX:	// Counter
-					STACK[--REGS.RSP] = REGS.RCX;
-				break;
-				case (int)EREGISTERS::RDX:	// Data
-					STACK[--REGS.RSP] = REGS.RDX;
-				break;
-				case (int)EREGISTERS::RBX:	// Base
-					STACK[--REGS.RSP] = REGS.RBX;
-				break;
-				case (int)EREGISTERS::RSP:	// Stack Pointer
-					STACK[--REGS.RSP] = REGS.RSP;
-				break;
-				case (int)EREGISTERS::RBP:	// Stack Base Pointer
-					STACK[--REGS.RSP] = REGS.RBP;
-				break;
-				case (int)EREGISTERS::RSI:	// Source
-					STACK[--REGS.RSP] = REGS.RSI;
-				break;
-				case (int)EREGISTERS::RDI:	// Destination
-					STACK[--REGS.RSP] = REGS.RDI;
-				break;
-			}
+			pushr(eOpCode);
 		break;
 		case OPCODE::POP:
 		case OPCODE::POPI:
 		break;
 		case OPCODE::POPR:
-			iOperand = READ_OPERAND(eOpCode);
-			switch (iOperand)
-			{
-				case (int)EREGISTERS::RAX:	// Accumulator
-					REGS.RAX = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RCX:	// Counter
-					REGS.RCX = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RDX:	// Data
-					REGS.RDX = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RBX:	// Base
-					REGS.RBX = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RSP:	// Stack Pointer
-					REGS.RSP = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RBP:	// Stack Base Pointer
-					REGS.RBP = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RSI:	// Source
-					REGS.RSI = STACK[REGS.RSP++];
-				break;
-				case (int)EREGISTERS::RDI:	// Destination
-					REGS.RDI = STACK[REGS.RSP++];
-				break;
-			}
+			popr(eOpCode);
 		break;
 		case OPCODE::CALL:
 			iOperand = READ_OPERAND(eOpCode);
@@ -322,36 +265,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			REGS.EIP = STACK[REGS.RSP++];			// Pop the Return address off the stack.
 		break;
 		case OPCODE::SUB_REG:
-			iOperand = READ_OPERAND(eOpCode);
-			iOperand2 = READ_OPERAND(eOpCode);
-
-			switch (iOperand)
-			{
-				case (int)EREGISTERS::RAX:	// Accumulator
-					REGS.RAX += iOperand2;
-				break;
-				case (int)EREGISTERS::RCX:	// Counter
-					REGS.RCX += iOperand2;
-				break;
-				case (int)EREGISTERS::RDX:	// Data
-					REGS.RDX += iOperand2;
-				break;
-				case (int)EREGISTERS::RBX:	// Base
-					REGS.RBX += iOperand2;
-				break;
-				case (int)EREGISTERS::RSP:	// Stack Pointer
-					REGS.RSP += iOperand2;
-				break;
-				case (int)EREGISTERS::RBP:	// Stack Base Pointer
-					REGS.RBP += iOperand2;
-				break;
-				case (int)EREGISTERS::RSI:	// Source
-					REGS.RSI += iOperand2;
-				break;
-				case (int)EREGISTERS::RDI:	// Destination
-					REGS.RDI += iOperand2;
-				break;
-			}
+			subreg(eOpCode);
 		break;
 		case OPCODE::MUL:
 			iTemp1 = STACK[REGS.RSP++];
@@ -505,67 +419,18 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		case OPCODE::LDA:
 		{
 			// LDA - Load Value from memory address in Accumulator(in our case, the STACK)
-			iOperand = READ_OPERAND(eOpCode);			// Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
-
-			int32_t iVarType = STACK[REGS.RSP++];		// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
-			int32_t iAddress = STACK[REGS.RSP++];
-			int32_t iArrayIndex = STACK[REGS.RSP++];	// ArrayIndex.
-			
-			int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
-			pAddress_8 += (iArrayIndex * iVarType);
-			int32_t* pAddress = (int32_t*)pAddress_8;
-
-			int32_t iValue = ((*pAddress) & iOperand);
-			
-			STACK[--REGS.RSP] = iValue;
+			lda(eOpCode);
 		}
 		break;
 		case OPCODE::STA:
 		{
 			// STA - Store Value in Accumulator(in our case, the STACK) to memory address
-			int32_t iVariable = READ_OPERAND(eOpCode);			// Pointer Variable.
-
-			int32_t iVarType = STACK[REGS.RSP++];				// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
-			int32_t iArrayIndex = STACK[REGS.RSP++];			// ArrayIndex.
-			int32_t iRValue = STACK[REGS.RSP++];				// RValue to be stored, picked up from the STACK.
-
-			int32_t iAddress = getValueIn(iVariable);
-			{
-				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
-				pAddress_8 += (iArrayIndex*iVarType);
-				int32_t* pAddress = (int32_t*)pAddress_8;
-				*pAddress = iRValue;
-#if (VERBOSE == 1)
-				std::cout << "\t\t\t\t\t\t[HEAP] " << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
-#endif
-			}
+			sta(eOpCode);
 		}
 		break;
 		case OPCODE::CLR:
 		{
-			// arr[5..7] = 0; ------------ - (II)
-
-			int32_t iOperand1_Variable				= READ_OPERAND(eOpCode);		// 1. "arr" position in heap
-			int32_t iOperand2_ArrayIndex			= READ_OPERAND(eOpCode);		// 2. '5'	==> ArrayIndex.
-			int32_t iOperand3_LastPos				= READ_OPERAND(eOpCode);		// 3. Count (in this case, 3 i.e for 5, 6, 7)
-			int32_t iOperand4_RValue				= READ_OPERAND(eOpCode);		// 4. '0'	==> RValue to be stored
-			int32_t iOperand5_VarType				= READ_OPERAND(eOpCode);		// 5. Cast Value of Type "arr" to perform relevant 'CAST'
-			int32_t iOperand6_CastValue				= READ_OPERAND(eOpCode);		// 6. Variable TYPE(int8_t = 1, int16_t = 2, int32_t = 4).
-
-			// Clear Memory
-			{
-				int32_t iAddress = getValueIn(iOperand1_Variable);
-
-				int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
-				pAddress_8 += (iOperand2_ArrayIndex * iOperand5_VarType);
-				int32_t iCount = (iOperand3_LastPos - iOperand2_ArrayIndex);
-
-				for (int32_t i = 1; i <= iCount; i++)
-				{
-					*pAddress_8 = (iOperand4_RValue & iOperand6_CastValue);
-					pAddress_8 += iOperand5_VarType;
-				}
-			}
+			clrMem(eOpCode);
 		}
 		break;
 		case OPCODE::NEGATE:
@@ -676,6 +541,168 @@ int64_t VirtualMachine::readOperandFor(OPCODE eOpCode)
 	}
 }
 
+void VirtualMachine::pushr(OPCODE eOpCode)
+{
+	int32_t iOperand = READ_OPERAND(eOpCode);
+	switch (iOperand)
+	{
+		case (int)EREGISTERS::RAX:	// Accumulator
+			STACK[--REGS.RSP] = REGS.RAX;
+		break;
+		case (int)EREGISTERS::RCX:	// Counter
+			STACK[--REGS.RSP] = REGS.RCX;
+		break;
+		case (int)EREGISTERS::RDX:	// Data
+			STACK[--REGS.RSP] = REGS.RDX;
+		break;
+		case (int)EREGISTERS::RBX:	// Base
+			STACK[--REGS.RSP] = REGS.RBX;
+		break;
+		case (int)EREGISTERS::RSP:	// Stack Pointer
+			STACK[--REGS.RSP] = REGS.RSP;
+		break;
+		case (int)EREGISTERS::RBP:	// Stack Base Pointer
+			STACK[--REGS.RSP] = REGS.RBP;
+		break;
+		case (int)EREGISTERS::RSI:	// Source
+			STACK[--REGS.RSP] = REGS.RSI;
+		break;
+		case (int)EREGISTERS::RDI:	// Destination
+			STACK[--REGS.RSP] = REGS.RDI;
+		break;
+	}
+}
+
+void VirtualMachine::popr(OPCODE eOpCode)
+{
+	int32_t iOperand = READ_OPERAND(eOpCode);
+	switch (iOperand)
+	{
+		case (int)EREGISTERS::RAX:	// Accumulator
+			REGS.RAX = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RCX:	// Counter
+			REGS.RCX = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RDX:	// Data
+			REGS.RDX = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RBX:	// Base
+			REGS.RBX = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RSP:	// Stack Pointer
+			REGS.RSP = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RBP:	// Stack Base Pointer
+			REGS.RBP = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RSI:	// Source
+			REGS.RSI = STACK[REGS.RSP++];
+		break;
+		case (int)EREGISTERS::RDI:	// Destination
+			REGS.RDI = STACK[REGS.RSP++];
+		break;
+	}
+}
+
+void VirtualMachine::subreg(OPCODE eOpCode)
+{
+	int32_t iOperand = READ_OPERAND(eOpCode);
+	int32_t iOperand2 = READ_OPERAND(eOpCode);
+
+	switch (iOperand)
+	{
+		case (int)EREGISTERS::RAX:	// Accumulator
+			REGS.RAX += iOperand2;
+		break;
+		case (int)EREGISTERS::RCX:	// Counter
+			REGS.RCX += iOperand2;
+		break;
+		case (int)EREGISTERS::RDX:	// Data
+			REGS.RDX += iOperand2;
+		break;
+		case (int)EREGISTERS::RBX:	// Base
+			REGS.RBX += iOperand2;
+		break;
+		case (int)EREGISTERS::RSP:	// Stack Pointer
+			REGS.RSP += iOperand2;
+		break;
+		case (int)EREGISTERS::RBP:	// Stack Base Pointer
+			REGS.RBP += iOperand2;
+		break;
+		case (int)EREGISTERS::RSI:	// Source
+			REGS.RSI += iOperand2;
+		break;
+		case (int)EREGISTERS::RDI:	// Destination
+			REGS.RDI += iOperand2;
+		break;
+	}
+}
+
+void VirtualMachine::lda(OPCODE eOpCode)
+{
+	int32_t iOperand = READ_OPERAND(eOpCode);			// Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
+
+	int32_t iVarType = STACK[REGS.RSP++];		// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+	int32_t iAddress = STACK[REGS.RSP++];
+	int32_t iArrayIndex = STACK[REGS.RSP++];	// ArrayIndex.
+
+	int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
+	pAddress_8 += (iArrayIndex * iVarType);
+	int32_t* pAddress = (int32_t*)pAddress_8;
+
+	int32_t iValue = ((*pAddress) & iOperand);
+
+	STACK[--REGS.RSP] = iValue;
+}
+
+void VirtualMachine::sta(OPCODE eOpCode)
+{
+	int32_t iVariable = READ_OPERAND(eOpCode);			// Pointer Variable.
+
+	int32_t iVarType = STACK[REGS.RSP++];				// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+	int32_t iArrayIndex = STACK[REGS.RSP++];			// ArrayIndex.
+	int32_t iRValue = STACK[REGS.RSP++];				// RValue to be stored, picked up from the STACK.
+
+	int32_t iAddress = getValueIn(iVariable);
+	{
+		int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
+		pAddress_8 += (iArrayIndex*iVarType);
+		int32_t* pAddress = (int32_t*)pAddress_8;
+		*pAddress = iRValue;
+#if (VERBOSE == 1)
+		std::cout << "\t\t\t\t\t\t[HEAP] " << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
+#endif
+	}
+}
+
+void VirtualMachine::clrMem(OPCODE eOpCode)
+{
+	// arr[5..7] = 0; ------------ - (II)
+
+	int32_t iOperand1_Variable = READ_OPERAND(eOpCode);			// 1. "arr" position in heap
+	int32_t iOperand2_ArrayIndex = READ_OPERAND(eOpCode);		// 2. '5'	==> ArrayIndex.
+	int32_t iOperand3_LastPos = READ_OPERAND(eOpCode);			// 3. Count (in this case, 3 i.e for 5, 6, 7)
+	int32_t iOperand4_RValue = READ_OPERAND(eOpCode);			// 4. '0'	==> RValue to be stored
+	int32_t iOperand5_VarType = READ_OPERAND(eOpCode);			// 5. Cast Value of Type "arr" to perform relevant 'CAST'
+	int32_t iOperand6_CastValue = READ_OPERAND(eOpCode);		// 6. Variable TYPE(int8_t = 1, int16_t = 2, int32_t = 4).
+
+	// Clear Memory
+	{
+		int32_t iAddress = getValueIn(iOperand1_Variable);
+
+		int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
+		pAddress_8 += (iOperand2_ArrayIndex * iOperand5_VarType);
+		int32_t iCount = (iOperand3_LastPos - iOperand2_ArrayIndex);
+
+		for (int32_t i = 1; i <= iCount; i++)
+		{
+			*pAddress_8 = (iOperand4_RValue & iOperand6_CastValue);
+			pAddress_8 += iOperand5_VarType;
+		}
+	}
+}
+
 int32_t VirtualMachine::malloc(int32_t iSize)
 {
 	int32_t iReturnAddress = -1;
@@ -715,17 +742,20 @@ void VirtualMachine::dealloc(int32_t pAddress)
 	std::vector<HeapNode>::iterator itrAllocList = m_vAllocatedList.begin();
 	bool bMemoryReclaimed = false;
 
+	/////////////////////////////////////////////////////////////////
 	// 1. Iterate through the 'Allocated' list.
 	for (; itrAllocList != m_vAllocatedList.end();  ++itrAllocList)
 	{
 		HeapNode& pAllocHeapNode = *itrAllocList;
 
+		/////////////////////////////////////////////////////////////////
 		// 2. Check if the address to be freed matches with any HeapNode.
 		if (pAddress == pAllocHeapNode.m_pAddress)
 		{
 #if (VERBOSE == 1)
 			std::cout << "\t\t\t\t\t\t[HEAP] Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << std::endl;
 #endif
+			/////////////////////////////////////////////////////////////////
 			// 3. Merge it with any preceding HeapNode.
 			bool bFoundPrecedingNode = false;
 			for (HeapNode& pUnAllocHeapNode : m_vUnAllocatedList)
@@ -752,6 +782,7 @@ void VirtualMachine::dealloc(int32_t pAddress)
 					m_vUnAllocatedList.push_back(HeapNode(pAllocHeapNode.m_pAddress, pAllocHeapNode.m_iSize));
 					std::sort(m_vUnAllocatedList.begin(), m_vUnAllocatedList.end(), sortList);
 
+					/////////////////////////////////////////////////////////////////
 					// HeapNodes can be optimized to be merged periodically,
 					// depending on various factors, one of which can be:
 					//		- If 'UnAllocated List' increases to a certain number.
@@ -798,41 +829,13 @@ void VirtualMachine::merge()
 	}
 }
 
-int32_t VirtualMachine::getAddressOf(int32_t iVariable)
-{
-	int32_t iAddress = 0;
-	int16_t iVariablePos = (iVariable & 0x0000FFFF);
-	E_VARIABLESCOPE eVariableType = (E_VARIABLESCOPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
-
-	// Local Var or Function Argument ==> saved on the STACK
-	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
-		||
-		eVariableType == E_VARIABLESCOPE::LOCAL
-	) {
-		if (eVariableType == E_VARIABLESCOPE::ARGUMENT)
-			iVariablePos *= -1;
-
-		iAddress = STACK[REGS.RBP - iVariablePos];
-	}
-	else
-	if (eVariableType == E_VARIABLESCOPE::MEMBER)
-	{
-		iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
-	}
-	else // STATIC variable saved on the HEAP
-	{
-		iAddress = GLOBALS[iVariablePos];
-	}
-
-	return iAddress;
-}
-
 int32_t VirtualMachine::getValueIn(int32_t iVariable)
 {
 	int32_t iValue = 0;
 	int16_t iVariablePos = (iVariable & 0x0000FFFF);
 	E_VARIABLESCOPE eVariableType = (E_VARIABLESCOPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
 
+	/////////////////////////////////////////////////////////////////
 	// Local Var or Function Argument ==> saved on the STACK
 	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||
@@ -858,11 +861,13 @@ int32_t VirtualMachine::getValueIn(int32_t iVariable)
 	return iValue;
 }
 
-void VirtualMachine::storeValueFromStackIn(int32_t iVariable)
+void VirtualMachine::store(OPCODE eOpCode)
 {
+	int32_t iVariable = READ_OPERAND(eOpCode);
 	int16_t iVariablePos = (iVariable & 0x0000FFFF);
 	E_VARIABLESCOPE eVariableType = (E_VARIABLESCOPE)((int32_t)iVariable >> (sizeof(int16_t) * 8));
 
+	/////////////////////////////////////////////////////////////////
 	// Local Var or Function Argument ==> saved on the STACK
 	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||

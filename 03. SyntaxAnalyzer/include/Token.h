@@ -469,7 +469,6 @@ typedef struct Tree
 		, m_pLeftNode(nullptr)
 		, m_pRightNode(nullptr)
 		, m_eASTNodeType(ASTNodeType::ASTNode_INVALID)
-		, m_sText("")
 		, m_sAdditionalInfo("")
 		, m_bIsPointerType(false)
 	{
@@ -550,7 +549,6 @@ typedef struct Tree
 	ASTNodeType			m_eASTNodeType;
 
 	std::vector<Tree*>	m_vStatements;
-	std::string			m_sText;
 	std::string			m_sAdditionalInfo;
 
 	bool				m_bIsPointerType;
@@ -605,6 +603,8 @@ static E_VARIABLESCOPE toScope(std::string sE_VARIABLESCOPE)
 	else if (sE_VARIABLESCOPE == "MEMBER") return E_VARIABLESCOPE::MEMBER;
 }
 
+#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
+
 typedef struct StructInfo
 {
 	StructInfo(Tree* pNode)
@@ -612,7 +612,7 @@ typedef struct StructInfo
 	, m_bHasConstructor(false)
 	, m_bHasDestructor(false)
 	{
-		m_sStructName = pNode->m_sText;
+		m_sStructName = GET_INFO_FOR_KEY(pNode, "text");
 		scanStructForMemberVariables(pNode);
 	}
 
@@ -652,7 +652,7 @@ typedef struct StructInfo
 		for (; pFunctionItr != m_vMemberFunctions.cend(); ++pFunctionItr)
 		{
 			Tree* pFunctionNode = (Tree*)*pFunctionItr;
-			if (pFunctionNode->m_sText == sFunctionName)
+			if (GET_INFO_FOR_KEY(pFunctionNode, "text") == sFunctionName)
 			{
 				bReturn = true;
 				break;
@@ -667,7 +667,7 @@ typedef struct StructInfo
 		Tree* pASTNode = nullptr;
 		for (Tree* pMemberVar : m_vMemberVariables) // Starts with index 0
 		{
-			if (pMemberVar->m_sText == sVariableName)
+			if (GET_INFO_FOR_KEY(pMemberVar, "text") == sVariableName)
 			{
 				pASTNode = pMemberVar;
 				break;
@@ -715,7 +715,7 @@ typedef struct FunctionInfo
 	FunctionInfo(Tree* pNode, int iOffset)
 		: m_pNode(pNode)
 		, m_iStartOffsetInCode(iOffset)
-		, m_sFunctionName(pNode->m_sText)
+		, m_sFunctionName( GET_INFO_FOR_KEY(pNode, "text") )
 		, m_pFunctionReturnType(pNode->m_pLeftNode)
 		, m_pFunctionArguments(pNode->m_pRightNode)
 		, m_pParentStructInfo(nullptr)
@@ -786,7 +786,7 @@ typedef struct FunctionInfo
 			for (Tree* pLocalVar : m_vLocalVariables) // Starts with index 1
 			{
 				iShortPosition++;
-				if (pLocalVar->m_sText == sVariableName)
+				if (GET_INFO_FOR_KEY(pLocalVar, "text") == sVariableName)
 				{
 					pASTNode = pLocalVar;
 					bFound = true;
@@ -800,7 +800,7 @@ typedef struct FunctionInfo
 				iShortPosition = 0;
 				for (Tree* pArgVar : m_vArguments) // Starts with index 0
 				{
-					if (pArgVar->m_sText == sVariableName)
+					if (GET_INFO_FOR_KEY(pArgVar, "text") == sVariableName)
 					{
 						pASTNode = pArgVar;
 						bFound = true;
@@ -817,7 +817,7 @@ typedef struct FunctionInfo
 				iShortPosition = 0;
 				for (Tree* pMemberVar : m_pParentStructInfo->m_vMemberVariables) // Starts with index 0
 				{
-					if (pMemberVar->m_sText == sVariableName)
+					if (GET_INFO_FOR_KEY(pMemberVar, "text") == sVariableName)
 					{
 						pASTNode = pMemberVar;
 						bFound = true;
@@ -834,7 +834,7 @@ typedef struct FunctionInfo
 				iShortPosition = 0;
 				for (Tree* pStaticVar : m_vStaticVariables) // Starts with index 0
 				{
-					if (pStaticVar->m_sText == sVariableName)
+					if (GET_INFO_FOR_KEY(pStaticVar, "text") == sVariableName)
 					{
 						pASTNode = pStaticVar;
 						break;
@@ -929,7 +929,7 @@ typedef struct FunctionInfo
 		bool bIsNew = true;
 		for (Tree* pStaticVar : m_vStaticVariables)
 		{
-			if (pNode->m_sText == pStaticVar->m_sText) {
+			if (GET_INFO_FOR_KEY(pNode, "text") == GET_INFO_FOR_KEY(pStaticVar, "text")) {
 				bIsNew = false;
 				break;
 			}

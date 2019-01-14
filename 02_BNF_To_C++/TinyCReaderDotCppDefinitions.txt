@@ -14,6 +14,8 @@
 
 #define __START_FUNCTION__ m_bFunctionInProcess = true;
 #define __END_FUNCTION__ m_bFunctionInProcess = false;
+
+#define PREV_TOKEN_TEXT GrammerUtils::m_pPrevToken.getText()
 	
 TinyCReader::TinyCReader()
 : m_bStructInProcess(false)
@@ -208,7 +210,7 @@ Tree* TinyCReader::createPostFixExpr(Tree* pLeaf /* = nullptr*/)
 	if (pLeaf == nullptr)
 		pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
 	else
-		pLeaf->m_sText = sPostFixExpr;
+		pLeaf->setAdditionalInfo("text", sPostFixExpr);
 
 	return pLeaf;
 }
@@ -218,7 +220,7 @@ Tree* TinyCReader::makeLeaf(ASTNodeType eASTNodeType, const char* sText)
 	Tree* pLeaf = new Tree();
 	{
 		pLeaf->m_eASTNodeType = eASTNodeType;
-		pLeaf->m_sText = sText;
+		pLeaf->setAdditionalInfo("text", sText);
 	}
 
 	return pLeaf;
@@ -281,7 +283,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 			) {
 				if (pChild->m_sAdditionalInfo == sVariable)
 				{
-					sFullyQualifiedName = pChild->m_sText;
+					sFullyQualifiedName = pChild->getAdditionalInfoFor("text");
 					bFound = true;
 					break;
 				}
@@ -293,9 +295,9 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 	{
 		for (Tree* pStaticVar : FunctionInfo::m_vStaticVariables)
 		{
-			if (pStaticVar->m_sText == sVariable)
+			if (pStaticVar->getAdditionalInfoFor("text") == sVariable)
 			{
-				sFullyQualifiedName = pStaticVar->m_sText;
+				sFullyQualifiedName = pStaticVar->getAdditionalInfoFor("text");
 				bFound = true;
 				break;
 			}
@@ -316,7 +318,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 				) {
 					if (pChildNode->m_sAdditionalInfo == sVariable)
 					{
-						sFullyQualifiedName = pChildNode->m_sText;
+						sFullyQualifiedName = pChildNode->getAdditionalInfoFor("text");
 						bFound = true;
 						break;
 					}

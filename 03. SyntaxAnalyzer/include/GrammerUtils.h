@@ -59,6 +59,9 @@ class GrammerUtils
 		static void									handleStructConstructorOrDestructor(FunctionInfo* pNode);
 		static void									addASTForStructMemberVariableConstruction(FunctionInfo* pFunctionInfo);
 		static void									addASTForStructMemberVariableDestruction(FunctionInfo* pFunctionInfo);
+		static void									handleStructEnd(Tree* pNode);
+		static void									handleStructMemberAccess(Tree* pNode);
+
 		static Tree*								createASTForArrayType(Tree* pASTArrayTypeNode);
 		static Tree*								createASTForPointerType(Tree* pASTArrayTypeSrc);
 		static Tree*								createASTForType(Tree* pASTArrayTypeSrc);
