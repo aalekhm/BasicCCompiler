@@ -5,6 +5,8 @@
 #include <assert.h>
 
 #define NOT !
+#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
+#define SET_INFO_FOR_KEY(__node__, __key__, __info__)		__node__->setAdditionalInfo(__key__, __info__)
 
 namespace TokenType
 {
@@ -150,7 +152,7 @@ namespace TokenType
 
 	inline TokenType::Type fromString(std::string sTokenType)
 	{
-			 if (sTokenType == "TK_MUL")				return Type::TK_MUL;
+		if (sTokenType == "TK_MUL")				return Type::TK_MUL;
 		else if (sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
 		else if (sTokenType == "TK_DIV")				return Type::TK_DIV;
 		else if (sTokenType == "TK_DIVEQ")				return Type::TK_DIVEQ;
@@ -281,6 +283,7 @@ enum class OPCODE
 	LDA,
 	STA,
 	CLR,
+	VTBL,
 	HLT,
 };
 
@@ -296,7 +299,7 @@ struct CodeMap
 {
 	const char*		sOpCode;
 	OPCODE			eOpCode;
-	int				iOpcodeOperandCount;
+	int32_t			iOpcodeOperandCount;
 	PRIMIIVETYPE	ePRIMIIVETYPE;
 };
 
@@ -473,7 +476,7 @@ typedef struct Tree
 		, m_bIsPointerType(false)
 	{
 		// Reset the "variablePos" info to "-1"
-		setAdditionalInfo("variablePos", "-1");
+		SET_INFO_FOR_KEY(this, "variablePos", "-1");
 	}
 
 	void addChild(Tree* pNode)
@@ -574,20 +577,20 @@ static std::string toString(E_VARIABLESCOPE eE_VARIABLESCOPE)
 	std::string sE_VARIABLESCOPE = "";
 	switch (eE_VARIABLESCOPE)
 	{
-		case E_VARIABLESCOPE::INVALID:
-			sE_VARIABLESCOPE = "INVALID";
+	case E_VARIABLESCOPE::INVALID:
+		sE_VARIABLESCOPE = "INVALID";
 		break;
-		case E_VARIABLESCOPE::ARGUMENT:
-			sE_VARIABLESCOPE = "ARGUMENT";
+	case E_VARIABLESCOPE::ARGUMENT:
+		sE_VARIABLESCOPE = "ARGUMENT";
 		break;
-		case E_VARIABLESCOPE::LOCAL:
-			sE_VARIABLESCOPE = "LOCAL";
+	case E_VARIABLESCOPE::LOCAL:
+		sE_VARIABLESCOPE = "LOCAL";
 		break;
-		case E_VARIABLESCOPE::STATIC:
-			sE_VARIABLESCOPE = "STATIC";
+	case E_VARIABLESCOPE::STATIC:
+		sE_VARIABLESCOPE = "STATIC";
 		break;
-		case E_VARIABLESCOPE::MEMBER:
-			sE_VARIABLESCOPE = "MEMBER";
+	case E_VARIABLESCOPE::MEMBER:
+		sE_VARIABLESCOPE = "MEMBER";
 		break;
 	}
 
@@ -603,7 +606,7 @@ static E_VARIABLESCOPE toScope(std::string sE_VARIABLESCOPE)
 	else if (sE_VARIABLESCOPE == "MEMBER") return E_VARIABLESCOPE::MEMBER;
 }
 
-#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
+static std::map<std::string, Tree*>		m_MapVariableToASTNodeCache;
 
 typedef struct StructInfo
 {
@@ -611,14 +614,42 @@ typedef struct StructInfo
 	: m_pNode(pNode)
 	, m_bHasConstructor(false)
 	, m_bHasDestructor(false)
+	, m_ParentStructInfo(nullptr)
+	, m_iVirtualFunctionCount(-1)
+	, m_iSizeOf(-1)
+	, m_iVTableOffset(-1)
+	, m_bHasVTable(false)
 	{
 		m_sStructName = GET_INFO_FOR_KEY(pNode, "text");
 		scanStructForMemberVariables(pNode);
 	}
 
-	int32_t sizeOf()
+	int32_t sizeOfMe()					// sizeOf 'this'
 	{
-		return sizeof(int32_t) * m_vMemberVariables.size();
+		int32_t iSizeOf = (sizeof(int32_t) * m_vMemberVariables.size());
+		iSizeOf += (sizeof(int32_t) * (m_bHasVTable ? 1 : 0)); // VTABLE pointer
+
+		return iSizeOf;
+	}
+
+	int32_t sizeOf()					// sizeOf 'this' + sizeOf 'parent'
+	{
+		if (m_iSizeOf < 0)
+		{
+			m_iSizeOf = sizeOfMe();
+
+			if (m_ParentStructInfo != nullptr)
+			{
+				m_iSizeOf += m_ParentStructInfo->sizeOf();
+			}
+		}
+
+		return m_iSizeOf;
+	}
+
+	void setParentStruct(StructInfo* pParentStructInfo)
+	{
+		m_ParentStructInfo = pParentStructInfo;
 	}
 
 	void scanStructForMemberVariables(Tree* pNode)
@@ -637,11 +668,11 @@ typedef struct StructInfo
 		}
 	}
 
-	void addFunction(void* pFunctionInfo)
+	void addFunction(void* vpFunctionInfo)
 	{
-		if (pFunctionInfo != nullptr)
+		if (vpFunctionInfo != nullptr)
 		{
-			m_vMemberFunctions.push_back(pFunctionInfo);
+			m_vMemberFunctions.push_back(vpFunctionInfo);
 		}
 	}
 
@@ -662,15 +693,80 @@ typedef struct StructInfo
 		return bReturn;
 	}
 
+	int32_t structOffsetToVariable(const char* sVariableName)
+	{
+		int32_t iOffset = 0;
+		bool bFound = false;
+		for (Tree* pMemberVar : m_vMemberVariables)
+		{
+			if (GET_INFO_FOR_KEY(pMemberVar, "givenName") == sVariableName)
+			{
+				bFound = true;
+				break;
+			}
+		}
+
+		if (NOT bFound && m_ParentStructInfo != nullptr)
+		{
+			iOffset += sizeOfMe();
+			iOffset += m_ParentStructInfo->structOffsetToVariable(sVariableName);
+		}
+
+		return iOffset;
+	}
+
 	Tree* getMemberVariableASTNode(const char* sVariableName)
 	{
 		Tree* pASTNode = nullptr;
-		for (Tree* pMemberVar : m_vMemberVariables) // Starts with index 0
+		std::map<std::string, Tree*>::const_iterator itr = m_MapVariableToASTNodeCache.find(sVariableName);
+		if (itr != m_MapVariableToASTNodeCache.end())
 		{
-			if (GET_INFO_FOR_KEY(pMemberVar, "text") == sVariableName)
+			pASTNode = m_MapVariableToASTNodeCache[sVariableName];
+		}
+		else
+		{
+			short iShortPosition = 0;
+			for (Tree* pMemberVar : m_vMemberVariables) // Starts with index 0
 			{
-				pASTNode = pMemberVar;
-				break;
+				if (GET_INFO_FOR_KEY(pMemberVar, "givenName") == sVariableName)
+				{
+					pASTNode = pMemberVar;
+					break;
+				}
+
+				iShortPosition++;
+			}
+
+			if (pASTNode == nullptr && m_ParentStructInfo != nullptr)
+			{
+				pASTNode = m_ParentStructInfo->getMemberVariableASTNode(sVariableName);
+			}
+
+			assert(pASTNode != nullptr);
+			if (pASTNode != nullptr)
+			{
+				// While scanning for the variable, find its position in the respective block & set it.
+				std::string sVariablePos = GET_INFO_FOR_KEY(pASTNode, "variablePos");
+				if (sVariablePos == "-1")
+				{
+					int32_t iPositionOperand = 0;
+					E_VARIABLESCOPE eVARIABLESCOPE = E_VARIABLESCOPE::INVALID;
+					eVARIABLESCOPE = toScope(GET_INFO_FOR_KEY(pASTNode, "scope"));
+					assert(eVARIABLESCOPE != E_VARIABLESCOPE::INVALID);
+
+					if (eVARIABLESCOPE == E_VARIABLESCOPE::MEMBER && m_bHasVTable)
+						iShortPosition++;
+
+					iPositionOperand = (int32_t)eVARIABLESCOPE;
+					iPositionOperand <<= sizeof(int16_t) * 8;
+					iPositionOperand |= (iShortPosition & 0x0000FFFF);
+
+					char sVariablePosFound[255] = { 0 };
+					_itoa(iPositionOperand, sVariablePosFound, 10);
+					SET_INFO_FOR_KEY(pASTNode, "variablePos", sVariablePosFound);
+				}
+
+				m_MapVariableToASTNodeCache[sVariableName] = pASTNode;
 			}
 		}
 
@@ -685,37 +781,40 @@ typedef struct StructInfo
 		assert(pASTNode != nullptr);
 		if (pASTNode != nullptr)
 		{
-			std::string sVariablePos = pASTNode->getAdditionalInfoFor("variablePos");
-			short iShortPosition = atoi(sVariablePos.c_str());
-
-			E_VARIABLESCOPE eVARIABLESCOPE = E_VARIABLESCOPE::INVALID;
-			eVARIABLESCOPE = toScope(pASTNode->getAdditionalInfoFor("scope"));
-			assert(eVARIABLESCOPE != E_VARIABLESCOPE::INVALID);
-
-			iPositionOperand = (int32_t)eVARIABLESCOPE;
-			iPositionOperand <<= sizeof(int16_t) * 8;
-			iPositionOperand |= (iShortPosition & 0x0000FFFF);
+			std::string sVariablePos = GET_INFO_FOR_KEY(pASTNode, "variablePos");
+			iPositionOperand = atoi(sVariablePos.c_str());
 		}
 
 		return iPositionOperand;
+	}
+
+	int32_t getVTableOffset()
+	{
+		return m_iVTableOffset;
 	}
 
 	Tree*									m_pNode;
 	std::string								m_sStructName;
 	std::vector<void*>						m_vMemberFunctions;
 	std::vector<Tree*>						m_vMemberVariables;
+	std::vector<void*>						m_vVirtualFunctionTable;
 	bool									m_bHasConstructor;
 	bool									m_bHasDestructor;
-} StructInfo;
 
-static std::map<std::string, Tree*>		m_MapVariableToASTNodeCache;
+	int32_t									m_iVirtualFunctionCount;
+	StructInfo*								m_ParentStructInfo;
+
+	int32_t									m_iSizeOf;
+	int32_t									m_iVTableOffset;
+	bool									m_bHasVTable;
+} StructInfo;
 
 typedef struct FunctionInfo
 {
 	FunctionInfo(Tree* pNode, int iOffset)
 		: m_pNode(pNode)
 		, m_iStartOffsetInCode(iOffset)
-		, m_sFunctionName( GET_INFO_FOR_KEY(pNode, "text") )
+		, m_sFunctionName(GET_INFO_FOR_KEY(pNode, "text"))
 		, m_pFunctionReturnType(pNode->m_pLeftNode)
 		, m_pFunctionArguments(pNode->m_pRightNode)
 		, m_pParentStructInfo(nullptr)
@@ -730,26 +829,26 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_TYPE:
-				case ASTNodeType::ASTNode_TYPEARRAY:
-				case ASTNodeType::ASTNode_TYPESTRUCT:
-				{
-					m_vLocalVariables.push_back(pChild);
-				}
-				break;
-				case ASTNodeType::ASTNode_IF:
-				{
-					scanFunctionForLocals(pChild);
-					Tree* pElseNode = pChild->m_pRightNode;
-					if (pElseNode != nullptr)
-						scanFunctionForLocals(pElseNode);
-				}
-				break;
-				case ASTNodeType::ASTNode_WHILE:
-				{
-					scanFunctionForLocals(pChild);
-				}
-				break;
+			case ASTNodeType::ASTNode_TYPE:
+			case ASTNodeType::ASTNode_TYPEARRAY:
+			case ASTNodeType::ASTNode_TYPESTRUCT:
+			{
+				m_vLocalVariables.push_back(pChild);
+			}
+			break;
+			case ASTNodeType::ASTNode_IF:
+			{
+				scanFunctionForLocals(pChild);
+				Tree* pElseNode = pChild->m_pRightNode;
+				if (pElseNode != nullptr)
+					scanFunctionForLocals(pElseNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_WHILE:
+			{
+				scanFunctionForLocals(pChild);
+			}
+			break;
 			}
 		}
 	}
@@ -760,11 +859,11 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-				case ASTNodeType::ASTNode_TYPE:
-				{
-					m_vArguments.push_back(pChild);
-				}
-				break;
+			case ASTNodeType::ASTNode_TYPE:
+			{
+				m_vArguments.push_back(pChild);
+			}
+			break;
 			}
 		}
 	}
@@ -848,12 +947,24 @@ typedef struct FunctionInfo
 			if (pASTNode != nullptr)
 			{
 				// While scanning for the variable, find its position in the respective block & set it.
-				std::string sVariablePos = pASTNode->getAdditionalInfoFor("variablePos");
+				std::string sVariablePos = GET_INFO_FOR_KEY(pASTNode, "variablePos");
 				if (sVariablePos == "-1")
 				{
+					int32_t iPositionOperand = 0;
+					E_VARIABLESCOPE eVARIABLESCOPE = E_VARIABLESCOPE::INVALID;
+					eVARIABLESCOPE = toScope(GET_INFO_FOR_KEY(pASTNode, "scope"));
+					assert(eVARIABLESCOPE != E_VARIABLESCOPE::INVALID);
+
+					if (eVARIABLESCOPE == E_VARIABLESCOPE::MEMBER && m_pParentStructInfo->m_bHasVTable)
+						iShortPosition++;
+
+					iPositionOperand = (int32_t)eVARIABLESCOPE;
+					iPositionOperand <<= sizeof(int16_t) * 8;
+					iPositionOperand |= (iShortPosition & 0x0000FFFF);
+
 					char sVariablePosFound[255] = { 0 };
-					_itoa(iShortPosition, sVariablePosFound, 10);
-					pASTNode->setAdditionalInfo("variablePos", sVariablePosFound);
+					_itoa(iPositionOperand, sVariablePosFound, 10);
+					SET_INFO_FOR_KEY(pASTNode, "variablePos", sVariablePosFound);
 				}
 
 				m_MapVariableToASTNodeCache[sVariableName] = pASTNode;
@@ -866,21 +977,13 @@ typedef struct FunctionInfo
 	int32_t getLocalVariablePosition(const char* sLocalVariableName)
 	{
 		int32_t iPositionOperand = 0;
-		
+
 		Tree* pASTNode = getVariableASTNode(sLocalVariableName);
 		assert(pASTNode != nullptr);
 		if (pASTNode != nullptr)
 		{
-			std::string sVariablePos = pASTNode->getAdditionalInfoFor("variablePos");
-			short iShortPosition = atoi(sVariablePos.c_str());
-
-			E_VARIABLESCOPE eVARIABLESCOPE = E_VARIABLESCOPE::INVALID;
-			eVARIABLESCOPE = toScope(pASTNode->getAdditionalInfoFor("scope"));
-			assert(eVARIABLESCOPE != E_VARIABLESCOPE::INVALID);
-
-			iPositionOperand = (int32_t)eVARIABLESCOPE;
-			iPositionOperand <<= sizeof(int16_t) * 8;
-			iPositionOperand |= (iShortPosition & 0x0000FFFF);
+			std::string sVariablePos = GET_INFO_FOR_KEY(pASTNode, "variablePos");
+			iPositionOperand = atoi(sVariablePos.c_str());
 		}
 
 		return iPositionOperand;
@@ -894,7 +997,7 @@ typedef struct FunctionInfo
 		assert(pVariableASTNode != nullptr);
 		if (pVariableASTNode != nullptr)
 		{
-			sType = pVariableASTNode->getAdditionalInfoFor("type");
+			sType = GET_INFO_FOR_KEY(pVariableASTNode, "type");
 		}
 
 		return sType;
@@ -942,6 +1045,15 @@ typedef struct FunctionInfo
 	void setParent(StructInfo* pStructInfo)
 	{
 		m_pParentStructInfo = pStructInfo;
+
+		// Check for "virtual"
+		{
+			std::string sVirtual = GET_INFO_FOR_KEY(m_pNode, "isVirtual");
+			if (NOT pStructInfo->m_bHasVTable && sVirtual == "virtual")
+			{
+				pStructInfo->m_bHasVTable = true;
+			}
+		}
 	}
 
 	Tree*							m_pNode;
@@ -957,3 +1069,27 @@ typedef struct FunctionInfo
 	static std::vector<Tree*>		m_vStaticVariables;
 	StructInfo*						m_pParentStructInfo;
 } FunctionInfo;
+
+static int32_t calculateVirtualFunctionCount(StructInfo* pStructInfo)
+{
+	if (pStructInfo->m_iVirtualFunctionCount < 0)
+	{
+		pStructInfo->m_iVirtualFunctionCount = 0;
+		std::vector<void*>::const_iterator itrFunc = pStructInfo->m_vMemberFunctions.begin();
+		for (; itrFunc != pStructInfo->m_vMemberFunctions.end(); ++itrFunc)
+		{
+			FunctionInfo* pFunctionInfo = (FunctionInfo*)*itrFunc;
+			if (pFunctionInfo != nullptr)
+			{
+				Tree* pNode = pFunctionInfo->m_pNode;
+				std::string sVirtual = GET_INFO_FOR_KEY(pNode, "isVirtual");
+				if (NOT sVirtual.empty())
+				{
+					pStructInfo->m_iVirtualFunctionCount++;
+				}
+			}
+		}
+	}
+
+	return pStructInfo->m_iVirtualFunctionCount;
+}

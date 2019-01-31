@@ -12,6 +12,7 @@ class TinyCReader {
 		void addKeywords() {
 			GrammerUtils::m_vKeywords.push_back("struct");
 			GrammerUtils::m_vKeywords.push_back("inline");
+			GrammerUtils::m_vKeywords.push_back("virtual");
 			GrammerUtils::m_vKeywords.push_back("static");
 			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
@@ -158,6 +159,8 @@ class TinyCReader {
 		
 		E_VARIABLESCOPE 			getCurrentScope();
 		std::string 				getCurrentScopeString();
+		
+		Tree*						getStructNodeByName(std::string sStructName);
 	protected:
 		
 	private:
@@ -172,5 +175,7 @@ class TinyCReader {
 		std::vector<std::string>	m_sBlockStringList;
 		bool						m_bStructInProcess;
 		bool						m_bFunctionInProcess;
+		
+		std::vector<Tree*>			m_vStructs;
 
 };

@@ -15,6 +15,78 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+struct Part
+{
+	int32_t 	m_iUniquePartID;
+	inline virtual void getManufacturer() 
+	{ 
+		print("In Part::getManufacturer");
+		putc(10);
+	}	
+};
+
+struct MachinePart : Part
+{
+	int32_t 	m_iOEMID;
+	int32_t 	m_iManufacturerID;
+	int32_t 	m_iPartNumber;
+	int32_t 	m_iDescription;
+	
+	inline virtual void getPartNumber() 
+	{ 
+		print("In MachinePart::getPartNumber");
+		putc(10);
+	}
+
+	inline virtual void getDescription() 
+	{ 
+		print("In MachinePart::getDescription");
+		putc(10);
+	}
+};
+
+struct Tyre : MachinePart
+{
+	int8_t 	m_iSpeed = 0;
+	int8_t 	m_iRating = 0;
+	
+	inline virtual void getPartNumber() 
+	{
+		this->m_iPartNumber = 999;
+		this->m_iUniquePartID = 555;
+		print("In Tyre::getPartNumber this->m_iPartNumber = ", this->m_iPartNumber, ", this->m_iUniquePartID = ", this->m_iUniquePartID);
+		putc(10);
+	}
+
+	inline void getTyreDetails() 
+	{
+		print("In Tyre::getTyreDetails ==> this->m_iPartNumber = ", this->m_iPartNumber, ", this->m_iUniquePartID = ", this->m_iUniquePartID);
+		putc(10);
+		
+		this->m_iUniquePartID = 143165576;
+	}
+};
+
+struct Shape
+{
+	int32_t 		m_iWidth;
+	int32_t 		m_iHeight;
+	int32_t 		m_iOutline;
+	int32_t 		m_iFill;
+	
+	inline int32_t area()
+	{
+		int32_t iArea = m_iWidth * m_iHeight;
+		return iArea;
+	}
+	
+	inline int32_t perimeter()
+	{
+		int32_t iPerimeter = (2 * m_iWidth) + (2 * m_iHeight);
+		return iPerimeter;
+	}
+};
+
 struct Example1
 {
 	// * Member Variables should be declared before the functions.
@@ -46,7 +118,7 @@ struct Person
 	
 	inline void Person(int8_t iAge)
 	{
-		print("In Person Constructor with 1 argument");
+		print("In Person() with 1 argument");
 		putc(10);
 		
 		print("m_iAge = ", m_iAge, ", m_iTest = ", m_iTest);
@@ -91,7 +163,7 @@ struct Person
 	//		 This is done just to make parsing easier as '~' is also bitwisenot.
 	inline void #Person()
 	{
-		print("In Person Destructor");
+		print("In #Person()");
 		putc(10);
 	}
 };
@@ -103,15 +175,38 @@ static int32_t* pStaticPtr_3;
 static int8_t* pStaticPtr_0_Start;
 int32_t retNewFunc()
 {
-	print("In retNewFunc................");
+	print("In retNewFunc.....");
 	putc(10);
-
+	
 	Example1 pExampleObj0;					// OR (a) Person* pPersonObj0;
 	Person pPersonObj1 = new Person();		// OR (b) Person* pPersonObj1();
 	Person pPersonObj2 = new Person(10);	// OR (c) Person* pPersonObj2(10);
 	//Person pPersonObjs[4];				// OR (d) Person* pPersonObjs[4];
+
+	Tyre pTyre = new Tyre();
+	pTyre->m_iSpeed = 11;
+	print("Tyre pTyre->m_iSpeed = ", pTyre->m_iSpeed);
+	putc(10);
+	pTyre->m_iDescription = 9876;
+	print("Tyre MachinePart::m_iDescription = ", pTyre->m_iDescription);
+	putc(10);
+	pTyre->m_iOEMID = 4321;
+	print("Tyre Part::m_iOEMID = ", pTyre->m_iOEMID);
+	putc(10);
+	pTyre->getPartNumber();
+	print("Tyre pTyre->m_iPartNumber = ", pTyre->m_iPartNumber, ", pTyre->m_iUniquePartID = ", pTyre->m_iUniquePartID);
+	putc(10);
+	pTyre->m_iUniquePartID = 5467;
+	pTyre->getTyreDetails();
+	print("Tyre Part::m_iUniquePartID = ", pTyre->m_iUniquePartID);
+	putc(10);
 	
-	print("Struct pPersonObj2 Created................");
+	MachinePart pMachinePart;
+	pMachinePart->m_iOEMID = 1234;
+	print("MachinePart pMachinePart->m_iOEMID = ", pMachinePart->m_iOEMID);
+	putc(10);
+	pMachinePart->m_iDescription = 5678;
+	print("MachinePart pMachinePart->m_iDescription = ", pMachinePart->m_iDescription);
 	putc(10);
 	
 	pExampleObj0->example1Func1();
@@ -142,8 +237,6 @@ int32_t retNewFunc()
 	int8_t arr1[10] = {111, 222, 333, 444, 555};	//int32_t arr1[10];
 													//int32_t arr[] = {10, 20, 30, 40};
 													//int32_t arr[6] = {10, 20, 30, 40};
-
-	
 	for(int32_t ii = 0; ii < 10; ii++)
 	{
 		print("arr1[", ii, "] = ", arr1[ii]);
@@ -274,9 +367,9 @@ int32_t retNewFunc()
 	print("m = ", m);
 	putc(10);
 	
-	for(int32_t i = 0, j = 1, int32_t iCount = 1; i < 10; ++i, ++iCount)
+	for(int32_t i = 0, j = 1, int32_t k = 1; i < 10; ++i, ++k)
 	{
-		print("ForLoop i = ", i, " ,val of j = ", j, " ,iCount = ", iCount);
+		print("ForLoop i = ", i, " ,val of j = ", j, " ,k = ", k);
 		putc(10);
 	}
 	
@@ -285,6 +378,8 @@ int32_t retNewFunc()
 	
 	// Objects created by the notation in (a), (b) & (c) are created on the HEAP & need to be deleted MANUALLY.
 	// Although, objects created by (a) & (d) need to be deleted AUTOMATICALLY.
+	free(pTyre);
+	free(pMachinePart);
 	free(pExampleObj0);
 	free(pPersonObj1);
 	free(pPersonObj2);
@@ -298,7 +393,7 @@ int32_t retFunc()
 {
 	pStaticPtr_1 = malloc(14);
 	
-	print("In retFunc................");
+	print("In retFunc.....");
 	putc(10);
 	
 	free(pStaticPtr_1);
@@ -674,6 +769,7 @@ void main()
 	putc(10);
 		
 	int32_t a = (1 * ((1 * (5 * 15)) / 10));
+	print("a = ", a);
 		
 	tempFunc(55, 101);
 	testPrinting();
@@ -687,12 +783,12 @@ void main()
 	fizzBuzz();
 	_99BottlesOfBeer();
 	primes();
-	//AsciiMandlebrot();
+	AsciiMandlebrot();
 	
 	callMe();
 	
 	free(pStaticPtr_3);
 	
-	print("End of main()................");
+	print("End of main().....");
 	putc(10);
 }

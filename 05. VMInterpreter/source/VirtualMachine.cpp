@@ -82,6 +82,8 @@ struct CodeMap
 
 	{ "CLR",		OPCODE::CLR,		7,  PRIMIIVETYPE::INT_32},
 
+	{ "VTBL",		OPCODE::VTBL,		2,  PRIMIIVETYPE::INT_32 },
+
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
 
@@ -225,7 +227,7 @@ OPCODE VirtualMachine::fetch()
 
 void VirtualMachine::eval(OPCODE eOpCode)
 {
-	int32_t iOperand = 0, iOperand2 = 0, iTemp1 = 0, iTemp2 = 0, iTemp3 = 0;
+	int32_t iOperand = 0, iTemp1 = 0, iTemp2 = 0;
 	switch (eOpCode)
 	{
 		case OPCODE::FETCH:
@@ -479,7 +481,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			assert(iAddress >= 0);
 			STACK[--REGS.RSP] = iAddress;
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t[HEAP] Malloc(" << iTemp1 << ") @ " << iAddress << std::endl;
+			std::cout << "\t\t\t\t\t\t[HEAP] Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << getConsumedMemory() << "/" << MAX_HEAP_SIZE << std::endl;
 #endif
 		}
 		break;
@@ -490,6 +492,11 @@ void VirtualMachine::eval(OPCODE eOpCode)
 				int32_t iAddress = getValueIn(iVariable);
 				dealloc(iAddress);
 			}
+		}
+		break;
+		case OPCODE::VTBL:
+		{
+
 		}
 		break;
 		case OPCODE::HLT:
@@ -729,6 +736,8 @@ int32_t VirtualMachine::malloc(int32_t iSize)
 		}
 	}
 
+	assert(iReturnAddress >= 0);
+
 	return iReturnAddress;
 }
 
@@ -753,7 +762,7 @@ void VirtualMachine::dealloc(int32_t pAddress)
 		if (pAddress == pAllocHeapNode.m_pAddress)
 		{
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t[HEAP] Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << std::endl;
+			std::cout << "\t\t\t\t\t\t[HEAP] Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << " ----- AVAILABLE: " << getAvailableMemory() << "/" << MAX_HEAP_SIZE << std::endl;
 #endif
 			/////////////////////////////////////////////////////////////////
 			// 3. Merge it with any preceding HeapNode.
@@ -889,4 +898,26 @@ void VirtualMachine::store(OPCODE eOpCode)
 	{
 		GLOBALS[iVariablePos] = STACK[REGS.RSP++];
 	}
+}
+
+int32_t VirtualMachine::getConsumedMemory()
+{
+	int32_t iConsumedMemory = 0;
+	for (HeapNode pHeapNode : m_vAllocatedList)
+	{
+		iConsumedMemory += pHeapNode.m_iSize;
+	}
+
+	return iConsumedMemory;
+}
+
+int32_t VirtualMachine::getAvailableMemory()
+{
+	int32_t iAvailableMemory = 0;
+	for (HeapNode pHeapNode : m_vUnAllocatedList)
+	{
+		iAvailableMemory += pHeapNode.m_iSize;
+	}
+
+	return iAvailableMemory;
 }

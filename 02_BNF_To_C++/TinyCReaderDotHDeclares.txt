@@ -25,6 +25,8 @@
 		
 		E_VARIABLESCOPE 			getCurrentScope();
 		std::string 				getCurrentScopeString();
+		
+		Tree*						getStructNodeByName(std::string sStructName);
 	protected:
 		
 	private:
@@ -39,3 +41,5 @@
 		std::vector<std::string>	m_sBlockStringList;
 		bool						m_bStructInProcess;
 		bool						m_bFunctionInProcess;
+		
+		std::vector<Tree*>			m_vStructs;

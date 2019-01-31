@@ -16,6 +16,8 @@
 #define __END_FUNCTION__ m_bFunctionInProcess = false;
 
 #define PREV_TOKEN_TEXT GrammerUtils::m_pPrevToken.getText()
+#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
+#define SET_INFO_FOR_KEY(__node__, __key__, __info__)		__node__->setAdditionalInfo(__key__, __info__)
 	
 TinyCReader::TinyCReader()
 : m_bStructInProcess(false)
@@ -271,7 +273,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 	std::string sFullyQualifiedName;
 	bool bFound = false;
 
-	if(NOT bFound)
+	if (NOT bFound)
 	{
 		for (Tree* pChild : pNode->m_vStatements)
 		{
@@ -280,7 +282,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
 				|
 				pChild->m_eASTNodeType == ASTNodeType::ASTNode_TYPESTRUCT
-			) {
+				) {
 				if (pChild->m_sAdditionalInfo == sVariable)
 				{
 					sFullyQualifiedName = pChild->getAdditionalInfoFor("text");
@@ -307,15 +309,17 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 	// Check for 'Member Variables'
 	if (NOT bFound)
 	{
-		Tree* pParentNode = pNode->m_pParentNode;
-		if (pParentNode->m_eASTNodeType == ASTNodeType::ASTNode_STRUCTDEF)
+		Tree* pStructNode = pNode->m_pParentNode;
+LABEL_STRUCT_INFO:
+		if (pStructNode->m_eASTNodeType == ASTNodeType::ASTNode_STRUCTDEF)
 		{
-			for (Tree* pChildNode : pParentNode->m_vStatements) // Starts with index 0
+			// 1. Check if its a Member Variable of the 'Struct'
+			for (Tree* pChildNode : pStructNode->m_vStatements) // Starts with index 0
 			{
-				if(	pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
+				if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 					||
 					pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPEARRAY
-				) {
+					) {
 					if (pChildNode->m_sAdditionalInfo == sVariable)
 					{
 						sFullyQualifiedName = pChildNode->getAdditionalInfoFor("text");
@@ -324,7 +328,19 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 					}
 				}
 			}
+
+			// 2. Check if its a Member Variable of the Parent 'Struct'
+			if (NOT bFound)
+			{
+				std::string sStructParentName = GET_INFO_FOR_KEY(pStructNode, "extends");
+				if (NOT sStructParentName.empty())
+				{
+					pStructNode = getStructNodeByName(sStructParentName);
+					goto LABEL_STRUCT_INFO;
+				}
+			}
 		}
+
 	}
 
 	if (sFullyQualifiedName.empty())
@@ -341,6 +357,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	return sFullyQualifiedName;
 }
+
 
 void TinyCReader::addType(std::string sType)
 {
@@ -471,4 +488,17 @@ E_VARIABLESCOPE TinyCReader::getCurrentScope()
 std::string TinyCReader::getCurrentScopeString()
 {
 	return toString(getCurrentScope());
+}
+
+Tree* TinyCReader::getStructNodeByName(std::string sStructName)
+{
+	for (Tree* pStruct : m_vStructs)
+	{
+		if (GET_INFO_FOR_KEY(pStruct, "text") == sStructName)
+		{
+			return pStruct;
+		}
+	}
+
+	assert(false);
 }

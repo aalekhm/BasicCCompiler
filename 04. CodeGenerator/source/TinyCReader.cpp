@@ -16,6 +16,8 @@
 #define __END_FUNCTION__ m_bFunctionInProcess = false;
 
 #define PREV_TOKEN_TEXT GrammerUtils::m_pPrevToken.getText()
+#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
+#define SET_INFO_FOR_KEY(__node__, __key__, __info__)		__node__->setAdditionalInfo(__key__, __info__)
 
 TinyCReader::TinyCReader()
 	: m_bStructInProcess(false)
@@ -307,10 +309,12 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 	// Check for 'Member Variables'
 	if (NOT bFound)
 	{
-		Tree* pParentNode = pNode->m_pParentNode;
-		if (pParentNode->m_eASTNodeType == ASTNodeType::ASTNode_STRUCTDEF)
+		Tree* pStructNode = pNode->m_pParentNode;
+	LABEL_STRUCT_INFO:
+		if (pStructNode->m_eASTNodeType == ASTNodeType::ASTNode_STRUCTDEF)
 		{
-			for (Tree* pChildNode : pParentNode->m_vStatements) // Starts with index 0
+			// 1. Check if its a Member Variable of the 'Struct'
+			for (Tree* pChildNode : pStructNode->m_vStatements) // Starts with index 0
 			{
 				if (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_TYPE
 					||
@@ -324,7 +328,19 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 					}
 				}
 			}
+
+			// 2. Check if its a Member Variable of the Parent 'Struct'
+			if (NOT bFound)
+			{
+				std::string sStructParentName = GET_INFO_FOR_KEY(pStructNode, "extends");
+				if (NOT sStructParentName.empty())
+				{
+					pStructNode = getStructNodeByName(sStructParentName);
+					goto LABEL_STRUCT_INFO;
+				}
+			}
 		}
+
 	}
 
 	if (sFullyQualifiedName.empty())
@@ -341,6 +357,7 @@ std::string	TinyCReader::getFullyQualifiedNameForVariable(Tree* pNode, std::stri
 
 	return sFullyQualifiedName;
 }
+
 
 void TinyCReader::addType(std::string sType)
 {
@@ -473,6 +490,19 @@ std::string TinyCReader::getCurrentScopeString()
 	return toString(getCurrentScope());
 }
 
+Tree* TinyCReader::getStructNodeByName(std::string sStructName)
+{
+	for (Tree* pStruct : m_vStructs)
+	{
+		if (GET_INFO_FOR_KEY(pStruct, "text") == sStructName)
+		{
+			return pStruct;
+		}
+	}
+
+	assert(false);
+}
+
 
 bool TinyCReader::def() {
 
@@ -524,6 +554,20 @@ bool TinyCReader::structDeclaration() {
 	m_pASTCurrentNode->addChild(pStructDefNode);
 	addStructType(sStructName);
 
+	if (!GrammerUtils::match(':', OPTIONAL)) {
+
+	}
+
+	else {
+
+		if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
+			return false;
+
+		std::string sStructParentName = PREV_TOKEN_TEXT;
+		SET_INFO_FOR_KEY(pStructDefNode, "extends", sStructParentName);
+
+	}
+
 	if (!GrammerUtils::match('{', MANDATORY))
 		return false;
 
@@ -557,6 +601,7 @@ bool TinyCReader::structDeclaration() {
 
 		Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
 	m_pASTCurrentNode->addChild(pStructEndNode);
+	m_vStructs.push_back(pStructDefNode);
 
 	m_pASTCurrentNode = pTemp;
 
@@ -584,6 +629,14 @@ bool TinyCReader::structObjectList() {
 bool TinyCReader::structInlineFunction() {
 	if (!GrammerUtils::match("inline", MANDATORY))
 		return false;
+	if (!GrammerUtils::match("virtual", OPTIONAL)) {
+
+	}
+
+	else {
+
+	}
+
 	if (!functionDef())
 		return false;
 	return true;
@@ -634,8 +687,9 @@ bool TinyCReader::staticPtr() {
 
 	Tree* pStaticPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPESTATIC, PREV_TOKEN_TEXT);
 	pStaticPtrNode->m_bIsPointerType = true;
-	pStaticPtrNode->setAdditionalInfo("type", sPointerType);
-	pStaticPtrNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::STATIC));
+	SET_INFO_FOR_KEY(pStaticPtrNode, "givenName", PREV_TOKEN_TEXT);
+	SET_INFO_FOR_KEY(pStaticPtrNode, "type", sPointerType);
+	SET_INFO_FOR_KEY(pStaticPtrNode, "scope", toString(E_VARIABLESCOPE::STATIC));
 
 	m_pASTCurrentNode->addChild(pStaticPtrNode);
 	FunctionInfo::addStaticVariable(pStaticPtrNode);
@@ -647,6 +701,9 @@ bool TinyCReader::staticPtr() {
 }
 
 bool TinyCReader::functionDef() {
+
+	std::string sPrevText = PREV_TOKEN_TEXT;
+
 	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 		return false;
 
@@ -670,6 +727,11 @@ bool TinyCReader::functionDef() {
 
 		pFunctionDefNode->m_pLeftNode = pReturnTypeNode;
 		pFunctionDefNode->m_pRightNode = pArgListNode;
+
+		if (sPrevText == "virtual")
+		{
+			SET_INFO_FOR_KEY(pFunctionDefNode, "isVirtual", "virtual");
+		}
 	}
 
 	if (!GrammerUtils::match('(', MANDATORY))
@@ -761,8 +823,9 @@ bool TinyCReader::primitiveTypeInt() {
 	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedArgName.c_str());
 	{
 		pPrimIntNode->m_sAdditionalInfo.append(sArgName);
-		pPrimIntNode->setAdditionalInfo("type", sType);
-		pPrimIntNode->setAdditionalInfo("scope", toString(E_VARIABLESCOPE::ARGUMENT));
+		SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sArgName);
+		SET_INFO_FOR_KEY(pPrimIntNode, "type", sType);
+		SET_INFO_FOR_KEY(pPrimIntNode, "scope", toString(E_VARIABLESCOPE::ARGUMENT));
 
 		m_pASTCurrentNode->addChild(pPrimIntNode);
 		m_pASTCurrentNode->m_sAdditionalInfo.append("I");
@@ -881,11 +944,12 @@ bool TinyCReader::prePostFixedIncrDecr() {
 bool TinyCReader::preFixIncrDecr() {
 	if (GrammerUtils::match(TokenType::Type::TK_PREFIXDECR, OPTIONAL)) {
 
-		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+		std::string sVariableName = PREV_TOKEN_TEXT;
 		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 		Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREDECR, sFullyQualifiedVariableName.c_str());
 		{
 			m_pASTCurrentNode->addChild(pPreDecrNode);
+			SET_INFO_FOR_KEY(pPreDecrNode, "givenName", sVariableName);
 		}
 
 		return true;
@@ -893,11 +957,12 @@ bool TinyCReader::preFixIncrDecr() {
 	else
 		if (GrammerUtils::match(TokenType::Type::TK_PREFIXINCR, OPTIONAL)) {
 
-			std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+			std::string sVariableName = PREV_TOKEN_TEXT;
 			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 			Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREINCR, sFullyQualifiedVariableName.c_str());
 			{
 				m_pASTCurrentNode->addChild(pPreDecrNode);
+				SET_INFO_FOR_KEY(pPreDecrNode, "givenName", sVariableName);
 			}
 
 			return true;
@@ -912,11 +977,12 @@ bool TinyCReader::preFixIncrDecr() {
 bool TinyCReader::postFixIncrDecr() {
 	if (GrammerUtils::match(TokenType::Type::TK_POSTFIXDECR, OPTIONAL)) {
 
-		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+		std::string sVariableName = PREV_TOKEN_TEXT;
 		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 		Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTDECR, sFullyQualifiedVariableName.c_str());
 		{
 			m_pASTCurrentNode->addChild(pPreDecrNode);
+			SET_INFO_FOR_KEY(pPreDecrNode, "givenName", sVariableName);
 		}
 
 		return true;
@@ -924,11 +990,12 @@ bool TinyCReader::postFixIncrDecr() {
 	else
 		if (GrammerUtils::match(TokenType::Type::TK_POSTFIXINCR, OPTIONAL)) {
 
-			std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+			std::string sVariableName = PREV_TOKEN_TEXT;
 			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 			Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTINCR, sFullyQualifiedVariableName.c_str());
 			{
 				m_pASTCurrentNode->addChild(pPreDecrNode);
+				SET_INFO_FOR_KEY(pPreDecrNode, "givenName", sVariableName);
 			}
 
 			return true;
@@ -1310,11 +1377,13 @@ bool TinyCReader::switchStatement() {
 bool TinyCReader::switchArgument() {
 	if (GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
-		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
+		std::string sIdentifier = PREV_TOKEN_TEXT;
+		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
 		assert(!sFullyQualifiedVariableName.empty());
 
 		Tree* pSwitchArgumentNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
 		m_pASTCurrentNode->m_pLeftNode = pSwitchArgumentNode;
+		SET_INFO_FOR_KEY(pSwitchArgumentNode, "givenName", PREV_TOKEN_TEXT);
 
 		return true;
 	}
@@ -1762,6 +1831,7 @@ bool TinyCReader::putcList() {
 
 		Tree* pIdentifierNode = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
 		m_pASTCurrentNode->addChild(pIdentifierNode);
+		SET_INFO_FOR_KEY(pIdentifierNode, "givenName", PREV_TOKEN_TEXT);
 
 		return true;
 	}
@@ -1832,8 +1902,9 @@ bool TinyCReader::newStructPtr() {
 	{
 		pStructPtrNode->m_sAdditionalInfo.append(sVariableName);
 		pStructPtrNode->m_bIsPointerType = true;
-		pStructPtrNode->setAdditionalInfo("type", sStructType);
-		pStructPtrNode->setAdditionalInfo("scope", getCurrentScopeString());
+		SET_INFO_FOR_KEY(pStructPtrNode, "givenName", sVariableName);
+		SET_INFO_FOR_KEY(pStructPtrNode, "type", sStructType);
+		SET_INFO_FOR_KEY(pStructPtrNode, "scope", getCurrentScopeString());
 		pStructPtrNode->m_pParentNode = m_pASTCurrentNode;
 
 		pTemp = m_pASTCurrentNode;
@@ -1864,7 +1935,7 @@ bool TinyCReader::newStructPtr() {
 		m_pASTCurrentNode->addChild(pFunctionCallNode);
 	}
 
-	pFunctionCallNode->setAdditionalInfo("memberFunctionOf", sStructType);
+	SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sStructType);
 
 	m_pASTCurrentNode = pTemp;
 	m_pASTCurrentNode->addChild(pStructPtrNode);
@@ -1932,8 +2003,9 @@ bool TinyCReader::primPtr() {
 
 		pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 		pPrimPtrNode->m_bIsPointerType = true;
-		pPrimPtrNode->setAdditionalInfo("type", sPointerType);
-		pPrimPtrNode->setAdditionalInfo("scope", getCurrentScopeString());
+		SET_INFO_FOR_KEY(pPrimPtrNode, "givenName", sVariableName);
+		SET_INFO_FOR_KEY(pPrimPtrNode, "type", sPointerType);
+		SET_INFO_FOR_KEY(pPrimPtrNode, "scope", getCurrentScopeString());
 		pPrimPtrNode->m_pParentNode = m_pASTCurrentNode;
 
 		m_pASTCurrentNode = pPrimPtrNode;
@@ -2001,8 +2073,9 @@ bool TinyCReader::primArray() {
 
 		pPrimTypeArrayNode->m_sAdditionalInfo.append(sVariableName);
 		pPrimTypeArrayNode->m_bIsPointerType = true;
-		pPrimTypeArrayNode->setAdditionalInfo("type", sPrimitiveType);
-		pPrimTypeArrayNode->setAdditionalInfo("scope", getCurrentScopeString());
+		SET_INFO_FOR_KEY(pPrimTypeArrayNode, "givenName", sVariableName);
+		SET_INFO_FOR_KEY(pPrimTypeArrayNode, "type", sPrimitiveType);
+		SET_INFO_FOR_KEY(pPrimTypeArrayNode, "scope", getCurrentScopeString());
 		pPrimTypeArrayNode->m_pParentNode = m_pASTCurrentNode;
 	}
 
@@ -2102,8 +2175,9 @@ bool TinyCReader::primType() {
 		pTemp = m_pASTCurrentNode;
 
 		pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
-		pPrimIntNode->setAdditionalInfo("type", sPrimitiveType);
-		pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
+		SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sVariableName);
+		SET_INFO_FOR_KEY(pPrimIntNode, "type", sPrimitiveType);
+		SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
 		pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 
 		m_pASTCurrentNode = pPrimIntNode;
@@ -2203,12 +2277,14 @@ bool TinyCReader::assignmentDerefArray() {
 	Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
 	{
 		pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+		SET_INFO_FOR_KEY(pAssignmentNode, "givenName", sVariableName);
 	}
 
 	Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_DEREFARRAY, sFullyQualifiedVariableName.c_str());
 	Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
 	{
 		pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+		SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", sVariableName);
 
 		pAssignmentNode->m_pRightNode = pIdentifierLeaf;
 		pIdentifierLeaf->m_pParentNode = pAssignmentNode;
@@ -2258,11 +2334,17 @@ bool TinyCReader::structMemberVariableAssignmentOrFunctionCall() {
 	if (!GrammerUtils::match(TokenType::Type::TK_MEMBERACCESS, MANDATORY))
 		return false;
 
-	std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
+	std::string sObjectName = PREV_TOKEN_TEXT;
+	std::string sFullyQualifiedObjectName = "";
+	if (sObjectName == "this")
+		sFullyQualifiedObjectName = "this";
+	else
+		sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName.c_str());
 
 	Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
 	{
 		pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+		SET_INFO_FOR_KEY(pAssignmentNode, "givenName", PREV_TOKEN_TEXT);
 	}
 
 	Tree* pTemp = nullptr;
@@ -2283,10 +2365,11 @@ bool TinyCReader::structMemberVariableAssignmentOrFunctionCall() {
 	}
 	else													// Else, its an object variable value assignment.
 	{
-		std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+		std::string sVariableName = PREV_TOKEN_TEXT;
 		Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sVariableName.c_str());
 		{
 			pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+			SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", sVariableName);
 			pAssignmentNode->m_pRightNode = pIdentifierLeaf;
 		}
 	}
@@ -2342,18 +2425,21 @@ bool TinyCReader::assignmentRHS() {
 	if (!GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, MANDATORY))
 		return false;
 
-	std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
+	std::string sVariableName = PREV_TOKEN_TEXT;
 	std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 	assert(!sFullyQualifiedVariableName.empty());
 
 	Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedVariableName.c_str());
 	{
 		pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+		SET_INFO_FOR_KEY(pAssignmentNode, "givenName", sVariableName);
 	}
 
 	Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, sFullyQualifiedVariableName.c_str());
 	{
 		pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
+		SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", sVariableName);
+
 		pAssignmentNode->m_pRightNode = pIdentifierLeaf;
 	}
 
@@ -2394,6 +2480,8 @@ bool TinyCReader::freePtrStatement() {
 	assert(!sFullyQualifiedVariableName.empty());
 
 	Tree* pFreePtrLeaf = makeLeaf(ASTNodeType::ASTNode_FREE, sFullyQualifiedVariableName.c_str());
+	SET_INFO_FOR_KEY(pFreePtrLeaf, "givenName", PREV_TOKEN_TEXT);
+
 	m_pASTCurrentNode->addChild(pFreePtrLeaf);
 
 	if (!GrammerUtils::match(')', MANDATORY))
@@ -2768,17 +2856,18 @@ bool TinyCReader::operands() {
 		}
 		assert(pFunctionCallNode != nullptr);
 		{
-			std::string sFuncName = pFunctionCallNode->getAdditionalInfoFor("text");
+			std::string sFuncName = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
 			std::string sFullyQualifiedTempVariableName;
-			sFullyQualifiedTempVariableName.append(pAssignNode->getAdditionalInfoFor("text"));
+			sFullyQualifiedTempVariableName.append(GET_INFO_FOR_KEY(pAssignNode, "text"));
 			sFullyQualifiedTempVariableName.append("_");
 			sFullyQualifiedTempVariableName.append(sFuncName);
 
 			Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
 			{
 				pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
-				pPrimIntNode->setAdditionalInfo("type", "int32_t");
-				pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
+				SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
+				SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
+				SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
 				pBlockNode->addChild(pPrimIntNode);
 			}
 
@@ -2863,12 +2952,17 @@ bool TinyCReader::structMemberAccess() {
 		return false;
 
 	std::string sObjectName = PREV_TOKEN_TEXT;
-	std::string sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+	std::string sFullyQualifiedObjectName;
+	if (sObjectName == "this")
+		sFullyQualifiedObjectName = "this";
+	else
+		sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
 
 	Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
 	Tree* pTemp = nullptr;
 	{
 		pObjectAccessNode->m_sAdditionalInfo.append(sObjectName);
+		SET_INFO_FOR_KEY(pObjectAccessNode, "givenName", sObjectName);
 
 		m_pASTCurrentNode->addChild(pObjectAccessNode);
 
@@ -2897,7 +2991,7 @@ bool TinyCReader::structMemberVariableOrFunctionCall_RValue() {
 		if (GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 
 			{
-				std::string sOperand = m_pASTCurrentNode->getAdditionalInfoFor("text");
+				std::string sOperand = GET_INFO_FOR_KEY(m_pASTCurrentNode, "text");
 				sOperand.append("->");
 				sOperand.append(PREV_TOKEN_TEXT);
 
@@ -2937,17 +3031,18 @@ bool TinyCReader::structMemberFunctionCallInAnExpr() {
 	}
 	assert(pFunctionCallNode != nullptr);
 	{
-		std::string sFuncName = pFunctionCallNode->getAdditionalInfoFor("text");
+		std::string sFuncName = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
 		std::string sFullyQualifiedTempVariableName;
-		sFullyQualifiedTempVariableName.append(pAssignNode->getAdditionalInfoFor("text"));
+		sFullyQualifiedTempVariableName.append(GET_INFO_FOR_KEY(pAssignNode, "text"));
 		sFullyQualifiedTempVariableName.append("_");
 		sFullyQualifiedTempVariableName.append(sFuncName);
 
 		Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
 		{
 			pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
-			pPrimIntNode->setAdditionalInfo("type", "int32_t");
-			pPrimIntNode->setAdditionalInfo("scope", getCurrentScopeString());
+			SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
+			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
+			SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
 			pBlockNode->addChild(pPrimIntNode);
 		}
 
@@ -3015,6 +3110,8 @@ bool TinyCReader::preFixInExpr() {
 		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 		Tree* pPreDecrNode = makeLeaf(ASTNodeType::ASTNode_PREDECR, sFullyQualifiedVariableName.c_str());
 		{
+			SET_INFO_FOR_KEY(pPreDecrNode, "givenName", sVariableName);
+
 			m_pASTCurrentNode->m_pLeftNode->addChild(pPreDecrNode);
 			m_vPostFix.push_back(sFullyQualifiedVariableName);
 		}
@@ -3034,6 +3131,8 @@ bool TinyCReader::preFixInExpr() {
 			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 			Tree* pPreIncrNode = makeLeaf(ASTNodeType::ASTNode_PREINCR, sFullyQualifiedVariableName.c_str());
 			{
+				SET_INFO_FOR_KEY(pPreIncrNode, "givenName", sVariableName);
+
 				m_pASTCurrentNode->m_pLeftNode->addChild(pPreIncrNode);
 				m_vPostFix.push_back(sFullyQualifiedVariableName);
 			}
@@ -3091,6 +3190,8 @@ bool TinyCReader::postFixIncrDecrInExpr() {
 		std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 		Tree* pPostDecrNode = makeLeaf(ASTNodeType::ASTNode_POSTDECR, sFullyQualifiedVariableName.c_str());
 		{
+			SET_INFO_FOR_KEY(pPostDecrNode, "givenName", sVariableName);
+
 			m_pASTCurrentNode->m_pRightNode->addChild(pPostDecrNode);
 			m_vPostFix.push_back(sFullyQualifiedVariableName);
 		}
@@ -3110,6 +3211,8 @@ bool TinyCReader::postFixIncrDecrInExpr() {
 			std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 			Tree* pPostIncrNode = makeLeaf(ASTNodeType::ASTNode_POSTINCR, sFullyQualifiedVariableName.c_str());
 			{
+				SET_INFO_FOR_KEY(pPostIncrNode, "givenName", sVariableName);
+
 				m_pASTCurrentNode->m_pRightNode->addChild(pPostIncrNode);
 				m_vPostFix.push_back(sFullyQualifiedVariableName);
 			}

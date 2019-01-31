@@ -48,11 +48,12 @@ enum class OPCODE
 	LDA,
 	STA,
 	CLR,
+	VTBL,
 	HLT
 };
 
-#define MAX_BYTECODE_SIZE			8704
-#define MAX_DATA_SIZE				1536
+#define MAX_BYTECODE_SIZE			9728
+#define MAX_DATA_SIZE				2176
 #define MAX_HEAP_SIZE				512
 #define MAX_STACK_SIZE				256
 #define MAX_RAM_SIZE				MAX_BYTECODE_SIZE + MAX_DATA_SIZE + MAX_HEAP_SIZE + MAX_STACK_SIZE
@@ -189,6 +190,9 @@ class VirtualMachine
 		void						lda(OPCODE eOpCode);
 		void						sta(OPCODE eOpcode);
 		void						clrMem(OPCODE eOpCode);
+
+		int32_t						getConsumedMemory();
+		int32_t						getAvailableMemory();
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();

@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	8704
+#define MAX_BYTECODE_SIZE	9728
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -114,7 +114,11 @@ class GrammerUtils
 		static void									emitIntAtPos(int32_t iCode, uint32_t iOffset);
 
 		static FunctionInfo*						getFunctionInfo(Tree* pNode);
-		static StructInfo*							getStructOfObject(std::string sObjectName);
+		static StructInfo*							getStructByName(std::string sObjectName);
+		static void									createStructVTable(StructInfo* pCurrentStruct);
+		static void									addVirtualFunctionsFromParentStruct(StructInfo* pCurrentStruct, std::vector<void*>& vVirtualFunctions);
+		static void									emitStructVTable(StructInfo* pCurrentStruct);
+		static void									storeVTablePointerInObjectOnHeap(int16_t iShortPosition, StructInfo* pStructInfo);
 
 		static std::vector<std::string>				m_vStrings;
 
