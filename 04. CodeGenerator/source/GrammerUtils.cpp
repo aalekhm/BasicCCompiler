@@ -1207,21 +1207,7 @@ void GrammerUtils::createStructVTable(StructInfo* pCurrentStruct)
 {
 	std::vector<FunctionInfo*> vVirtualFunctions;
 
-	// 1. Check "virtual" function in the CURRENT struct & add them to the LIST.
-	for (int32_t i = 0; i < pCurrentStruct->m_vMemberFunctions.size(); i++)
-	{
-		FunctionInfo* pFunctionInfo = (FunctionInfo*)pCurrentStruct->m_vMemberFunctions.at(i);
-		if (pFunctionInfo != nullptr)
-		{
-			std::string sVirtual = GET_INFO_FOR_KEY(pFunctionInfo->m_pNode, "isVirtual");
-			if (sVirtual == "virtual")
-			{
-				pCurrentStruct->m_vVirtualFunctionTable.push_back(pFunctionInfo);
-			}
-		}
-	}
-
-	// 2. Add "virtual" functions, if any from the PARENT struct to the LIST.
+	// 1. Add "virtual" functions, if any from the PARENT struct to the LIST.
 	//    The functions added will be exclusive from the ones added.
 	addVirtualFunctionsFromParentStruct(pCurrentStruct, pCurrentStruct->m_vVirtualFunctionTable);
 }
@@ -1231,47 +1217,53 @@ void GrammerUtils::addVirtualFunctionsFromParentStruct(StructInfo* pCurrentStruc
 	StructInfo* pParentStruct = pCurrentStruct->m_ParentStructInfo;
 	if (pParentStruct != nullptr)
 	{
-		for (int32_t i = 0; i < pParentStruct->m_vMemberFunctions.size(); i++)
+		addVirtualFunctionsFromParentStruct(pParentStruct, vVirtualFunctions);
+	}
+	
+	// 1. Check "virtual" function in the CURRENT struct & add them to the LIST.
+	{
+		for (int32_t i = 0; i < pCurrentStruct->m_vMemberFunctions.size(); i++)
 		{
-			FunctionInfo* pPARENTFunctionInfo = (FunctionInfo*)pParentStruct->m_vMemberFunctions.at(i);
-			if (pPARENTFunctionInfo != nullptr)
+			FunctionInfo* pCURRENTSTRUCT_FunctionInfo = (FunctionInfo*)pCurrentStruct->m_vMemberFunctions.at(i);
+			if (pCURRENTSTRUCT_FunctionInfo != nullptr)
 			{
-				std::string sVirtual = GET_INFO_FOR_KEY(pPARENTFunctionInfo->m_pNode, "isVirtual");
+				std::string sVirtual = GET_INFO_FOR_KEY(pCURRENTSTRUCT_FunctionInfo->m_pNode, "isVirtual");
 				if (sVirtual == "virtual")
 				{
-					Tree* pPARENTFUNC_ArgListNode = pPARENTFunctionInfo->m_pFunctionArguments;
-					int iPARENTFUNC_ArgCount = pPARENTFUNC_ArgListNode->m_vStatements.size();
-					std::string sPARENTFUNC_Signature = pPARENTFUNC_ArgListNode->m_sAdditionalInfo;
+					Tree* pCURRENTSTRUCT_FUNC_ArgListNode = pCURRENTSTRUCT_FunctionInfo->m_pFunctionArguments;
+					int pCURRENTSTRUCT_FUNC_ArgCount = pCURRENTSTRUCT_FUNC_ArgListNode->m_vStatements.size();
+					std::string pCURRENTSTRUCT_FUNC_Signature = pCURRENTSTRUCT_FUNC_ArgListNode->m_sAdditionalInfo;
 
 					bool bFound = false;
-					// 1. Check is similar one is already added !
-					for (void* pChildFunctionInfo : vVirtualFunctions)
+					for (int32_t j = 0; j < vVirtualFunctions.size(); j++)
 					{
-						FunctionInfo* pADDEDFunctionInfo = (FunctionInfo*)pChildFunctionInfo;
+						FunctionInfo* pADDEDFunctionInfo = (FunctionInfo*)vVirtualFunctions.at(j);
 						Tree* pADDEDFUNC_ArgListNode = pADDEDFunctionInfo->m_pFunctionArguments;
 						int iADDEDFUNC_ArgCount = pADDEDFUNC_ArgListNode->m_vStatements.size();
 						std::string sADDEDFUNC_Signature = pADDEDFUNC_ArgListNode->m_sAdditionalInfo;
 
-						bFound = (	pPARENTFunctionInfo->m_sFunctionName == pADDEDFunctionInfo->m_sFunctionName
+						bFound = (	pCURRENTSTRUCT_FunctionInfo->m_sFunctionName == pADDEDFunctionInfo->m_sFunctionName
 									&&
-									iPARENTFUNC_ArgCount == iADDEDFUNC_ArgCount
+									pCURRENTSTRUCT_FUNC_ArgCount == iADDEDFUNC_ArgCount
 									&&
-									sPARENTFUNC_Signature == sADDEDFUNC_Signature
+									pCURRENTSTRUCT_FUNC_Signature == sADDEDFUNC_Signature
 								);
 						if (bFound)
+						{
+							vVirtualFunctions[j] = pCURRENTSTRUCT_FunctionInfo;
+							pCURRENTSTRUCT_FunctionInfo->m_iPositionInVTABLE = j;
 							break;
+						}
 					}
 
 					if (NOT bFound)
-						vVirtualFunctions.push_back(pPARENTFunctionInfo);
+					{
+						pCURRENTSTRUCT_FunctionInfo->m_iPositionInVTABLE = vVirtualFunctions.size();
+						vVirtualFunctions.push_back(pCURRENTSTRUCT_FunctionInfo);
+					}
 				}
 			}
 		}
-	}
-
-	if (pParentStruct != nullptr)
-	{
-		addVirtualFunctionsFromParentStruct(pParentStruct, vVirtualFunctions);
 	}
 }
 
@@ -1664,6 +1656,16 @@ LABEL1:
 							}
 						}
 					}
+
+					// Maybe its a function of the Parent !
+					if (pRETURN_FunctionInfo == nullptr)
+					{
+						if (pStructInfo->m_ParentStructInfo != nullptr)
+						{
+							sType = pStructInfo->m_ParentStructInfo->m_sStructName;
+							goto LABEL1;
+						}
+					}
 				}
 			}
 		}
@@ -1791,7 +1793,21 @@ void GrammerUtils::handleFunctionCall(Tree* pNode)
 			//////////////////////////////////////////////////////
 			// 4. Make the actual 'Function Call'
 			//		- Execution will jump onto 'iCalleeFunctionAddress' below
-			int iCalleeFunctionAddress = pCalleeFunctionInfo->m_iStartOffsetInCode;
+			int32_t iCalleeFunctionAddress = 0, iStartOffsetInCode = 0;
+			
+			E_FUNCTIONCALLTYPE eE_FUNCTIONCALLTYPE = E_FUNCTIONCALLTYPE::NORMAL;
+			iStartOffsetInCode = pCalleeFunctionInfo->m_iStartOffsetInCode;
+
+			bool bIsVirtual = (GET_INFO_FOR_KEY(pCalleeFunctionInfo->m_pNode, "isVirtual") == "virtual");
+			if (bIsVirtual)
+			{
+				eE_FUNCTIONCALLTYPE = E_FUNCTIONCALLTYPE::VIRTUAL;
+				iStartOffsetInCode = pCalleeFunctionInfo->m_iPositionInVTABLE;
+			}
+
+			iCalleeFunctionAddress = (int32_t)eE_FUNCTIONCALLTYPE;
+			iCalleeFunctionAddress <<= sizeof(int16_t) * 8;
+			iCalleeFunctionAddress |= (iStartOffsetInCode & 0x0000FFFF);
 
 			EMIT_1(OPCODE::CALL, iCalleeFunctionAddress); 
 #if (VERBOSE == 1)
@@ -2690,20 +2706,23 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 			ASTNodeType eChilsASTNodeType = pFunctionCallNode->m_eASTNodeType;
 			if (eChilsASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
 			{
-				std::string sType = GET_VARIABLE_NODETYPE(sPointerName.c_str());
-				SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sType);
+				if (sPointerName != "this")
+				{
+					std::string sType = GET_VARIABLE_NODETYPE(sPointerName.c_str());
+					SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sType);
 
-				// 1. Fetch 'this' into 'ECX'
-				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
-				EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+					// 1. Fetch 'this' into 'ECX' if its a variable name.
+					EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
+					EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+				}
 
-																						// 2. Make the function call.
+				// 2. Make the function call.
 				populateCode(pFunctionCallNode);
 
-				//// 3. Clear off 'ECX' that holds the address of 'this'				// No need to clear 'ECX' as every time a member is accessed,
-																						// the object address('this') will be pushed into 'ECX'
+				//// 3. Clear off 'ECX' that holds the address of 'this'					// No need to clear 'ECX' as every time a member is accessed,
+																							// the object address('this') will be pushed into 'ECX'
 				////EMIT_1(OPCODE::PUSH, 0);
-				////EMIT_1(OPCODE::POPR, EREGISTERS::RCX);								// Clear off 'ECX'.
+				////EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
 			}
 		}
 	}

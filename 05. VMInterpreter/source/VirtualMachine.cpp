@@ -25,6 +25,13 @@ enum class E_VARIABLESCOPE
 	MEMBER
 };
 
+enum class E_FUNCTIONCALLTYPE
+{
+	INVALID = -1,
+	NORMAL,
+	VIRTUAL,
+};
+
 struct CodeMap
 {
 	const char*		sOpCode;
@@ -259,9 +266,9 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			popr(eOpCode);
 		break;
 		case OPCODE::CALL:
-			iOperand = READ_OPERAND(eOpCode);
-			REGS.RBP = REGS.RSP;					// ESP is now the new EBP.
-			REGS.EIP = iOperand;					// Jump to the call address.
+		{
+			call(eOpCode);
+		}
 		break;
 		case OPCODE::RET:
 			REGS.EIP = STACK[REGS.RSP++];			// Pop the Return address off the stack.
@@ -710,6 +717,36 @@ void VirtualMachine::clrMem(OPCODE eOpCode)
 	}
 }
 
+void VirtualMachine::call(OPCODE eOpCode)
+{
+	int32_t iOperand1_CallAddressType = READ_OPERAND(eOpCode);
+	int32_t iJumpAddress = iOperand1_CallAddressType;
+
+	E_FUNCTIONCALLTYPE eE_FUNCTIONCALLTYPE = (E_FUNCTIONCALLTYPE)((int32_t)iOperand1_CallAddressType >> (sizeof(int16_t) * 8));
+	if (eE_FUNCTIONCALLTYPE == E_FUNCTIONCALLTYPE::VIRTUAL)		// ( VIRTUAL | POS_IN_VTABLE )
+	{
+		/////////////////////////////// OBJECT ALIGNMENT IN HEAP ///////////////////////////
+		// RCX ==>	[-VTABLE_ADDR-][--MEMBER_VAR_0--][--MEMBER_VAR_1--][--MEMBER_VAR_2--]...[-VTABLE_ADDR_BASE1-][--MEMBER_VAR_0--][--MEMBER_VAR_1--]...
+		//			|<--4 bytes-->|<----4 bytes---->|<----4 bytes---->|<----4 bytes---->|...
+		//
+		// VTABLE ==>	[-VIRT_FUN_ADDR_0-][-VIRT_FUN_ADDR_1-][-VIRT_FUN_ADDR_2-]...
+		//				|<-----4 bytes---->|<-----4 bytes---->|<-----4 bytes---->...
+		////////////////////////////////////////////////////////////////////////////////////
+
+		int32_t iPosition = (iOperand1_CallAddressType & 0x0000FFFF);							// POS_IN_VTABLE
+		int32_t iVTABLEAddress = getValueIn(((int32_t)E_VARIABLESCOPE::MEMBER << 16) | 0);		// RCX ==>	[-VTABLE_ADDR-][--MEMBER_VAR_0--][--MEMBER_VAR_1--][--MEMBER_VAR_2--]...[-VTABLE_ADDR_BASE1-][--MEMBER_VAR_0--][--MEMBER_VAR_1--]...
+																								//			|<--4 bytes-->|<----4 bytes---->|<----4 bytes---->|<----4 bytes---->|...
+		
+		int32_t* pIntPtr = (int32_t*)&CODE[iVTABLEAddress + (sizeof(int32_t) * iPosition)];		// VTABLE ==>	[-VIRT_FUN_ADDR_0-][-VIRT_FUN_ADDR_1-][-VIRT_FUN_ADDR_2-]...
+																								//				|<-----4 bytes---->|<-----4 bytes---->|<-----4 bytes---->...
+
+		iJumpAddress = *pIntPtr;
+	}
+
+	REGS.RBP = REGS.RSP;					// ESP is now the new EBP.
+	REGS.EIP = iJumpAddress;				// Jump to the call address.
+}
+
 int32_t VirtualMachine::malloc(int32_t iSize)
 {
 	int32_t iReturnAddress = -1;
@@ -858,6 +895,14 @@ int32_t VirtualMachine::getValueIn(int32_t iVariable)
 	else
 	if (eVariableType == E_VARIABLESCOPE::MEMBER)
 	{
+		/////////////////////////////// OBJECT ALIGNMENT IN HEAP ///////////////////////////
+		// RCX ==>	[-VTABLE_ADDR-][--MEMBER_VAR_0--][--MEMBER_VAR_1--][--MEMBER_VAR_2--]...[-VTABLE_ADDR_BASE1-][--MEMBER_VAR_0--][--MEMBER_VAR_1--]...
+		//			|<--4 bytes-->|<----4 bytes---->|<----4 bytes---->|<----4 bytes---->|...
+		//
+		// VTABLE ==>	[-VIRT_FUN_ADDR_0-][-VIRT_FUN_ADDR_1-][-VIRT_FUN_ADDR_2-]...
+		//				|<-----4 bytes---->|<-----4 bytes---->|<-----4 bytes---->...
+		////////////////////////////////////////////////////////////////////////////////////
+
 		int32_t iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
 		int32_t* pIntPtr = (int32_t*)(HEAP + iAddress);
 		iValue = (*pIntPtr);

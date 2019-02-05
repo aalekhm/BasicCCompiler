@@ -572,6 +572,13 @@ enum class E_VARIABLESCOPE
 	MEMBER
 };
 
+enum class E_FUNCTIONCALLTYPE
+{
+	INVALID = -1,
+	NORMAL,
+	VIRTUAL,
+};
+
 static std::string toString(E_VARIABLESCOPE eE_VARIABLESCOPE)
 {
 	std::string sE_VARIABLESCOPE = "";
@@ -812,12 +819,13 @@ typedef struct StructInfo
 typedef struct FunctionInfo
 {
 	FunctionInfo(Tree* pNode, int iOffset)
-		: m_pNode(pNode)
-		, m_iStartOffsetInCode(iOffset)
-		, m_sFunctionName(GET_INFO_FOR_KEY(pNode, "text"))
-		, m_pFunctionReturnType(pNode->m_pLeftNode)
-		, m_pFunctionArguments(pNode->m_pRightNode)
-		, m_pParentStructInfo(nullptr)
+	: m_pNode(pNode)
+	, m_iStartOffsetInCode(iOffset)
+	, m_sFunctionName(GET_INFO_FOR_KEY(pNode, "text"))
+	, m_pFunctionReturnType(pNode->m_pLeftNode)
+	, m_pFunctionArguments(pNode->m_pRightNode)
+	, m_pParentStructInfo(nullptr)
+	, m_iPositionInVTABLE(-1)
 	{
 		scanFunctionForLocals(pNode);
 		scanFunctionForArguments(pNode);
@@ -829,26 +837,26 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-			case ASTNodeType::ASTNode_TYPE:
-			case ASTNodeType::ASTNode_TYPEARRAY:
-			case ASTNodeType::ASTNode_TYPESTRUCT:
-			{
-				m_vLocalVariables.push_back(pChild);
-			}
-			break;
-			case ASTNodeType::ASTNode_IF:
-			{
-				scanFunctionForLocals(pChild);
-				Tree* pElseNode = pChild->m_pRightNode;
-				if (pElseNode != nullptr)
-					scanFunctionForLocals(pElseNode);
-			}
-			break;
-			case ASTNodeType::ASTNode_WHILE:
-			{
-				scanFunctionForLocals(pChild);
-			}
-			break;
+				case ASTNodeType::ASTNode_TYPE:
+				case ASTNodeType::ASTNode_TYPEARRAY:
+				case ASTNodeType::ASTNode_TYPESTRUCT:
+				{
+					m_vLocalVariables.push_back(pChild);
+				}
+				break;
+				case ASTNodeType::ASTNode_IF:
+				{
+					scanFunctionForLocals(pChild);
+					Tree* pElseNode = pChild->m_pRightNode;
+					if (pElseNode != nullptr)
+						scanFunctionForLocals(pElseNode);
+				}
+				break;
+				case ASTNodeType::ASTNode_WHILE:
+				{
+					scanFunctionForLocals(pChild);
+				}
+				break;
 			}
 		}
 	}
@@ -1068,6 +1076,8 @@ typedef struct FunctionInfo
 
 	static std::vector<Tree*>		m_vStaticVariables;
 	StructInfo*						m_pParentStructInfo;
+
+	int32_t							m_iPositionInVTABLE;
 } FunctionInfo;
 
 static int32_t calculateVirtualFunctionCount(StructInfo* pStructInfo)

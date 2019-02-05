@@ -190,6 +190,7 @@ class VirtualMachine
 		void						lda(OPCODE eOpCode);
 		void						sta(OPCODE eOpcode);
 		void						clrMem(OPCODE eOpCode);
+		void						call(OPCODE eOpCode);
 
 		int32_t						getConsumedMemory();
 		int32_t						getAvailableMemory();

@@ -240,7 +240,9 @@ public:
 class SecondFloor : public FirstFloor
 {
 public:
-	virtual void virtualGroundFn0() { };
+	virtual void virtualGroundFn0() { 
+		GroundFloor::virtualGroundFn0();
+	};
 	virtual void virtualGroundFn1() { };
 
 	virtual void virtualFirstFn0() { m_iInt0 = 302; };
@@ -264,6 +266,8 @@ public:
 	int32_t		m_iCoordinates = 1;
 	int32_t		m_iOutline = 2;
 	int32_t		m_iFill = 3;
+
+	int32_t		m_iID = 1;
 };
 
 class Circle : public Shape
@@ -276,6 +280,7 @@ public:
 	virtual double radius() const { return 1.0; printf("Circle::radius"); };
 
 	int32_t		m_iRadius = 4;
+	int32_t		m_iID = 3;
 };
 
 class Rectangle : public Shape
@@ -286,6 +291,8 @@ public:
 
 	int32_t		m_iHeight = 5;
 	int32_t		m_iWidth = 6;
+
+	int32_t		m_iID = 4;
 };
 
 class Ellipse : public Circle
@@ -301,6 +308,8 @@ public:
 
 	int32_t		m_iMinorAxis = 7;
 	int32_t		m_iMajorAxis = 8;
+
+	int32_t		m_iID = 5;
 };
 
 class IInterface1
@@ -332,6 +341,8 @@ int main(int argc, char* argv[])
 	sf->virtualSecondFn0();
 
 	GroundFloor* gff = new SecondFloor();
+	gff->virtualGroundFn0();
+	gff->GroundFloor::virtualGroundFn0();
 	
 	Shape* s = new Shape();
 	Circle* c = new Circle();
@@ -343,9 +354,10 @@ int main(int argc, char* argv[])
 	e->area();
 	e->diameter();
 	e->Shape::area();
+
+	printf("%d, %d, %d, %d", s->m_iID, c->m_iID, r->m_iID, e->m_iID);
 	
 	Shape* se = new Ellipse();
-
 
 	InterfaceImpl* ii = new InterfaceImpl();
 

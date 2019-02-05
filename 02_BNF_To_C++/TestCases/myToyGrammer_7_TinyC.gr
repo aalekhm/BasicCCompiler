@@ -13,7 +13,7 @@
 											<functionDef>
 										) ;
 										
-<structDeclaration>				::		"struct"
+<structDeclaration>				::=		"struct"
 										TK_IDENTIFIER
 															"<code>"
 																__START_STRUCT__

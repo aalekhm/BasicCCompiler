@@ -23,6 +23,12 @@ struct Part
 		print("In Part::getManufacturer");
 		putc(10);
 	}	
+
+	inline virtual void getDealer() 
+	{ 
+		print("In Part::getDealer");
+		putc(10);
+	}	
 };
 
 struct MachinePart : Part
@@ -40,7 +46,7 @@ struct MachinePart : Part
 
 	inline virtual void getDescription() 
 	{ 
-		print("In MachinePart::getDescription");
+		print("In MachinePart::getDescription = ", m_iDescription);
 		putc(10);
 	}
 };
@@ -52,6 +58,8 @@ struct Tyre : MachinePart
 	
 	inline virtual void getPartNumber() 
 	{
+		this->getDescription();
+		
 		this->m_iPartNumber = 999;
 		this->m_iUniquePartID = 555;
 		print("In Tyre::getPartNumber this->m_iPartNumber = ", this->m_iPartNumber, ", this->m_iUniquePartID = ", this->m_iUniquePartID);
@@ -64,6 +72,12 @@ struct Tyre : MachinePart
 		putc(10);
 		
 		this->m_iUniquePartID = 143165576;
+	}
+
+	inline virtual void getDescription() 
+	{ 
+		print("In Tyre::getDescription");
+		putc(10);
 	}
 };
 
@@ -208,6 +222,7 @@ int32_t retNewFunc()
 	pMachinePart->m_iDescription = 5678;
 	print("MachinePart pMachinePart->m_iDescription = ", pMachinePart->m_iDescription);
 	putc(10);
+	pMachinePart->getDescription();
 	
 	pExampleObj0->example1Func1();
 	pPersonObj2->func1();
@@ -770,7 +785,7 @@ void main()
 		
 	int32_t a = (1 * ((1 * (5 * 15)) / 10));
 	print("a = ", a);
-		
+	
 	tempFunc(55, 101);
 	testPrinting();
 	simpleCount();
