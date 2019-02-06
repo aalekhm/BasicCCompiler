@@ -15,6 +15,69 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+// http://dotnet.jku.at/applications/visualizer/
+
+struct AAA
+{
+	int32_t 	m_iAAAInt1;
+	int8_t 		m_aAAANumberList[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+	
+	inline virtual void printMembers()
+	{
+		print("m_iAAAInt1 = ", this->m_iAAAInt1);
+		putc(10);
+		
+		this->m_aAAANumberList[0] = 100;
+		
+		print("m_aAAANumberList = ");
+		for(int8_t i = 0; i < 8; i++)
+		{
+			print(" , ", this->m_aAAANumberList[i]);
+		}
+		putc(10);
+	}
+};
+
+struct BBB : AAA
+{
+	int32_t 	m_iBBBInt1;
+	int8_t 		m_aBBBNumberList[8] = { 11, 12, 13, 14, 15, 16, 17, 18 };
+
+	inline virtual void printMembers()
+	{
+		print("m_iBBBInt1 = ", this->m_iBBBInt1);
+		putc(10);
+		
+		print("m_aBBBNumberList = ");
+		for(int8_t i = 0; i < 8; i++)
+		{
+			print(this->m_aBBBNumberList[i], " ");
+		}
+		putc(10);
+	}
+};
+
+struct CCC : BBB
+{
+	int32_t 	m_iCCCInt1;
+	int8_t 		m_aCCCNumberList[8] = { 21, 22, 23, 24, 25, 26, 27, 28 };
+	
+	inline virtual void printMembers()
+	{
+		print("m_iCCCInt1 = ", this->m_iCCCInt1);
+		putc(10);
+		
+		this->m_aAAANumberList[0] = 101;
+		
+		print("m_aCCCNumberList = ");
+		for(int8_t i = 0; i < 8; i++)
+		{
+			print(this->m_aCCCNumberList[i], " ");
+		}
+		putc(10);
+	}
+};
+
 struct Part
 {
 	int32_t 	m_iUniquePartID;
@@ -187,6 +250,55 @@ static int32_t* pStaticPtr_2;
 static int32_t* pStaticPtr_3;
 
 static int8_t* pStaticPtr_0_Start;
+
+void structTest()
+{
+	AAA* pAAA = new AAA();
+	pAAA->printMembers();
+
+	BBB* pBBB = new BBB();
+	pBBB->printMembers();
+
+	CCC* pCCC = new CCC();
+	pCCC->printMembers();
+	
+	////////////////////////////////////////////////////////////////////////////////
+	print("pAAA->m_aAAANumberList = ");
+	for(int8_t i = 0; i < 8; i++)
+	{
+		print(pAAA->m_aAAANumberList[i], " ");
+	}
+	putc(10);
+
+	print("pBBB->m_aBBBNumberList = ");
+	for(int8_t i = 0; i < 8; i++)
+	{
+		print(pBBB->m_aBBBNumberList[i], " ");
+	}
+	putc(10);
+	
+	print("pCCC->m_aCCCNumberList = ");
+	for(int8_t i = 0; i < 8; i++)
+	{
+		print(pCCC->m_aCCCNumberList[i], " ");
+	}
+	putc(10);
+	////////////////////////////////////////////////////////////////////////////////
+	
+	////////////////////////////////////////////////////////////////////////////////
+	print("pCCC->m_aAAANumberList = ");
+	for(int8_t i = 0; i < 8; i++)
+	{
+		print(pCCC->m_aAAANumberList[i], " ");
+	}
+	putc(10);
+	////////////////////////////////////////////////////////////////////////////////
+	
+	free(pAAA);
+	free(pBBB);
+	free(pCCC);
+}
+
 int32_t retNewFunc()
 {
 	print("In retNewFunc.....");
@@ -785,6 +897,8 @@ void main()
 		
 	int32_t a = (1 * ((1 * (5 * 15)) / 10));
 	print("a = ", a);
+	
+	structTest();
 	
 	tempFunc(55, 101);
 	testPrinting();

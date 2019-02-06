@@ -98,6 +98,7 @@ class TinyCReader {
 		bool assignmentDerefArray();
 		bool structMemberVariableAssignmentOrFunctionCall();
 		bool structMemberVariableLValueOrFunctionCall();
+		bool structMemberVariableLValueArrayAccess();
 		bool assignmentRHS();
 		bool freePtrStatement();
 		bool expr();
@@ -124,6 +125,7 @@ class TinyCReader {
 		bool tk_identifier();
 		bool structMemberAccess();
 		bool structMemberVariableOrFunctionCall_RValue();
+		bool structMemberVariableArrayInAnExpr();
 		bool structMemberFunctionCallInAnExpr();
 		bool unary_expr();
 		bool unary_oper();

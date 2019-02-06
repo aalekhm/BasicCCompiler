@@ -2357,23 +2357,6 @@ if(!GrammerUtils::match('>', MANDATORY))
 return false;
 if(!structMemberVariableLValueOrFunctionCall())
 return false;
-
-															Tree* pNode = hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL);
-															if(pNode != nullptr)									// Check if there was a object function call
-															{														// If Yes, then change the ASTNodeType to ASTNode_MEMBERACCESS.
-																pAssignmentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
-															}
-															else													// Else, its an object variable value assignment.
-															{
-																std::string sVariableName = PREV_TOKEN_TEXT;
-																Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sVariableName.c_str());
-																{
-																	pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
-																	SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", sVariableName);
-																	pAssignmentNode->m_pRightNode = pIdentifierLeaf;
-																}
-															}
-														
 if(!GrammerUtils::match('=', OPTIONAL)) {
 
 }
@@ -2408,15 +2391,62 @@ return true;
 
 bool TinyCReader::structMemberVariableLValueOrFunctionCall() {
 if(functionCall()) {
+
+															m_pASTCurrentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
+														
 return true;
 }
 else
 if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
+
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, PREV_TOKEN_TEXT);
+															{
+																pIdentifierLeaf->m_sAdditionalInfo = PREV_TOKEN_TEXT;
+																SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", PREV_TOKEN_TEXT);
+																m_pASTCurrentNode->m_pRightNode = pIdentifierLeaf;
+															}
+														
+return true;
+}
+else
+if(structMemberVariableLValueArrayAccess()) {
 return true;
 }
 else
 return false;
 
+return true;
+
+}
+
+bool TinyCReader::structMemberVariableLValueArrayAccess() {
+if(!GrammerUtils::match(TokenType::Type::TK_DEREFARRAY, MANDATORY))
+return false;
+
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESSDEREF, PREV_TOKEN_TEXT);
+															Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pIdentifierLeaf->m_sAdditionalInfo = PREV_TOKEN_TEXT;
+																SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", PREV_TOKEN_TEXT);
+																m_pASTCurrentNode->m_pRightNode = pIdentifierLeaf;
+															}
+														
+if(!GrammerUtils::match('[', MANDATORY))
+return false;
+
+															checkOpPrecedenceAndPush("(");
+														
+if(!expr())
+return false;
+
+															checkOpPrecedenceAndPush(")");
+														
+
+															pArrayIndexExpressionLeaf = createPostFixExpr(pArrayIndexExpressionLeaf);
+															pIdentifierLeaf->m_pLeftNode = pArrayIndexExpressionLeaf;
+														
+if(!GrammerUtils::match(']', MANDATORY))
+return false;
 return true;
 
 }
@@ -2952,7 +2982,7 @@ if(!GrammerUtils::match(TokenType::Type::TK_MEMBERACCESS, MANDATORY))
 return false;
 
 																std::string sObjectName = PREV_TOKEN_TEXT;
-																std::string sFullyQualifiedObjectName;
+																std::string sFullyQualifiedObjectName = "";
 																if (sObjectName == "this")
 																	sFullyQualifiedObjectName = "this";
 																else
@@ -3001,8 +3031,44 @@ if(GrammerUtils::match(TokenType::Type::TK_IDENTIFIER, OPTIONAL)) {
 return true;
 }
 else
+if(structMemberVariableArrayInAnExpr()) {
+return true;
+}
+else
 return false;
 
+return true;
+
+}
+
+bool TinyCReader::structMemberVariableArrayInAnExpr() {
+if(!GrammerUtils::match(TokenType::Type::TK_DEREFARRAY, MANDATORY))
+return false;
+
+															m_pASTCurrentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESSDEREF;
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, PREV_TOKEN_TEXT);
+															{
+																SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", PREV_TOKEN_TEXT);
+															}
+
+															Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														
+if(!GrammerUtils::match('[', MANDATORY))
+return false;
+
+																checkOpPrecedenceAndPush("(");
+														
+if(!expr())
+return false;
+
+															checkOpPrecedenceAndPush(")");
+															
+															pArrayIndexExpressionLeaf = createPostFixExpr(pArrayIndexExpressionLeaf);
+															m_pASTCurrentNode->m_pLeftNode = pIdentifierLeaf;
+															m_pASTCurrentNode->m_pRightNode = pArrayIndexExpressionLeaf;
+														
+if(!GrammerUtils::match(']', MANDATORY))
+return false;
 return true;
 
 }

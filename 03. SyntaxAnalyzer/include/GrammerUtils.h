@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	9728
+#define MAX_BYTECODE_SIZE	12288
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -61,6 +61,7 @@ class GrammerUtils
 		static void									addASTForStructMemberVariableDestruction(FunctionInfo* pFunctionInfo);
 		static void									handleStructEnd(Tree* pNode);
 		static void									handleStructMemberAccess(Tree* pNode);
+		static void									handleStructMemberAccessDeref(Tree* pNode);
 
 		static Tree*								createASTForArrayType(Tree* pASTArrayTypeNode);
 		static Tree*								createASTForPointerType(Tree* pASTArrayTypeSrc);

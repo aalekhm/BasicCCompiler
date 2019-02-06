@@ -655,11 +655,10 @@ void VirtualMachine::subreg(OPCODE eOpCode)
 
 void VirtualMachine::lda(OPCODE eOpCode)
 {
-	int32_t iOperand = READ_OPERAND(eOpCode);			// Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
-
-	int32_t iVarType = STACK[REGS.RSP++];		// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
-	int32_t iAddress = STACK[REGS.RSP++];
-	int32_t iArrayIndex = STACK[REGS.RSP++];	// ArrayIndex.
+	int32_t iOperand = READ_OPERAND(eOpCode);	// LDA_VM_4. Pointer Variable Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF).
+	int32_t iVarType = STACK[REGS.RSP++];		// LDA_VM_3. Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+	int32_t iAddress = STACK[REGS.RSP++];		// LDA_VM_2. Address
+	int32_t iArrayIndex = STACK[REGS.RSP++];	// LDA_VM_1. ArrayIndex.
 
 	int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
 	pAddress_8 += (iArrayIndex * iVarType);
@@ -672,18 +671,38 @@ void VirtualMachine::lda(OPCODE eOpCode)
 
 void VirtualMachine::sta(OPCODE eOpCode)
 {
-	int32_t iVariable = READ_OPERAND(eOpCode);			// Pointer Variable.
-
-	int32_t iVarType = STACK[REGS.RSP++];				// Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
-	int32_t iArrayIndex = STACK[REGS.RSP++];			// ArrayIndex.
-	int32_t iRValue = STACK[REGS.RSP++];				// RValue to be stored, picked up from the STACK.
+	int32_t iVariable = READ_OPERAND(eOpCode);			// STA_VM_4. Pointer Variable.
+	int32_t iVarType = STACK[REGS.RSP++];				// STA_VM_3. Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
+	int32_t iArrayIndex = STACK[REGS.RSP++];			// STA_VM_2. ArrayIndex.
+	int32_t iRValue = STACK[REGS.RSP++];				// STA_VM_1. RValue to be stored, picked up from the STACK.
 
 	int32_t iAddress = getValueIn(iVariable);
 	{
 		int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
 		pAddress_8 += (iArrayIndex*iVarType);
-		int32_t* pAddress = (int32_t*)pAddress_8;
-		*pAddress = iRValue;
+
+		switch (iVarType)
+		{
+			case 1:
+			{
+				int8_t* pAddress = (int8_t*)pAddress_8;
+				*pAddress = (iRValue & 0xFF);
+			}
+			break;
+			case 2:
+			{
+				int16_t* pAddress = (int16_t*)pAddress_8;
+				*pAddress = (iRValue & 0xFFFF);
+			}
+			break;
+			case 4:
+			{
+				int32_t* pAddress = (int32_t*)pAddress_8;
+				*pAddress = (iRValue & 0xFFFFFFFF);
+			}
+			break;
+		}
+
 #if (VERBOSE == 1)
 		std::cout << "\t\t\t\t\t\t[HEAP] " << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
 #endif

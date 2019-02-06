@@ -1046,23 +1046,6 @@
 														"</code>"
 										'-' '>'
 										<structMemberVariableLValueOrFunctionCall>	
-														"<code>"
-															Tree* pNode = hasNodeOfType(m_pASTCurrentNode, ASTNodeType::ASTNode_FUNCTIONCALL);
-															if(pNode != nullptr)									// Check if there was a object function call
-															{														// If Yes, then change the ASTNodeType to ASTNode_MEMBERACCESS.
-																pAssignmentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
-															}
-															else													// Else, its an object variable value assignment.
-															{
-																std::string sVariableName = PREV_TOKEN_TEXT;
-																Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sVariableName.c_str());
-																{
-																	pIdentifierLeaf->m_sAdditionalInfo = sVariableName;
-																	SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", sVariableName);
-																	pAssignmentNode->m_pRightNode = pIdentifierLeaf;
-																}
-															}
-														"</code>"
 										[
 										'='				"<code>"
 															Tree* pTemp = nullptr;
@@ -1088,9 +1071,48 @@
 										
 <structMemberVariableLValueOrFunctionCall>
 								::=		(	<functionCall>
+														"<code>"
+															m_pASTCurrentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
+														"</code>"
 											|
 											TK_IDENTIFIER
+														"<code>"
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, PREV_TOKEN_TEXT);
+															{
+																pIdentifierLeaf->m_sAdditionalInfo = PREV_TOKEN_TEXT;
+																SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", PREV_TOKEN_TEXT);
+																m_pASTCurrentNode->m_pRightNode = pIdentifierLeaf;
+															}
+														"</code>"
+											|
+											<structMemberVariableLValueArrayAccess>
 										);
+
+<structMemberVariableLValueArrayAccess>
+								::=
+										TK_DEREFARRAY
+														"<code>"
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESSDEREF, PREV_TOKEN_TEXT);
+															Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+															{
+																pIdentifierLeaf->m_sAdditionalInfo = PREV_TOKEN_TEXT;
+																SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", PREV_TOKEN_TEXT);
+																m_pASTCurrentNode->m_pRightNode = pIdentifierLeaf;
+															}
+														"</code>"
+										'['
+														"<code>"
+															checkOpPrecedenceAndPush("(");
+														"</code>"
+										<expr>			
+														"<code>"
+															checkOpPrecedenceAndPush(")");
+														"</code>"
+														"<code>"
+															pArrayIndexExpressionLeaf = createPostFixExpr(pArrayIndexExpressionLeaf);
+															pIdentifierLeaf->m_pLeftNode = pArrayIndexExpressionLeaf;
+														"</code>"
+										']';
 
 										
 <assignmentRHS>					::=  	TK_IDENTIFIER	"<code>"
@@ -1371,7 +1393,33 @@
 																	m_vPostFix.push_back(sOperand);
 																}
 															"</code>"
+											|
+											<structMemberVariableArrayInAnExpr>
 										);
+										
+<structMemberVariableArrayInAnExpr>
+								::=		TK_DEREFARRAY	"<code>"
+															m_pASTCurrentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESSDEREF;
+															Tree* pIdentifierLeaf = makeLeaf(ASTNodeType::ASTNode_IDENTIFIER, PREV_TOKEN_TEXT);
+															{
+																SET_INFO_FOR_KEY(pIdentifierLeaf, "givenName", PREV_TOKEN_TEXT);
+															}
+
+															Tree* pArrayIndexExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+														"</code>"
+										'['
+														"<code>"
+																checkOpPrecedenceAndPush("(");
+														"</code>"
+										<expr>
+														"<code>"
+															checkOpPrecedenceAndPush(")");
+															
+															pArrayIndexExpressionLeaf = createPostFixExpr(pArrayIndexExpressionLeaf);
+															m_pASTCurrentNode->m_pLeftNode = pIdentifierLeaf;
+															m_pASTCurrentNode->m_pRightNode = pArrayIndexExpressionLeaf;
+														"</code>"
+										']' ;
 
 <structMemberFunctionCallInAnExpr>	
 								::= 	<functionCall>		"<code>"
