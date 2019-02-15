@@ -9,7 +9,7 @@
 #define OPTIONAL			0
 #define MANDATORY			1
 
-#define MAX_BYTECODE_SIZE	12288
+#define MAX_BYTECODE_SIZE	13 * 1024
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -69,6 +69,8 @@ class GrammerUtils
 		static Tree*								createFreeASTForArrayType(Tree* pASTArrayTypeSrc);
 		static Tree*								createFunctionWithNoArguments(const char* sFunctionName, const char* sReturnType);
 		static Tree*								createFunctionCallWithNoArguments(const char* sFunctionName);
+		static Tree*								createThisFunctionCallWithoutArguments(const char* sFunctionName);
+		static Tree*								createPrintType(const char* sString);
 
 		static void									handlePreFixExpression(Tree* pNode);
 		static void									handleExpression(Tree* pNode);
@@ -80,6 +82,8 @@ class GrammerUtils
 		static void									handleString(Tree* pNode);
 		static void									handlePrimitiveInt(Tree* pNode);
 		static void									handleTypeArray(Tree* pNode);
+		static void									allocateTypeArray(Tree* pNode);
+		static void									initializeTypeArray(Tree* pNode);
 		static void									handlePrimitivePtrEpilogue(Tree* pNode);
 		static void									handleAssign(Tree* pNode);
 		static void									handleReturnStatement(Tree* pNode);
@@ -104,7 +108,7 @@ class GrammerUtils
 		static int32_t								sizeOf(std::string sType);
 		static int32_t								castValueFor(std::string sType);
 		static void									cast(int32_t iCastValue);
-		static void									storeValueAtPosForVariable(int32_t iPos, const char* sType, const char* sVariableName);
+		static void									storeValueAtPosForVariable(int32_t iPos, const char* sType, Tree* pNode);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);
 		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2);
@@ -120,6 +124,9 @@ class GrammerUtils
 		static void									addVirtualFunctionsFromParentStruct(StructInfo* pCurrentStruct, std::vector<void*>& vVirtualFunctions);
 		static void									emitStructVTable(StructInfo* pCurrentStruct);
 		static void									storeVTablePointerInObjectOnHeap(int16_t iShortPosition, StructInfo* pStructInfo);
+
+		static int32_t								getMemberPositionInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo);
+		static std::string							getMemberTypeInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo);
 
 		static std::vector<std::string>				m_vStrings;
 

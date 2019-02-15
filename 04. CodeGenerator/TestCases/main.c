@@ -15,15 +15,21 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+// https://rosettacode.org/wiki/Compiler/
 // http://dotnet.jku.at/applications/visualizer/
+// http://kenyatips.com/weird-programming-languages/
+// https://www.memorymanagement.org/mmref/alloc.html
 
 struct AAA
 {
-	int32_t 	m_iAAAInt1;
-	int8_t 		m_aAAANumberList[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-	
+	int32_t 	m_iAAAInt1 = 101;
+	int8_t 		m_aAAANumberList[8] = { 1, 2 * 1, 3, 4, 5, 6, 7, 8 };
+			
 	inline virtual void printMembers()
 	{
+		print("<--------------------------------------------------------->");
+		putc(10);
+		
 		print("m_iAAAInt1 = ", this->m_iAAAInt1);
 		putc(10);
 		
@@ -35,6 +41,16 @@ struct AAA
 			print(" , ", this->m_aAAANumberList[i]);
 		}
 		putc(10);
+
+		print("</--------------------------------------------------------->");
+		putc(10);
+	}
+	
+	// Note: Default Constructor() & #Destructor() need to be declared at bottom of the 'struct' after all the function decls.
+	inline void AAA()
+	{
+		print("In AAA");
+		putc(10);
 	}
 };
 
@@ -45,7 +61,19 @@ struct BBB : AAA
 
 	inline virtual void printMembers()
 	{
+		print("<***********************************************************>");
+		putc(10);
+
 		print("m_iBBBInt1 = ", this->m_iBBBInt1);
+		putc(10);
+		
+		print("m_aAAANumberList = ");
+		putc(10);
+		for(int8_t i = 0; i < 8; i++)
+		{
+			this->m_aAAANumberList[i] = 100 + i;
+			print(this->m_aAAANumberList[i], " ");
+		}
 		putc(10);
 		
 		print("m_aBBBNumberList = ");
@@ -53,6 +81,9 @@ struct BBB : AAA
 		{
 			print(this->m_aBBBNumberList[i], " ");
 		}
+		putc(10);
+
+		print("</***********************************************************>");
 		putc(10);
 	}
 };
@@ -64,16 +95,43 @@ struct CCC : BBB
 	
 	inline virtual void printMembers()
 	{
+		print("<############################################################>");
+		putc(10);
+
 		print("m_iCCCInt1 = ", this->m_iCCCInt1);
 		putc(10);
 		
-		this->m_aAAANumberList[0] = 101;
-		
+		this->m_aAAANumberList[0] = 1001;
+		print("m_aAAANumberList = ");
+		putc(10);
+		for(int8_t i = 0; i < 8; i++)
+		{
+			print(this->m_aAAANumberList[i], " ");
+		}
+		putc(10);
+
+		print("m_aBBBNumberList = ");
+		for(int8_t i = 0; i < 8; i++)
+		{
+			this->m_aBBBNumberList[i] = 2001 + i;
+			print(this->m_aBBBNumberList[i], " ");
+		}
+		putc(10);
+
 		print("m_aCCCNumberList = ");
 		for(int8_t i = 0; i < 8; i++)
 		{
 			print(this->m_aCCCNumberList[i], " ");
 		}
+		putc(10);
+
+		print("</############################################################>");
+		putc(10);
+	}
+	
+	inline void #CCC()
+	{
+		print("<#CCC>");
 		putc(10);
 	}
 };
@@ -290,6 +348,13 @@ void structTest()
 	for(int8_t i = 0; i < 8; i++)
 	{
 		print(pCCC->m_aAAANumberList[i], " ");
+	}
+	putc(10);
+
+	print("pCCC->m_aBBBNumberList = ");
+	for(int8_t i = 0; i < 8; i++)
+	{
+		print(pCCC->m_aBBBNumberList[i], " ");
 	}
 	putc(10);
 	////////////////////////////////////////////////////////////////////////////////

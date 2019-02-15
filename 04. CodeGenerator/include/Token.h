@@ -877,7 +877,7 @@ typedef struct FunctionInfo
 		}
 	}
 
-	Tree* getVariableASTNode(const char* sVariableName)
+	Tree* getLocalVariableASTNode(std::string sVariableName)
 	{
 		Tree* pASTNode = nullptr;
 		std::map<std::string, Tree*>::const_iterator itr = m_MapVariableToASTNodeCache.find(sVariableName);
@@ -983,11 +983,11 @@ typedef struct FunctionInfo
 		return pASTNode;
 	}
 
-	int32_t getLocalVariablePosition(const char* sLocalVariableName)
+	int32_t getLocalVariablePosition(std::string sLocalVariableName)
 	{
 		int32_t iPositionOperand = 0;
 
-		Tree* pASTNode = getVariableASTNode(sLocalVariableName);
+		Tree* pASTNode = getLocalVariableASTNode(sLocalVariableName);
 		assert(pASTNode != nullptr);
 		if (pASTNode != nullptr)
 		{
@@ -998,11 +998,11 @@ typedef struct FunctionInfo
 		return iPositionOperand;
 	}
 
-	std::string getVariableNodeType(const char* sLocalVariableName)
+	std::string getLocalVariableNodeType(std::string sLocalVariableName)
 	{
 		std::string sType;
 
-		Tree* pVariableASTNode = getVariableASTNode(sLocalVariableName);
+		Tree* pVariableASTNode = getLocalVariableASTNode(sLocalVariableName);
 		assert(pVariableASTNode != nullptr);
 		if (pVariableASTNode != nullptr)
 		{
@@ -1012,11 +1012,11 @@ typedef struct FunctionInfo
 		return sType;
 	}
 
-	bool IsVariableAPointerType(const char* sLocalVariableName)
+	bool IsLocalVariableAPointerType(std::string sLocalVariableName)
 	{
 		bool bIsPointerType = false;
 
-		Tree* pVariableASTNode = getVariableASTNode(sLocalVariableName);
+		Tree* pVariableASTNode = getLocalVariableASTNode(sLocalVariableName);
 		assert(pVariableASTNode != nullptr);
 		if (pVariableASTNode != nullptr)
 		{
@@ -1066,7 +1066,7 @@ typedef struct FunctionInfo
 	}
 
 	Tree*							m_pNode;
-	int								m_iStartOffsetInCode;
+	int32_t							m_iStartOffsetInCode;
 	std::string						m_sFunctionName;
 
 	Tree*							m_pFunctionReturnType;

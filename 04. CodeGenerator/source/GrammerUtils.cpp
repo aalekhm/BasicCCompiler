@@ -40,8 +40,8 @@ std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
 #define CURRENT_OFFSET_READ								m_pBAIS->getCurrentOffset()
 
 #define GET_VARIABLE_POSITION(__VAR__NAME__)			m_pCurrentFunction->getLocalVariablePosition(__VAR__NAME__)
-#define IS_POINTER_TYPE(__VAR_NAME__)					m_pCurrentFunction->IsVariableAPointerType(__VAR_NAME__)
-#define GET_VARIABLE_NODETYPE(__VAR_NAME__)				m_pCurrentFunction->getVariableNodeType(__VAR_NAME__)
+#define IS_VARIABLE_POINTER_TYPE(__VAR_NAME__)			m_pCurrentFunction->IsLocalVariableAPointerType(__VAR_NAME__)
+#define GET_VARIABLE_NODETYPE(__VAR_NAME__)				m_pCurrentFunction->getLocalVariableNodeType(__VAR_NAME__)
 
 #define IS_STATEMENT_INSIDE_FUNCTION					if(m_pCurrentFunction != nullptr)
 #define CREATE_NODE_OF_AST(__eASTType__, __TEXT__)		createNodeOfType(__eASTType__, __TEXT__)
@@ -863,6 +863,7 @@ void GrammerUtils::populateCode(Tree* pNode)
 			case ASTNodeType::ASTNode_STRUCTEND:
 			{
 				handleStructEnd(pNode);
+				bool bProcessStatements = false;
 			}
 			break;
 			case ASTNodeType::ASTNode_TYPESTATIC:
@@ -1016,6 +1017,7 @@ void GrammerUtils::populateCode(Tree* pNode)
 						handlePrimitivePtrEpilogue(pNode);
 				}
 			}
+
 			break;
 		}
 	}
@@ -1310,6 +1312,8 @@ Tree* GrammerUtils::createASTForArrayType(Tree* pASTArrayTypeSrc)
 			pPrimTypeArrayNode->m_sAdditionalInfo.append(pASTArrayTypeSrc->m_sAdditionalInfo);
 			pPrimTypeArrayNode->m_bIsPointerType = true;
 			SET_INFO_FOR_KEY(pPrimTypeArrayNode, "type", GET_INFO_FOR_KEY(pASTArrayTypeSrc, "type"));
+			SET_INFO_FOR_KEY(pPrimTypeArrayNode, "givenName", GET_INFO_FOR_KEY(pASTArrayTypeSrc, "givenName"));
+			SET_INFO_FOR_KEY(pPrimTypeArrayNode, "scope", GET_INFO_FOR_KEY(pASTArrayTypeSrc, "scope"));
 			pPrimTypeArrayNode->m_pParentNode = nullptr;
 
 			////////////////////////////////////////
@@ -1451,6 +1455,39 @@ Tree* GrammerUtils::createFunctionCallWithNoArguments(const char* sFunctionName)
 	return pFunctionCallNode;
 }
 
+Tree* GrammerUtils::createThisFunctionCallWithoutArguments(const char* sFunctionName)
+{
+	Tree* pMemberFunctionCall = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_MEMBERACCESS, "this");
+	{
+		SET_INFO_FOR_KEY(pMemberFunctionCall, "text", "this");
+		SET_INFO_FOR_KEY(pMemberFunctionCall, "givenName", "this");
+
+		Tree* pFunctionCallNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONCALL, sFunctionName);
+		{
+			SET_INFO_FOR_KEY(pFunctionCallNode, "text", sFunctionName);
+			pMemberFunctionCall->addChild(pFunctionCallNode);
+
+			Tree* pFunctionCallEndNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONCALLEND, sFunctionName);
+			{
+				SET_INFO_FOR_KEY(pFunctionCallEndNode, "text", sFunctionName);
+				pFunctionCallNode->addChild(pFunctionCallEndNode);
+			}
+		}
+	}
+
+	return pMemberFunctionCall;
+}
+
+Tree* GrammerUtils::createPrintType(const char* sString)
+{
+	Tree* pPrintNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_PRINT, "this");
+	{
+
+	}
+
+	return pPrintNode;
+}
+
 Tree* GrammerUtils::createNodeOfType(ASTNodeType eASTNodeType, const char* sText)
 {
 	Tree* pASTNode = TinyCReader::makeLeaf(eASTNodeType, sText);
@@ -1461,16 +1498,21 @@ void GrammerUtils::addASTForStructMemberVariableConstruction(FunctionInfo* pFunc
 {
 	Tree* pFunctionNode = pFunctionInfo->m_pNode;
 	Tree* pCreatedASTNode = nullptr;
-	for (Tree* pASTNode : m_pCurrentStruct->m_vMemberVariables)
+	StructInfo* pStructInfo = m_pCurrentStruct;
+
+	/////////////////////////////////////////////////////////////////////////
+	// Add Member variables those need to be allocated / initialized.
+	for (Tree* pASTNode : pStructInfo->m_vMemberVariables)
 	{
 		switch (pASTNode->m_eASTNodeType)
 		{
 			case ASTNodeType::ASTNode_TYPE:
 			{
-				if (pASTNode->m_bIsPointerType)
-				{
-				}
-				else
+				/////////////////////////////////////////////////////////////////////////
+				// A Non-Pointer needs to be initialized.
+				// Eg: 
+				//		int32_t iMemberVariable = 1234;
+				if (NOT pASTNode->m_bIsPointerType)
 				{
 					pCreatedASTNode = createASTForType(pASTNode);
 				}
@@ -1478,7 +1520,87 @@ void GrammerUtils::addASTForStructMemberVariableConstruction(FunctionInfo* pFunc
 			break;
 			case ASTNodeType::ASTNode_TYPEARRAY:
 			{
+				/////////////////////////////////////////////////////////////////////////
+				// A Array type need to be allocated & initialized.
+				// Eg: 
+				//		int8_t 		m_aArrayList[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
 				pCreatedASTNode = createASTForArrayType(pASTNode);
+			}
+			break;
+		}
+
+		/////////////////////////////////////////////////////////////////////////
+		// Add the newly created Node to the 'Constructor'
+		// It's added at the start so that allocation/initilization happens before actual function body.
+		if (pCreatedASTNode != nullptr)
+		{
+			// Inserting @ position '1' as '0' is ASTNode_FUNCTIONSTART
+			pFunctionNode->insertAt(1, pCreatedASTNode);
+		}
+
+		pCreatedASTNode = nullptr;
+	}
+
+	/////////////////////////////////////////////////////////////////////////
+	// Check if a struct has a 'parent', if yes, then call it's Default Constructor.
+	// Call to Super's Default Constructor()"
+	if (pStructInfo->m_ParentStructInfo != nullptr)
+	{
+		int32_t iStructSize = pStructInfo->sizeOfMe();
+
+		std::string sSuper = pStructInfo->m_ParentStructInfo->m_sStructName;
+		Tree* pMemberFunctionCall = createThisFunctionCallWithoutArguments(sSuper.c_str());
+		{
+			/////////////////////////////////////////////////////////////////////////
+			// Before calling 'Super()' adjust 'this' pointer in 'ECX'.
+			// Eg:
+			//		struct A {}
+			//		struct B : A {}
+			//		struct C : B {}
+			//		
+			//		ECX('this) ==>	CONTENTS_OF_C...CONTENTS_OF_B...CONTENTS_OF_A...
+			//						*(1)			*(2)			*(3)
+			//						|<--sizeOf(C)-->|<--sizeOf(B)-->|<--sizeOf(B)-->|
+			//
+			//		If the object is of 'C', in the Constructor of 'C()' there will be a call to B().
+			//		Before this call move the 'this' pointer in 'ECX' from *(1) to *(2) above.
+			//		The movement is equivalent to the sizeOf(C).
+			//		Same rule applies in B().
+			{
+				int32_t iVal = (int32_t)EREGISTERS::RCX;
+				iVal <<= sizeof(int16_t) * 8;
+				iVal |= (iStructSize & 0x0000FFFF);
+				char sOperand[255] = { 0 };
+				_itoa(iVal, sOperand, 10);
+				SET_INFO_FOR_KEY(pMemberFunctionCall, "SUB_REG", sOperand);
+			}
+			/////////////////////////////////////////////////////////////////////////
+
+			// Inserting @ position '1' as '0' is ASTNode_FUNCTIONSTART
+			pFunctionNode->insertAt(1, pMemberFunctionCall);
+		}
+	}
+}
+
+void GrammerUtils::addASTForStructMemberVariableDestruction(FunctionInfo* pFunctionInfo)
+{
+	Tree* pFunctionNode = pFunctionInfo->m_pNode;
+	Tree* pCreatedASTNode = nullptr;
+	StructInfo* pStructInfo = m_pCurrentStruct;
+
+	/////////////////////////////////////////////////////////////////////////
+	// Free Member variables those need to be de-allocated.
+	for (Tree* pASTNode : pStructInfo->m_vMemberVariables)
+	{
+		switch (pASTNode->m_eASTNodeType)
+		{
+			case ASTNodeType::ASTNode_TYPEARRAY:
+			{
+				/////////////////////////////////////////////////////////////////////////
+				// A Array type needs to be de-allocated.
+				// Eg:
+				//		free(m_aArrayList);
+				pCreatedASTNode = createFreeASTForArrayType(pASTNode);
 			}
 			break;
 		}
@@ -1492,39 +1614,44 @@ void GrammerUtils::addASTForStructMemberVariableConstruction(FunctionInfo* pFunc
 		pCreatedASTNode = nullptr;
 	}
 
-	//// call to "super()"
-	//if (m_pCurrentStruct->m_ParentStructInfo != nullptr)
-	//{
-	//	std::string sParentStructName = m_pCurrentStruct->m_ParentStructInfo->m_sStructName;
-	//	pCreatedASTNode = createFunctionCallWithNoArguments(sParentStructName.c_str());
-	//
-	//	// Inserting @ position '1' as '0' is ASTNode_FUNCTIONSTART
-	//	pFunctionNode->insertAt(1, pCreatedASTNode);
-	//}
-}
-
-void GrammerUtils::addASTForStructMemberVariableDestruction(FunctionInfo* pFunctionInfo)
-{
-	Tree* pFunctionNode = pFunctionInfo->m_pNode;
-	Tree* pCreatedASTNode = nullptr;
-	for (Tree* pASTNode : m_pCurrentStruct->m_vMemberVariables)
+	/////////////////////////////////////////////////////////////////////////
+	// Check if a struct has a 'parent', if yes, then call it's #Destructor.
+	// Call to Super's #Destructor()"
+	if (pStructInfo->m_ParentStructInfo != nullptr)
 	{
-		switch (pASTNode->m_eASTNodeType)
+		int32_t iStructSize = pStructInfo->sizeOfMe();
+
+		std::string sSuper = "#" + pStructInfo->m_ParentStructInfo->m_sStructName;
+		Tree* pMemberFunctionCall = createThisFunctionCallWithoutArguments(sSuper.c_str());
 		{
-			case ASTNodeType::ASTNode_TYPEARRAY:
+			/////////////////////////////////////////////////////////////////////////
+			// Before calling '#Super()' adjust 'this' pointer in 'ECX'.
+			// Eg:
+			//		struct A {}
+			//		struct B : A {}
+			//		struct C : B {}
+			//		
+			//		ECX('this) ==>	CONTENTS_OF_C...CONTENTS_OF_B...CONTENTS_OF_A...
+			//						*(1)			*(2)			*(3)
+			//						|<--sizeOf(C)-->|<--sizeOf(B)-->|<--sizeOf(A)-->|
+			//
+			//		If the object is of 'C', in the Destructor of '#C()' there will be a call to #B().
+			//		Before this call move the 'this' pointer in 'ECX' from *(1) to *(2) above.
+			//		The movement is equivalent to the sizeOf(C).
+			//		Same rule applies in #B().
 			{
-				pCreatedASTNode = createFreeASTForArrayType(pASTNode);
+				int32_t iVal = (int32_t)EREGISTERS::RCX;
+				iVal <<= sizeof(int16_t) * 8;
+				iVal |= (iStructSize & 0x0000FFFF);
+				char sOperand[255] = { 0 };
+				_itoa(iVal, sOperand, 10);
+				SET_INFO_FOR_KEY(pMemberFunctionCall, "SUB_REG", sOperand);
 			}
-			break;
-		}
+			/////////////////////////////////////////////////////////////////////////
 
-		if (pCreatedASTNode != nullptr)
-		{
 			// Inserting @ position '1' as '0' is ASTNode_FUNCTIONSTART
-			pFunctionNode->insertAt(1, pCreatedASTNode);
+			pFunctionNode->insertAt(1, pMemberFunctionCall);
 		}
-
-		pCreatedASTNode = nullptr;
 	}
 }
 
@@ -1579,6 +1706,7 @@ void GrammerUtils::handleFunctionStart(Tree* pNode)
 #if (VERBOSE == 1)
 	bool bHasVirtual = NOT GET_INFO_FOR_KEY(m_pCurrentFunction->m_pNode, "isVirtual").empty();
 
+	std::cout << "<___________________" << m_pCurrentFunction->m_sFunctionName << "___________________>" << std::endl;
 	std::cout	<< (bHasVirtual ? "virtual ":"")
 				<< m_pCurrentFunction->m_pFunctionReturnType->getAdditionalInfoFor("text") << " "
 				<< ((m_pCurrentStruct != nullptr) ? (m_pCurrentStruct->m_sStructName + "::") : "") 
@@ -1625,6 +1753,7 @@ void GrammerUtils::handleFunctionEnd(Tree* pNode)
 		EMIT_1(OPCODE::PUSHR, EREGISTERS::RAX);
 	}
 
+	std::cout << "</___________________" << m_pCurrentFunction->m_sFunctionName << "___________________>" << std::endl;
 	m_pCurrentFunction = nullptr;
 }
 
@@ -1869,15 +1998,15 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 		{
 			/////////////////////////////////////////////////
 			// 1. Fetch variable value & store it onto the stack
-			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPreFixNode, "text").c_str() ));
+			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPreFixNode, "text") ));
 
 			/////////////////////////////////////////////////
 			// 2. Push integer 1.
 			{
 				int8_t iIncrementValue = 1;
-				if (IS_POINTER_TYPE( GET_INFO_FOR_KEY(pPreFixNode, "text").c_str() ))
+				if (IS_VARIABLE_POINTER_TYPE( GET_INFO_FOR_KEY(pPreFixNode, "text") ))
 				{
-					std::string sType = GET_VARIABLE_NODETYPE( GET_INFO_FOR_KEY(pPreFixNode, "text").c_str() );
+					std::string sType = GET_VARIABLE_NODETYPE( GET_INFO_FOR_KEY(pPreFixNode, "text") );
 					iIncrementValue = sizeOf(sType);
 				}
 
@@ -1890,7 +2019,7 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 
 			//////////////////////////////////////////////////////
 			// 4. Store the decremented/incremented value from the stack back to the variable
-			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPreFixNode, "text").c_str() ));
+			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPreFixNode, "text") ));
 		}
 	}
 }
@@ -2012,7 +2141,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				if (sObjectName == "this")
 					sStructType = m_pCurrentStruct->m_sStructName;
 				else	
-					sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+					sStructType = GET_VARIABLE_NODETYPE(sObjectName);
 				StructInfo* pStructInfo = m_MapGlobalStructs[sStructType];
 				assert(pStructInfo != nullptr);
 				if (pStructInfo != nullptr)
@@ -2021,15 +2150,14 @@ void GrammerUtils::handleExpression(Tree* pNode)
 					// 1. Fetch 'this' into 'ECX'
 					if (sObjectName != "this")
 					{
-						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName.c_str()));		// Get the 'this' pointer value
-						EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName));		// Get the 'this' pointer value
+						EMIT_1(OPCODE::POPR, EREGISTERS::RCX);							// & push it in 'ECX'
 					}
 
 					/////////////////////////////////////////////////////////////////
 					// 2. Fetch the value in the objects variable & push it onto the STACK.
 					std::string sVariableName = tok.getText();
-					int32_t iStructOffset = pStructInfo->structOffsetToVariable(sVariableName.c_str());
-					int32_t iPosition = iStructOffset + pStructInfo->getMemberVariablePosition(sVariableName.c_str());
+					int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, pStructInfo);
 
 					EMIT_1(OPCODE::FETCH, iPosition);
 				}
@@ -2068,15 +2196,15 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 		{
 			/////////////////////////////////////////////////
 			// 1. Fetch variable value & store it onto the stack
-			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPostFixNode, "text").c_str() ));
+			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPostFixNode, "text") ));
 
 			/////////////////////////////////////////////////
 			// 2. Push integer 1.
 			{
 				int8_t iIncrementValue = 1;
-				if (IS_POINTER_TYPE( GET_INFO_FOR_KEY(pPostFixNode, "text").c_str() ))
+				if (IS_VARIABLE_POINTER_TYPE( GET_INFO_FOR_KEY(pPostFixNode, "text") ))
 				{
-					std::string sType = GET_VARIABLE_NODETYPE( GET_INFO_FOR_KEY(pPostFixNode, "text").c_str() );
+					std::string sType = GET_VARIABLE_NODETYPE( GET_INFO_FOR_KEY(pPostFixNode, "text") );
 					iIncrementValue = sizeOf(sType);
 				}
 
@@ -2089,7 +2217,7 @@ void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
 
 			//////////////////////////////////////////////////////
 			// 4. Store the decremented/incremented value from the stack back to the variable
-			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPostFixNode, "text").c_str() ));
+			EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pPostFixNode, "text") ));
 		}
 	}
 }
@@ -2110,7 +2238,7 @@ void GrammerUtils::handleInteger(Tree* pNode)
 
 void GrammerUtils::handleIdentifier(Tree* pNode)
 {
-	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text") ));
 }
 
 void GrammerUtils::handleString(Tree* pNode)
@@ -2141,16 +2269,17 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 		// & the final value on the STACK is then 'ANDED(&)' with this variable's 'type'(check 'castValueFor()' for more info)
 		// and then pushed onto the STACK which is later stored in the variable.
 		cast(castValueFor( GET_INFO_FOR_KEY(pNode, "type") ));
-		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));
+		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text") ));
 	}
 }
 
-void GrammerUtils::handleTypeArray(Tree* pNode)
+void GrammerUtils::allocateTypeArray(Tree* pNode)
 {
 	Tree* pArraySizeLeaf = pNode->m_pLeftNode;
 	Tree* pArrayElementsLeaf = pNode->m_pRightNode;
 
 	std::string sType = GET_INFO_FOR_KEY(pNode, "type");
+	E_VARIABLESCOPE eVARIABLESCOPE = toScope(GET_INFO_FOR_KEY(pNode, "scope"));
 	int32_t iSize = 0;
 
 	//////////////////////////////////////////////////////////////
@@ -2158,7 +2287,7 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 	{
 		if (pArraySizeLeaf != nullptr)
 		{
-			iSize = atoi( GET_INFO_FOR_KEY(pArraySizeLeaf, "text").c_str() );
+			iSize = atoi(GET_INFO_FOR_KEY(pArraySizeLeaf, "text").c_str());
 		}
 		else
 		{
@@ -2171,8 +2300,40 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 
 		EMIT_1(OPCODE::MALLOC, 0);							// MALLOC will pull the amount of bytes to allocate from the STACK & reserve memory on heap.
 															// The address of allocated memory location will be pushed onto the STACK.
+		{
+			if (eVARIABLESCOPE == E_VARIABLESCOPE::MEMBER)
+			{
+				std::string sVariableName = GET_INFO_FOR_KEY(pNode, "givenName");
+				int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, m_pCurrentStruct);
 
-		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));	// Store the memory address in the array variable.
+				EMIT_1(OPCODE::STORE, iPosition);			// Store the memory address in the array variable.
+			}
+			else
+			if (eVARIABLESCOPE == E_VARIABLESCOPE::LOCAL)
+			{
+				EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "text")));	// Store the memory address in the array variable.
+			}
+		}
+	}
+}
+
+void GrammerUtils::initializeTypeArray(Tree* pNode)
+{
+	Tree* pArraySizeLeaf = pNode->m_pLeftNode;
+	Tree* pArrayElementsLeaf = pNode->m_pRightNode;
+
+	std::string sType = GET_INFO_FOR_KEY(pNode, "type");
+	E_VARIABLESCOPE eVARIABLESCOPE = toScope(GET_INFO_FOR_KEY(pNode, "scope"));
+	int32_t iSize = 0;
+
+	// Calculate size to allocate / initilize.
+	if (pArraySizeLeaf != nullptr)
+	{
+		iSize = atoi(GET_INFO_FOR_KEY(pArraySizeLeaf, "text").c_str());
+	}
+	else
+	{
+		iSize = pArrayElementsLeaf->m_vStatements.size();
 	}
 
 	// int32_t arr[8] = {10, 20, 30, 40};
@@ -2193,7 +2354,8 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 			{
 				populateCode(pArrayElement);
 
-				storeValueAtPosForVariable(iCount, sType.c_str(), GET_INFO_FOR_KEY(pNode, "text").c_str());
+				storeValueAtPosForVariable(iCount, sType.c_str(), pNode);
+
 				iCount++;
 			}
 		}
@@ -2203,21 +2365,21 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 			// arr[5..7] = 0; ------------ - (II)
 
 			std::string sVariableName = GET_INFO_FOR_KEY(pNode, "text");
-			int32_t iOperand1_PointerVariable = GET_VARIABLE_POSITION(sVariableName.c_str());	// 1. "arr" position in heap
+			int32_t iOperand1_PointerVariable = GET_VARIABLE_POSITION(sVariableName);			// 1. "arr" position in heap
 			int32_t iOperand2_StartPos = iCount;												// 2. '5'
 			int32_t iOperand3_LastPos = iSize;													// 3. Count (in this case, 3 i.e for 5, 6, 7)
 			int32_t iOperand4_Value = 0;														// 4. '0'
 			int32_t iOperand5_ArrayType = sizeOf(sType);										// 5. sizeof(Type) i.e bytes to get to access subsequent "arr" elements.
 			int32_t iOperand6_CastValue = castValueFor(sType);									// 6. Cast Value of Type "arr" to perform relevant 'CAST'
 
-			std::cout	<< CURRENT_OFFSET << ". " << opCodeMap[(int)OPCODE::CLR].sOpCode 
-						<< " " << iOperand1_PointerVariable
-						<< " " << iOperand2_StartPos
-						<< " " << iOperand3_LastPos
-						<< " " << iOperand4_Value
-						<< " " << iOperand5_ArrayType
-						<< " " << iOperand6_CastValue
-						<< std::endl;
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)OPCODE::CLR].sOpCode
+				<< " " << iOperand1_PointerVariable
+				<< " " << iOperand2_StartPos
+				<< " " << iOperand3_LastPos
+				<< " " << iOperand4_Value
+				<< " " << iOperand5_ArrayType
+				<< " " << iOperand6_CastValue
+				<< std::endl;
 
 			EMIT_BYTE(OPCODE::CLR);
 			EMIT_INT(iOperand1_PointerVariable);
@@ -2230,9 +2392,17 @@ void GrammerUtils::handleTypeArray(Tree* pNode)
 	}
 }
 
+void GrammerUtils::handleTypeArray(Tree* pNode)
+{
+	E_VARIABLESCOPE eVARIABLESCOPE = toScope(GET_INFO_FOR_KEY(pNode, "scope"));
+	allocateTypeArray(pNode);
+
+	initializeTypeArray(pNode);
+}
+
 void GrammerUtils::handlePrimitivePtrEpilogue(Tree* pNode)
 {
-	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));
+	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text") ));
 }
 
 void GrammerUtils::handleAssign(Tree* pNode)
@@ -2240,7 +2410,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 	Tree* pExpressionNode = pNode->m_pLeftNode;
 	Tree* pIdentifierNode = pNode->m_pRightNode;	// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
-
+	std::string sVariableName = GET_INFO_FOR_KEY(pNode, "text");
 	//////////////////////////////////////////////////////////////
 	// Compute PreFixExpr
 	// STA_VM_1. RValue to be stored, picked up from the STACK.
@@ -2263,17 +2433,17 @@ void GrammerUtils::handleAssign(Tree* pNode)
 		{
 			case ASTNodeType::ASTNode_IDENTIFIER:
 			{
-				std::string sType = GET_VARIABLE_NODETYPE(GET_INFO_FOR_KEY(pNode, "text").c_str());
+				std::string sType = GET_VARIABLE_NODETYPE( sVariableName );
 
-				if (NOT IS_POINTER_TYPE( GET_INFO_FOR_KEY(pNode, "text").c_str() ))
+				if (NOT IS_VARIABLE_POINTER_TYPE(  sVariableName  ))
 					cast(castValueFor(sType));
-				EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));
+				EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(  sVariableName  ));
 			}
 			break;
 			case ASTNodeType::ASTNode_DEREF:
 			{
-				std::string sType = GET_VARIABLE_NODETYPE(GET_INFO_FOR_KEY(pNode, "text").c_str());
-				storeValueAtPosForVariable(0, sType.c_str(), GET_INFO_FOR_KEY(pNode, "text").c_str());		// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
+				std::string sType = GET_VARIABLE_NODETYPE(  sVariableName  );
+				storeValueAtPosForVariable(0, sType.c_str(), pNode);										// Push a 'fake' ArrayIndex of '0' onto the STACK i.e
 																											// @pVar = iRValue; ==> @pVar[0] = iRValue;
 			}
 			break;
@@ -2282,7 +2452,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 				Tree* pDerefExpressionLeaf = pIdentifierNode->m_pLeftNode;
 				if (pDerefExpressionLeaf != nullptr)
 				{
-					std::string sType = GET_VARIABLE_NODETYPE(GET_INFO_FOR_KEY(pNode, "text").c_str());
+					std::string sType = GET_VARIABLE_NODETYPE(  sVariableName  );
 					cast(castValueFor(sType));					// Perform relevant 'CAST'
 
 					/////////////////////////////////////////////////////////////////
@@ -2298,7 +2468,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 
 					/////////////////////////////////////////////////////////////////
 					// STA_VM_4. Pointer Variable.
-					EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));
+					EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(  sVariableName  ));
 				}
 			}
 			break;
@@ -2313,7 +2483,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 				}
 				else
 				{
-					sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+					sStructType = GET_VARIABLE_NODETYPE(sObjectName);
 				}
 				StructInfo* pStructInfo = m_MapGlobalStructs[sStructType];
 				assert(pStructInfo != nullptr);
@@ -2323,20 +2493,18 @@ void GrammerUtils::handleAssign(Tree* pNode)
 					// 1. Fetch 'this' into 'ECX'
 					if (sObjectName != "this")
 					{
-						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName.c_str()));	// Get the 'this' pointer value
+						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName));			// Get the 'this' pointer value
 						EMIT_1(OPCODE::POPR, EREGISTERS::RCX);								// & push it in 'ECX'
 					}
 
 					/////////////////////////////////////////////////////////////////
 					// 2. Perform relevant cast before storing the value in objects variable.
-					Tree* pVariableNode = pStructInfo->getMemberVariableASTNode(sVariableName.c_str());
-					std::string sType = GET_INFO_FOR_KEY(pVariableNode, "type");
+					std::string sType = getMemberTypeInStructHierarchy(sVariableName, pStructInfo);
 					cast(castValueFor(sType));												// Perform relevant 'CAST'
 
 					/////////////////////////////////////////////////////////////////
 					// 3. Storing the value in object variable.
-					int32_t iStructOffset = pStructInfo->structOffsetToVariable(sVariableName.c_str());
-					int32_t iPosition = iStructOffset + pStructInfo->getMemberVariablePosition(sVariableName.c_str());
+					int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, pStructInfo);
 
 					EMIT_1(OPCODE::STORE, iPosition);										// Store the rvalue in the variable.
 				}
@@ -2353,7 +2521,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 				}
 				else
 				{
-					sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+					sStructType = GET_VARIABLE_NODETYPE(sObjectName);
 				}
 				StructInfo* pStructInfo = m_MapGlobalStructs[sStructType];
 				assert(pStructInfo != nullptr);
@@ -2370,21 +2538,19 @@ void GrammerUtils::handleAssign(Tree* pNode)
 					// 1. Fetch 'this' into 'ECX'
 					if (sObjectName != "this")
 					{
-						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName.c_str()));	// Get the 'this' pointer value
-						EMIT_1(OPCODE::POPR, EREGISTERS::RCX);								// & push it in 'ECX'
+						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName));	// Get the 'this' pointer value
+						EMIT_1(OPCODE::POPR, EREGISTERS::RCX);						// & push it in 'ECX'
 					}
 					
 					/////////////////////////////////////////////////////////////////
 					// STA_VM_3.Variable TYPE(int8_t = 1, int16_t = 2, int32_t = 4).
-					Tree* pVarNode = pStructInfo->getMemberVariableASTNode(sVariableName.c_str());
-					std::string sType = GET_INFO_FOR_KEY(pVarNode, "type");
+					std::string sType = getMemberTypeInStructHierarchy(sVariableName, pStructInfo);
 					EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push variable TYPE onto the STACK as it will be
 																// required to access the array pointer.
 
 					/////////////////////////////////////////////////////////////////
 					// 2. Fetch the value in the objects variable & push it onto the STACK.
-					int32_t iStructOffset = pStructInfo->structOffsetToVariable(sVariableName.c_str());
-					int32_t iPosition = iStructOffset + pStructInfo->getMemberVariablePosition(sVariableName.c_str());
+					int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, pStructInfo);
 
 					/////////////////////////////////////////////////////////////////
 					// STA_VM_4. Pointer Variable.
@@ -2636,48 +2802,7 @@ void GrammerUtils::handleFree(Tree* pNode)
 	// I. Search for the 'Pointer Variable' AST Node; 
 	////////////////////////////////////////////////////////////////////
 	std::string sPointerName = GET_INFO_FOR_KEY(pNode, "text");
-	Tree* pPointerNode = nullptr;
-	if (m_pCurrentFunction != nullptr)
-	{
-		// 1. Search through the Local variable list.
-		for (Tree* pLocalVar : m_pCurrentFunction->m_vLocalVariables)
-		{
-			if (GET_INFO_FOR_KEY(pLocalVar, "text") == sPointerName)
-			{
-				pPointerNode = pLocalVar;
-				break;
-			}
-		}
-
-		// 2. Search through the Static variable list.
-		if (pPointerNode == nullptr)
-		{
-			for (Tree* pStaticVar : m_pCurrentFunction->m_vStaticVariables)
-			{
-				if (GET_INFO_FOR_KEY(pStaticVar, "text") == sPointerName)
-				{
-					pPointerNode = pStaticVar;
-					break;
-				}
-			}
-		}
-	}
-
-	if (pPointerNode == nullptr)
-	{
-		if (m_pCurrentStruct != nullptr)
-		{
-			// 3. Search through the Member variable list.
-			for (Tree* pMemberVar : m_pCurrentStruct->m_vMemberVariables)
-			{
-				if (GET_INFO_FOR_KEY(pMemberVar, "text") == sPointerName)
-				{
-					pPointerNode = pMemberVar;
-					break;
-				}
-			}
-		}
-	}
+	Tree* pPointerNode = m_pCurrentFunction->getLocalVariableASTNode(sPointerName);
 
 	////////////////////////////////////////////////////////////////////
 	// II. Once found emit the assembly;
@@ -2692,12 +2817,12 @@ void GrammerUtils::handleFree(Tree* pNode)
 			||
 			sType == "int32_t"
 		) {
-			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
+			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName));
 		}
 		else
 		{
 			// 1. Fetch 'this' into 'ECX'
-			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
+			EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName));		// Get the 'this' pointer value
 			EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
 																					
 			// 2. Call the 'Destructor' by creating a Dummy Destructor under the "free" ASTNode.
@@ -2709,7 +2834,7 @@ void GrammerUtils::handleFree(Tree* pNode)
 			populateCode(pDefaultDestructor);
 
 			// 3. Free the pointer itself that holds 'this' object.
-			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName.c_str()));
+			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName));
 
 			// 4. Clear off 'ECX' that holds the address of 'this'
 			//EMIT_1(OPCODE::PUSH, 0);
@@ -2726,7 +2851,7 @@ void GrammerUtils::handleStatics(Tree* pNode)
 void GrammerUtils::handleTypeStructs(Tree* pNode)
 {
 	//////////////////////////////////////////////////////////////////
-	// 1. Allocate Memory on HEAP for the sizeOf(STRUCT)
+	// 1. Allocate Memory on the HEAP of the sizeOf(STRUCT)
 	//		- Remember all the object allocations happen on the HEAP & not on the STACK.
 	//		- No STACK based BUFFER OVERFLOW(BO) possible.
 	//		- The objects once allocated on the HEAP, should be freed when they go out of scope.
@@ -2746,7 +2871,7 @@ void GrammerUtils::handleTypeStructs(Tree* pNode)
 																			// '0' as the VTABLE pointer will be the '0'th element in the HEAP Object.
 
 	// 3. Save 'this' pointer in the respective object variable.
-	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text").c_str() ));
+	EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text") ));
 																			// Store the memory address in the pointer(STRUCT*) variable.
 
 	Tree* pConstructorCallNode = pNode->m_vStatements[0];					// Struct pointer will be created in either 1 of following ways:
@@ -2778,14 +2903,27 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 			ASTNodeType eChilsASTNodeType = pFunctionCallNode->m_eASTNodeType;
 			if (eChilsASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
 			{
+				int32_t iOffsetSize = 0x0BADC0DE;
 				if (sPointerName != "this")
 				{
-					std::string sType = GET_VARIABLE_NODETYPE(sPointerName.c_str());
+					std::string sType = GET_VARIABLE_NODETYPE(sPointerName);
 					SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sType);
 
 					// 1. Fetch 'this' into 'ECX' if its a variable name.
-					EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName.c_str()));		// Get the 'this' pointer value
-					EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+					EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName));		// Get the 'this' pointer value
+					EMIT_1(OPCODE::POPR, EREGISTERS::RCX);							// & push it in 'ECX'
+				}
+				else
+				{
+					// Increment 'ECX' pointer by amount equivalent to the offset.
+					std::string sAdjustRegisterOffset = GET_INFO_FOR_KEY(pNode, "SUB_REG");
+					if (NOT sAdjustRegisterOffset.empty())
+					{
+						iOffsetSize = atoi(sAdjustRegisterOffset.c_str());
+						EMIT_2(	OPCODE::SUB_REG, 
+								(iOffsetSize >> (sizeof(int16_t) * 8)), 
+								(iOffsetSize & 0x0000FFFF));
+					}
 				}
 
 				// 2. Make the function call.
@@ -2795,6 +2933,14 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 																							// the object address('this') will be pushed into 'ECX'
 				////EMIT_1(OPCODE::PUSH, 0);
 				////EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
+
+				// Decrement 'ECX' pointer by amount equivalent to the offset.
+				if (iOffsetSize != 0x0BADC0DE)
+				{
+					EMIT_2(	OPCODE::SUB_REG, 
+							(iOffsetSize >> (sizeof(int16_t) * 8)), 
+							-(iOffsetSize & 0x0000FFFF));
+				}
 			}
 		}
 	}
@@ -2823,7 +2969,7 @@ void GrammerUtils::handleStructMemberAccessDeref(Tree* pNode)
 		if (sObjectName == "this")
 			sStructType = m_pCurrentStruct->m_sStructName;
 		else
-			sStructType = GET_VARIABLE_NODETYPE(sObjectName.c_str());
+			sStructType = GET_VARIABLE_NODETYPE(sObjectName);
 		pStructInfo = m_MapGlobalStructs[sStructType];
 		assert(pStructInfo != nullptr);
 		if (pStructInfo != nullptr)
@@ -2832,14 +2978,13 @@ void GrammerUtils::handleStructMemberAccessDeref(Tree* pNode)
 			// 1. Fetch 'this' into 'ECX'
 			if (sObjectName != "this")
 			{
-				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName.c_str()));		// Get the 'this' pointer value
-				EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// & push it in 'ECX'
+				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sObjectName));		// Get the 'this' pointer value
+				EMIT_1(OPCODE::POPR, EREGISTERS::RCX);							// & push it in 'ECX'
 			}
 
 			/////////////////////////////////////////////////////////////////
 			// 2. Fetch the value in the objects variable & push it onto the STACK.
-			int32_t iStructOffset = pStructInfo->structOffsetToVariable(sVariableName.c_str());
-			int32_t iPosition = iStructOffset + pStructInfo->getMemberVariablePosition(sVariableName.c_str());
+			int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, pStructInfo);
 
 			EMIT_1(OPCODE::FETCH, iPosition);
 		}
@@ -2847,8 +2992,7 @@ void GrammerUtils::handleStructMemberAccessDeref(Tree* pNode)
 	/////////////////////////////////////////////////////////////////
 
 	/////////////////////////////////////////////////////////////////
-	Tree* pVariableTree = pStructInfo->getMemberVariableASTNode(sVariableName.c_str());
-	std::string sType = GET_INFO_FOR_KEY(pVariableTree, "type");
+	std::string sType = getMemberTypeInStructHierarchy(sVariableName, pStructInfo);
 	uint32_t iCastValue = castValueFor(sType);
 
 	// LDA_VM_3. Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
@@ -2953,7 +3097,7 @@ int32_t GrammerUtils::castValueFor(std::string sType)
 	return 0;
 }
 
-void GrammerUtils::storeValueAtPosForVariable(int32_t iPos, const char* sType, const char* sVariableName)
+void GrammerUtils::storeValueAtPosForVariable(int32_t iPos, const char* sType, Tree* pNode)
 {
 	cast(castValueFor(sType));					// Perform relevant 'CAST'
 
@@ -2962,8 +3106,24 @@ void GrammerUtils::storeValueAtPosForVariable(int32_t iPos, const char* sType, c
 
 	EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push variable TYPE onto the STACK as it will be
 												// required to access the array pointer.
+	{
+		bool bStored = false;
+		// Check if its a Member variable of a struct or its parent's !
+		if (m_pCurrentStruct != nullptr)
+		{
+			std::string sVariableName = GET_INFO_FOR_KEY(pNode, "givenName");
+			int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, m_pCurrentStruct);
 
-	EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION(sVariableName));
+			EMIT_1(OPCODE::STA, iPosition);				// Store the memory address in the array variable.
+			bStored = true;
+		}
+
+		// If not, check if its a local variable of a function !
+		if (NOT bStored)
+		{
+			EMIT_1(OPCODE::STA, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text") ));	// Store the memory address in the array variable.
+		}
+	}
 }
 
 void GrammerUtils::storeVTablePointerInObjectOnHeap(int16_t iShortPosition, StructInfo* pStructInfo)
@@ -3006,11 +3166,27 @@ StructInfo* GrammerUtils::getStructByName(std::string sObjectName)
 	return pStructInfo;
 }
 
+int32_t GrammerUtils::getMemberPositionInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo)
+{
+	int32_t iStructOffset = pStructInfo->structOffsetToVariable(sMemberVariableName.c_str());
+	int32_t iPosition = (iStructOffset >> 2) + pStructInfo->getMemberVariablePosition(sMemberVariableName.c_str());
+
+	return iPosition;
+}
+
+std::string GrammerUtils::getMemberTypeInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo)
+{
+	Tree* pVariableNode = pStructInfo->getMemberVariableASTNode(sMemberVariableName.c_str());
+	std::string sType = GET_INFO_FOR_KEY(pVariableNode, "type");
+
+	return sType;
+}
+
 void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vStrings)
 {
 	/////////////////////////////////////////////////////////////////
 	// Write String info
-	pRaf->writeByte(vStrings.size());
+	pRaf->writeShort(vStrings.size());
 	for (std::string sString : vStrings)
 	{
 		pRaf->writeByte(sString.length());

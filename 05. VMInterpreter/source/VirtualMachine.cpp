@@ -160,7 +160,8 @@ void VirtualMachine::reset()
 int VirtualMachine::loadBSS(const char* iByteCode, int startOffset, int iBuffLength)
 {
 	int iOffset = startOffset;
-	int iStringCount = iByteCode[iOffset++];
+	int iStringCount = *((int16_t*)&iByteCode[iOffset]);
+	iOffset += sizeof(short);
 
 	int iStringSize = 0;
 	int iStringStartOffset = DS_START_OFFSET + (iStringCount * sizeof(int32_t));
@@ -845,7 +846,6 @@ void VirtualMachine::dealloc(int32_t pAddress)
 				if (itr == m_vUnAllocatedList.end())
 				{
 					m_vUnAllocatedList.push_back(HeapNode(pAllocHeapNode.m_pAddress, pAllocHeapNode.m_iSize));
-					std::sort(m_vUnAllocatedList.begin(), m_vUnAllocatedList.end(), sortList);
 
 					/////////////////////////////////////////////////////////////////
 					// HeapNodes can be optimized to be merged periodically,
@@ -853,6 +853,7 @@ void VirtualMachine::dealloc(int32_t pAddress)
 					//		- If 'UnAllocated List' increases to a certain number.
 					if (m_vUnAllocatedList.size() > 5)
 					{
+						std::sort(m_vUnAllocatedList.begin(), m_vUnAllocatedList.end(), sortList);
 						merge();
 					}
 				}

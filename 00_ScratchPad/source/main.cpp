@@ -333,7 +333,7 @@ public:
 	int32_t m_iVar1 = 10;
 };
 
-int main(int argc, char* argv[])
+int main_1(int argc, char* argv[])
 {
 	GroundFloor* gf = new GroundFloor();
 	FirstFloor* ff = new FirstFloor();
@@ -361,5 +361,103 @@ int main(int argc, char* argv[])
 
 	InterfaceImpl* ii = new InterfaceImpl();
 
+	exit(EXIT_SUCCESS);
+}
+
+#define MAX(x, y) ((x) >= (y) ? (x) : (y))
+
+void* xrealloc(void* ptr, size_t num_bytes)
+{
+	ptr = realloc(ptr, num_bytes);
+	if (!ptr)
+	{
+		perror("xrealloc failed!");
+		exit(1);
+	}
+
+	return ptr;
+}
+
+void* xmalloc(size_t num_bytes)
+{
+	void* ptr = malloc(num_bytes);
+	if (!ptr)
+	{
+		perror("xmalloc failed!");
+		exit(1);
+	}
+
+	return ptr;
+}
+
+typedef struct BufHdr
+{
+	size_t	length;
+	size_t	capacity;
+
+	char	buf[0];
+} BufHdr;
+
+#define buf__hdr(b)			( (BufHdr*)( (char*)(b) - offsetof(BufHdr, buf) ) )
+#define buf__fits(b, n)		( buf_len(b) + (n) <= buf_cap(b) )
+
+#define buf__fit(b, n)		(	buf__fits( (b), (n) ) \
+									? 0  \
+									: ( (b) = buf__grow(	(b), \
+															buf_len(b) + (n), sizeof((*b)) \
+														) \
+									) \
+							) \
+
+#define buf_len(b)			( (b) ? buf__hdr(b)->length : 0 )
+#define buf_cap(b)			( (b) ? buf__hdr(b)->capacity : 0 )
+#define buf_push(b, x)		( buf__fit((b), 1), (b)[buf__hdr(b)->length++] = (x) )
+#define buf_free(b)			( (b) ? ( free(buf__hdr(b)), (b) = NULL ) : 0 )
+
+template<class T>
+T* buf__grow(T* buf, size_t new_len, size_t elem_size)
+{
+	size_t new_capacity = MAX(1 + 2 * buf_cap(buf), new_len);
+	assert(new_len <= new_capacity);
+	size_t new_size = offsetof(BufHdr, buf) + new_capacity * elem_size;
+	BufHdr* new_hdr;
+	if (buf)
+	{
+		new_hdr = (BufHdr*)xrealloc(buf__hdr(buf), new_size);
+	}
+	else
+	{
+		new_hdr = (BufHdr*)xmalloc(new_size);
+		new_hdr->length = 0;
+	}
+
+	new_hdr->capacity = new_capacity;
+	return (T*)new_hdr->buf;
+}
+
+void buf_test()
+{
+	int* asdf = NULL;
+	assert(buf_len(asdf) == 0);
+	enum { N = 1024 };
+	for (int i = 0; i < N; i++)
+	{
+		buf_push(asdf, i);
+	}
+
+	assert(buf_len(asdf) == N);
+	for (int i = 0; i < N; i++)
+	{
+		assert(asdf[i] == i);
+	}
+
+	buf_free(asdf);
+	assert(asdf == NULL);
+	assert(buf_len(asdf) == 0);
+}
+
+int main(int argc, char* argv[])
+{
+	buf_test();
 	exit(EXIT_SUCCESS);
 }
