@@ -201,7 +201,11 @@
 											|
 											<print> 
 											| 
-											<putc> 
+											<putc>
+											|									|
+											<memSet>
+											|
+											<memCpy>
 											| 
 											<bracesstmtlist> 
 											| 
@@ -689,6 +693,172 @@
 															"</code>"
 										;
 										
+<memSet>						::=		"memSet"
+										'('					"<code>"
+																Tree* pAST_MemSet = makeLeaf(ASTNodeType::ASTNode_MEMSET, "");
+																Tree* pTemp;
+															"</code>"
+											TK_IDENTIFIER	"<code>"
+																std::string sIdentifier = PREV_TOKEN_TEXT;
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
+																assert(!sFullyQualifiedVariableName.empty());
+
+																SET_INFO_FOR_KEY(pAST_MemSet, "src", sFullyQualifiedVariableName);
+																
+																Tree* pExpressionMemSetValueLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																{
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pExpressionMemSetValueLeaf;
+																}
+															"</code>"
+											','
+											<expr>			"<code>"
+																pExpressionMemSetValueLeaf = createPostFixExpr(m_pASTCurrentNode);
+																pAST_MemSet->m_pLeftNode = pExpressionMemSetValueLeaf;
+																
+																Tree* pExpressionMemSetSizeLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																{
+																	m_pASTCurrentNode = pExpressionMemSetSizeLeaf;
+																}
+															"</code>"
+											','
+											<expr>			"<code>"
+																pExpressionMemSetSizeLeaf = createPostFixExpr(m_pASTCurrentNode);
+																pAST_MemSet->m_pRightNode = pExpressionMemSetSizeLeaf;
+															"</code>"
+										')'					"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pAST_MemSet);
+															"</code>"
+										;
+
+<memCpy>						::=		"memCpy"			"<code>"
+																Tree* pAST_MemCpy = makeLeaf(ASTNodeType::ASTNode_MEMCPY, "");
+															"</code>"
+										'('
+											TK_IDENTIFIER	"<code>"
+																std::string sIdentifier = PREV_TOKEN_TEXT;
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
+																assert(!sFullyQualifiedVariableName.empty());
+																
+																SET_INFO_FOR_KEY(pAST_MemCpy, "src", sFullyQualifiedVariableName);
+															"</code>"
+											','
+											TK_IDENTIFIER	"<code>"
+																sIdentifier = PREV_TOKEN_TEXT;
+																sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
+																assert(!sFullyQualifiedVariableName.empty());
+
+																SET_INFO_FOR_KEY(pAST_MemCpy, "dst", sFullyQualifiedVariableName);
+																
+																Tree* pSizeExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																Tree* pTemp;
+																{
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pSizeExpressionLeaf;
+																}
+															"</code>"
+											','
+											<expr>			"<code>"
+																pSizeExpressionLeaf = createPostFixExpr(m_pASTCurrentNode);
+																pAST_MemCpy->m_pRightNode = pSizeExpressionLeaf;																
+															"</code>"
+										')'					"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pAST_MemCpy);
+															"</code>"
+										;
+
+<memCmp>						::=		"memCmp"
+										'('					"<code>"
+																Tree* pAST_MemCmp = makeLeaf(ASTNodeType::ASTNode_MEMCMP, "");
+															"</code>"
+											TK_IDENTIFIER	"<code>"
+																std::string sIdentifier = PREV_TOKEN_TEXT;
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
+																assert(!sFullyQualifiedVariableName.empty());
+																
+																SET_INFO_FOR_KEY(pAST_MemCmp, "src", sFullyQualifiedVariableName);
+															"</code>"
+											','
+											TK_IDENTIFIER	"<code>"
+																sIdentifier = PREV_TOKEN_TEXT;
+																sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
+																assert(!sFullyQualifiedVariableName.empty());
+																
+																SET_INFO_FOR_KEY(pAST_MemCmp, "dst", sFullyQualifiedVariableName);
+																
+																Tree* pSizeExpressionLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																Tree* pTemp;
+																{
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pSizeExpressionLeaf;
+																}
+															"</code>"
+											','
+											<expr>			"<code>"
+																pSizeExpressionLeaf = createPostFixExpr(m_pASTCurrentNode);
+																pAST_MemCmp->m_pRightNode = pSizeExpressionLeaf;																
+															"</code>"
+										')'					"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pAST_MemCmp);
+															"</code>"
+										;
+
+<memChr>						::=		"memChr"			"<code>"
+																Tree* pAST_MemChr = makeLeaf(ASTNodeType::ASTNode_MEMCHR, "");
+															"</code>"
+										'('
+											TK_IDENTIFIER	"<code>"
+																std::string sIdentifier = PREV_TOKEN_TEXT;
+																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sIdentifier.c_str());
+																assert(!sFullyQualifiedVariableName.empty());
+																
+																SET_INFO_FOR_KEY(pAST_MemChr, "src", sFullyQualifiedVariableName);
+																
+																Tree* pExpressionMemValueLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																Tree* pTemp;
+																{
+																	pAST_MemChr->m_pLeftNode = pExpressionMemValueLeaf;
+																	
+																	pTemp = m_pASTCurrentNode;
+																	m_pASTCurrentNode = pExpressionMemValueLeaf;
+																}
+															"</code>"
+											','
+											<expr>			"<code>"
+																pExpressionMemValueLeaf = createPostFixExpr(m_pASTCurrentNode);
+																
+																Tree* pExpressionMemSizeLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+																{
+																	pAST_MemChr->m_pRightNode = pExpressionMemSizeLeaf;
+																	m_pASTCurrentNode = pExpressionMemSizeLeaf;
+																}
+															"</code>"
+											','
+											<expr>			"<code>"
+																pExpressionMemSizeLeaf = createPostFixExpr(m_pASTCurrentNode);
+															"</code>"
+										')'					"<code>"
+																m_pASTCurrentNode = pTemp;
+																m_pASTCurrentNode->addChild(pAST_MemChr);
+															"</code>"
+										;
+
+<sizeOf>						::=		"sizeOf"
+										'('					"<code>"
+																Tree* pSizeOfNode = makeLeaf(ASTNodeType::ASTNode_SIZEOF, "sizeof");
+																{
+																	m_pASTCurrentNode->addChild(pSizeOfNode);
+																}
+															"</code>"
+											TK_STRING	"<code>"
+																Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
+																pSizeOfNode->m_pLeftNode = pStringNode;
+															"</code>"
+										')';
+										
 <putcList>						::=		( 	TK_IDENTIFIER 	"<code>"
 																std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, PREV_TOKEN_TEXT);
 																assert(!sFullyQualifiedVariableName.empty());
@@ -943,7 +1113,10 @@
 															"</code>"
 										;
 
-<ptrAssign>						::=		( <malloc> );
+<ptrAssign>						::=		( 	<malloc>
+											|
+											<memChr>
+										);
 									
 <malloc>						::=		"malloc"			"<code>"
 																Tree* pMallocNode = makeLeaf(ASTNodeType::ASTNode_MALLOC, "");
@@ -1273,50 +1446,15 @@
 										"</code>"
 										
 										( 	<functionCall>	"<code>"
-																// The idea here is to create a temporary variable of the type returned by the function
-																// & add it before the expression statement.
-																// The temporary variable is then inserted in the expression.
-																// Eg:
-																// 		int32_t iRet = 10;
-																//		iRet = 10 + retFunc(); // where retFunc return type is "int32_t".
-																//		This will create a dummy code as follows:
-																//			int32_t iRet = 10;
-																//			int32_t iRet_retFunc = retFunc();	// This line of code will be inserted by the following piece of code.
-																//			iRet = 10 + iRet_retFunc;
-																
-																Tree* pExpressionNode = m_pASTCurrentNode;
-																Tree* pAssignNode = pExpressionNode->m_pParentNode;
-																Tree* pBlockNode = pAssignNode->m_pParentNode;
-																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
-																{
-																	pFunctionCallNode->removeFromParent();
-																}
-																assert(pFunctionCallNode != nullptr);
-																{
-																	std::string sFuncName = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
-																	std::string sFullyQualifiedTempVariableName;
-																	sFullyQualifiedTempVariableName.append( GET_INFO_FOR_KEY(pAssignNode, "text") );
-																	sFullyQualifiedTempVariableName.append("_");
-																	sFullyQualifiedTempVariableName.append(sFuncName);
-																	
-																	Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
-																	{
-																		pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
-																		SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
-																		SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
-																		SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
-																		pBlockNode->addChild(pPrimIntNode);
-																	}
-																	
-																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
-																	{
-																		pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
-																		pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
-																		pExpressionLeftLeaf->addChild(pFunctionCallNode);
-																	}
-																	
-																	m_vPostFix.push_back(sFullyQualifiedTempVariableName);
-																}
+																handleFunctionCallInExpr();
+															"</code>"
+											|
+											<memCmp>		"<code>"
+																handleFunctionCallInExpr();
+															"</code>"
+											|
+											<sizeOf>		"<code>"
+																handleFunctionCallInExpr();
 															"</code>"
 											|
 											<structMemberAccess>

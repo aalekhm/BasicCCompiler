@@ -91,6 +91,11 @@ struct CodeMap
 
 	{ "VTBL",		OPCODE::VTBL,		2,  PRIMIIVETYPE::INT_32 },
 
+	{ "MEMSET",		OPCODE::MEMSET,		1,  PRIMIIVETYPE::INT_32 },
+	{ "MEMCPY",		OPCODE::MEMCPY,		1,  PRIMIIVETYPE::INT_32 },
+	{ "MEMCMP",		OPCODE::MEMCMP,		1,  PRIMIIVETYPE::INT_32 },
+	{ "MEMCHR",		OPCODE::MEMCHR,		1,  PRIMIIVETYPE::INT_32 },
+
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
 
@@ -507,6 +512,26 @@ void VirtualMachine::eval(OPCODE eOpCode)
 
 		}
 		break;
+		case OPCODE::MEMSET:
+		{
+			memSet(eOpCode);
+		}
+		break;
+		case OPCODE::MEMCPY:
+		{
+			memCpy(eOpCode);
+		}
+		break;
+		case OPCODE::MEMCMP:
+		{
+			memCmp(eOpCode);
+		}
+		break;
+		case OPCODE::MEMCHR:
+		{
+			memChr(eOpCode);
+		}
+		break;
 		case OPCODE::HLT:
 			m_bRunning = false;
 		break;
@@ -765,6 +790,54 @@ void VirtualMachine::call(OPCODE eOpCode)
 
 	REGS.RBP = REGS.RSP;					// ESP is now the new EBP.
 	REGS.EIP = iJumpAddress;				// Jump to the call address.
+}
+
+void VirtualMachine::memSet(OPCODE eOpCode)
+{
+	int32_t iNum = STACK[REGS.RSP++];
+	int32_t iValue = STACK[REGS.RSP++];
+	int32_t iPointerAddress = STACK[REGS.RSP++];
+
+	int8_t* pAddress_8 = (int8_t*)&HEAP[iPointerAddress];
+
+	memset(pAddress_8, iValue, sizeof(int8_t) * iNum);
+}
+
+void VirtualMachine::memCpy(OPCODE eOpCode)
+{
+	int32_t iNum = STACK[REGS.RSP++];
+	int32_t iSrcAddress = STACK[REGS.RSP++];
+	int32_t iDstAddress = STACK[REGS.RSP++];
+
+	int8_t* pSrcAddress_8 = (int8_t*)&HEAP[iSrcAddress];
+	int8_t* pDstAddress_8 = (int8_t*)&HEAP[iDstAddress];
+
+	memcpy(pDstAddress_8, pSrcAddress_8, sizeof(int8_t) * iNum);
+}
+
+void VirtualMachine::memCmp(OPCODE eOpCode)
+{
+	int32_t iNum = STACK[REGS.RSP++];
+	int32_t iSrcAddress = STACK[REGS.RSP++];
+	int32_t iDstAddress = STACK[REGS.RSP++];
+
+	int8_t* pSrcAddress_8 = (int8_t*)&HEAP[iSrcAddress];
+	int8_t* pDstAddress_8 = (int8_t*)&HEAP[iDstAddress];
+
+	int32_t iRetValue = memcmp(pDstAddress_8, pSrcAddress_8, sizeof(int8_t) * iNum);
+	STACK[--REGS.RSP] = iRetValue;
+}
+
+void VirtualMachine::memChr(OPCODE eOpCode)
+{
+	int32_t iNum = STACK[REGS.RSP++];
+	int32_t iValue = STACK[REGS.RSP++];
+	int32_t iPointerAddress = STACK[REGS.RSP++];
+
+	int8_t* pAddress_8 = (int8_t*)&HEAP[iPointerAddress];
+
+	int8_t* pPosition = (int8_t*)memchr(pAddress_8, iValue, sizeof(int8_t) * iNum);
+	STACK[--REGS.RSP] = (iPointerAddress + (pPosition - pAddress_8));
 }
 
 int32_t VirtualMachine::malloc(int32_t iSize)

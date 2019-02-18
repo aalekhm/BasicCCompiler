@@ -27,6 +27,7 @@
 		std::string 				getCurrentScopeString();
 		
 		Tree*						getStructNodeByName(std::string sStructName);
+		void						handleFunctionCallInExpr();
 	protected:
 		
 	private:

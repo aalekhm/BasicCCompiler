@@ -68,6 +68,11 @@ namespace TokenType
 		TK_DEREF,
 		TK_DEREFARRAY,
 		TK_MEMBERACCESS,
+		ASTNode_MEMSET,
+		ASTNode_MEMCPY,
+		ASTNode_MEMCMP,
+		ASTNode_MEMCHR,
+		ASTNode_SIZEOF,
 		TK_UNKNOWN
 	};
 

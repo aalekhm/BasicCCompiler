@@ -15,15 +15,29 @@
 //				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
 //
 
+// https://rosettacode.org/wiki/Compiler/
 // http://dotnet.jku.at/applications/visualizer/
+// http://kenyatips.com/weird-programming-languages/
+// https://www.memorymanagement.org/mmref/alloc.html
+// https://www.tenouk.com/Bufferoverflowc/Bufferoverflow1c.html
+// Programming Ion (Bitwise : Bitwise is an educational project where we create the software/hardware stack for a computer from scratch.):
+//		https://www.youtube.com/playlist?list=PLU94OURih-CiP4WxKSMt3UcwMSDM3aTtX
+//		https://github.com/pervognsen/bitwise/
+// Programming an x64 compiler from scratch:
+//		https://www.youtube.com/watch?v=N9B2KeAWXgE&t
+//		https://www.youtube.com/watch?v=Mx29YQ4zAuM
+
 
 struct AAA
 {
-	int32_t 	m_iAAAInt1;
-	int8_t 		m_aAAANumberList[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-	
+	int32_t 	m_iAAAInt1 = 101;
+	int8_t 		m_aAAANumberList[8] = { 1, 2 * 1, 3, 4, 5, 6, 7, 8 };
+			
 	inline virtual void printMembers()
 	{
+		print("<--------------------------------------------------------->");
+		putc(10);
+		
 		print("m_iAAAInt1 = ", this->m_iAAAInt1);
 		putc(10);
 		
@@ -35,6 +49,16 @@ struct AAA
 			print(" , ", this->m_aAAANumberList[i]);
 		}
 		putc(10);
+
+		print("</--------------------------------------------------------->");
+		putc(10);
+	}
+	
+	// Note: Default Constructor() & #Destructor() need to be declared at bottom of the 'struct' after all the function decls.
+	inline void AAA()
+	{
+		print("In AAA");
+		putc(10);
 	}
 };
 
@@ -45,7 +69,19 @@ struct BBB : AAA
 
 	inline virtual void printMembers()
 	{
+		print("<***********************************************************>");
+		putc(10);
+
 		print("m_iBBBInt1 = ", this->m_iBBBInt1);
+		putc(10);
+		
+		print("m_aAAANumberList = ");
+		putc(10);
+		for(int8_t i = 0; i < 8; i++)
+		{
+			this->m_aAAANumberList[i] = 100 + i;
+			print(this->m_aAAANumberList[i], " ");
+		}
 		putc(10);
 		
 		print("m_aBBBNumberList = ");
@@ -53,6 +89,9 @@ struct BBB : AAA
 		{
 			print(this->m_aBBBNumberList[i], " ");
 		}
+		putc(10);
+
+		print("</***********************************************************>");
 		putc(10);
 	}
 };
@@ -64,16 +103,43 @@ struct CCC : BBB
 	
 	inline virtual void printMembers()
 	{
+		print("<############################################################>");
+		putc(10);
+
 		print("m_iCCCInt1 = ", this->m_iCCCInt1);
 		putc(10);
 		
-		this->m_aAAANumberList[0] = 101;
-		
+		this->m_aAAANumberList[0] = 1001;
+		print("m_aAAANumberList = ");
+		putc(10);
+		for(int8_t i = 0; i < 8; i++)
+		{
+			print(this->m_aAAANumberList[i], " ");
+		}
+		putc(10);
+
+		print("m_aBBBNumberList = ");
+		for(int8_t i = 0; i < 8; i++)
+		{
+			this->m_aBBBNumberList[i] = 2001 + i;
+			print(this->m_aBBBNumberList[i], " ");
+		}
+		putc(10);
+
 		print("m_aCCCNumberList = ");
 		for(int8_t i = 0; i < 8; i++)
 		{
 			print(this->m_aCCCNumberList[i], " ");
 		}
+		putc(10);
+
+		print("</############################################################>");
+		putc(10);
+	}
+	
+	inline void #CCC()
+	{
+		print("<#CCC>");
 		putc(10);
 	}
 };
@@ -292,6 +358,13 @@ void structTest()
 		print(pCCC->m_aAAANumberList[i], " ");
 	}
 	putc(10);
+
+	print("pCCC->m_aBBBNumberList = ");
+	for(int8_t i = 0; i < 8; i++)
+	{
+		print(pCCC->m_aBBBNumberList[i], " ");
+	}
+	putc(10);
 	////////////////////////////////////////////////////////////////////////////////
 	
 	free(pAAA);
@@ -361,36 +434,85 @@ int32_t retNewFunc()
 	print("3. iAge = ", iAge);
 	putc(10);
 	
+	int32_t iSizeOfExample1 = sizeOf("Example1");
+	int32_t iSizeOfPerson = sizeOf("Person");
+	int32_t iSizeOfTyre = sizeOf("Tyre");
+	int32_t iSizeOfCCC = sizeOf("CCC");
+	int32_t iTotal = ( sizeOf("Example1") + sizeOf("Person") + sizeOf("Tyre") + sizeOf("CCC") );
+	print("iTotal = ", iTotal);
+	putc(10);
+	print("sizeOf(Example1) = ", iSizeOfExample1, ", sizeOf(Person) = ", iSizeOfPerson, ", sizeOf(Tyre) = ", iSizeOfTyre, ", sizeOf(CCC) = ", iSizeOfCCC, ", iTotal = ", iTotal);
+	putc(10);
+	
+	// ToDo: functionCall() doesn't work in 'print'
+	//print("sizeOf(Example1) = ", sizeOf("Example1"), ", sizeOf(Person) = ", sizeOf("Person"), ", sizeOf(Tyre) = ", sizeOf("Tyre"), ", sizeOf(CCC) = ", sizeOf("CCC"));
+		
 	int8_t arr1[10] = {111, 222, 333, 444, 555};	//int32_t arr1[10];
 													//int32_t arr[] = {10, 20, 30, 40};
 													//int32_t arr[6] = {10, 20, 30, 40};
 	for(int32_t ii = 0; ii < 10; ii++)
 	{
 		print("arr1[", ii, "] = ", arr1[ii]);
-		putc(10);		
+		putc(10);
 	}
+	
+	memSet(arr1, 0, 10);
+	print("After memSet");
+	putc(10);
+	for(int32_t ii = 0; ii < 10; ii++)
+	{
+		print("arr1[", ii, "] = ", arr1[ii]);
+		putc(10);
+	}
+
+	int8_t arr2[10] = {11, 22, 33, 44, 55};			//int32_t arr1[10];
+													//int32_t arr[] = {10, 20, 30, 40};
+													//int32_t arr[6] = {10, 20, 30, 40};
+													
+	for(int32_t ii = 0; ii < 10; ii++)
+	{
+		print("arr2[", ii, "] = ", arr2[ii]);
+		putc(10);
+	}
+
+	memCpy(arr1, arr2, 10);
+	print("After memCpy");
+	putc(10);
+	for(int32_t ii = 0; ii < 10; ii++)
+	{
+		print("arr1[", ii, "] = ", arr1[ii]);
+		putc(10);
+	}
+	
+	int8_t pCmpStatus = memCmp(arr2, arr1, 10);
+	print("(arr2 == arr1) == ", pCmpStatus);
+	putc(10);
+	
+	int8_t* pArr4 = memChr(arr2, 33, 10);
+	print("33 found @ pos ", (pArr4 - arr2));
+	putc(10);
 	
 	int8_t ch = 'A';
 	ch = 'B';
-	print("int8_t = ", ch);
+	print("int8_t ch = ", ch);
 	putc(10);
 	
 	int16_t iShort = 131071;
-	print("int16_t = ", iShort);
+	print("int16_t iShort = ", iShort);
 	putc(10);
 
 	int32_t j = 1;
 	int32_t* pNew = malloc(j * 9);
-	print("pNew Allocated ", pNew);
+	print("pNew Allocated @ ", pNew);
 	putc(10);
 	
 	pNew[0] = 1977;
-	print("Value pNew = ", pNew[0]);
+	print("Value pNew[0] = ", pNew[0]);
 	putc(10);
 	
 	////////////////////////////////////////////////
 	int8_t* pPtr_0 = malloc(j * 8);
-	print("pNew Allocated ", pPtr_0[0]);
+	print("pPtr_0 Allocated @ ", pPtr_0, ", pPtr_0[0] = ", pPtr_0[0]);
 	putc(10);
 	
 	pStaticPtr_0_Start = pPtr_0;

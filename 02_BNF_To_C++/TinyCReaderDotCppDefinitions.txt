@@ -502,3 +502,56 @@ Tree* TinyCReader::getStructNodeByName(std::string sStructName)
 
 	assert(false);
 }
+
+void TinyCReader::handleFunctionCallInExpr()
+{
+	// The idea here is to create a temporary variable of the type returned by the function
+	// & add it before the expression statement.
+	// The temporary variable is then inserted in the expression.
+	// Eg:
+	// 		int32_t iRet = 10;
+	//		iRet = 10 + retFunc(); // where retFunc return type is "int32_t".
+	//		This will create a dummy code as follows:
+	//			int32_t iRet = 10;
+	//			int32_t iRet_retFunc = retFunc();	// This line of code will be inserted by the following piece of code.
+	//			iRet = 10 + iRet_retFunc;
+	
+	Tree* pExpressionNode = m_pASTCurrentNode;
+	Tree* pAssignNode = pExpressionNode->m_pParentNode;
+	Tree* pBlockNode = pAssignNode->m_pParentNode;
+	Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
+	{
+		pFunctionCallNode->removeFromParent();
+	}
+	assert(pFunctionCallNode != nullptr);
+	{
+		char sUniqueFuncName[255] = {};
+		sprintf_s(sUniqueFuncName, "%%u", pFunctionCallNode);
+	
+		std::string sFuncName = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
+		std::string sFullyQualifiedTempVariableName;
+		sFullyQualifiedTempVariableName.append( GET_INFO_FOR_KEY(pAssignNode, "text") );
+		sFullyQualifiedTempVariableName.append("_");
+		sFullyQualifiedTempVariableName.append(sFuncName);
+		sFullyQualifiedTempVariableName.append("_");
+		sFullyQualifiedTempVariableName.append(sUniqueFuncName);
+		
+		Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
+		{
+			pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
+			SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
+			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
+			SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
+			pBlockNode->addChild(pPrimIntNode);
+		}
+		
+		Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
+		{
+			pPrimIntNode->m_pLeftNode = pExpressionLeftLeaf;
+			pExpressionLeftLeaf->m_pParentNode = pPrimIntNode;
+			pExpressionLeftLeaf->addChild(pFunctionCallNode);
+		}
+		
+		m_vPostFix.push_back(sFullyQualifiedTempVariableName);
+	}
+}

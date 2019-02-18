@@ -100,6 +100,11 @@ CodeMap opCodeMap[] =
 	{ "CLR",		OPCODE::CLR,		7,  PRIMIIVETYPE::INT_32},
 	{ "VTBL",		OPCODE::VTBL,		2,  PRIMIIVETYPE::INT_32},
 
+	{ "MEMSET",		OPCODE::MEMSET,		1,  PRIMIIVETYPE::INT_32},
+	{ "MEMCPY",		OPCODE::MEMCPY,		1,  PRIMIIVETYPE::INT_32},
+	{ "MEMCMP",		OPCODE::MEMCMP,		1,  PRIMIIVETYPE::INT_32},
+	{ "MEMCHR",		OPCODE::MEMCHR,		1,  PRIMIIVETYPE::INT_32},
+
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
 };
 
@@ -320,12 +325,11 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			std::cout << (pNode->m_bIsPointerType ? "*" : "");
 			std::cout << " ";
 			std::cout << GET_INFO_FOR_KEY(pNode, "text");
+			std::cout << " = ";
 
 			Tree* pExpressionNode = pNode->m_pLeftNode;
 			if (pExpressionNode != nullptr)
 			{
-				std::cout << " = ";
-
 				if (pExpressionNode->m_vStatements.size() > 0)
 				{
 					for (Tree* pChild : pExpressionNode->m_vStatements)
@@ -455,7 +459,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			if (pExpressionNode->m_vStatements.size() > 0 && bPrintExpressionChilds)
 			{
 				std::cout << sIdentifierText << " = ";
-				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc()
+				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc(), memCmp(), memChr()
 				{
 					printAST(pChildNode, false);
 				}
@@ -602,6 +606,66 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			bProcessChildren = false;
 		}
 		break;
+		case ASTNodeType::ASTNode_MEMSET:
+		{
+			std::cout << "memSet(" << GET_INFO_FOR_KEY(pNode, "text");
+
+			Tree* pValueExpressionLeaf = pNode->m_pLeftNode;
+			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
+
+			assert(pValueExpressionLeaf != nullptr);
+			assert(pSizeExpressionLeaf != nullptr);
+			std::cout << GET_INFO_FOR_KEY(pValueExpressionLeaf, "text") << ", ";
+			std::cout << GET_INFO_FOR_KEY(pSizeExpressionLeaf, "text");
+
+			std::cout << ");" << std::endl;
+
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_MEMCPY:
+		{
+			std::cout << "memCpy(" << GET_INFO_FOR_KEY(pNode, "src") << ", " << GET_INFO_FOR_KEY(pNode, "dst") << ", ";
+
+			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
+			assert(pSizeExpressionLeaf != nullptr);
+			std::cout << GET_INFO_FOR_KEY(pSizeExpressionLeaf, "text");
+
+			std::cout << ");" << std::endl;
+
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_MEMCMP:
+		{
+			std::cout << "memCmp(" << GET_INFO_FOR_KEY(pNode, "src") << ", " << GET_INFO_FOR_KEY(pNode, "dst") << ", ";
+
+			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
+			assert(pSizeExpressionLeaf != nullptr);
+			std::cout << GET_INFO_FOR_KEY(pSizeExpressionLeaf, "text");
+
+			std::cout << ");" << std::endl;
+
+			bProcessChildren = false;
+		}
+		break;
+		case ASTNodeType::ASTNode_MEMCHR:
+		{
+			std::cout << "memChr(" << GET_INFO_FOR_KEY(pNode, "src") << ", ";
+
+			Tree* pValueExpressionLeaf = pNode->m_pLeftNode;
+			assert(pValueExpressionLeaf != nullptr);
+
+			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
+			assert(pSizeExpressionLeaf != nullptr);
+
+			std::cout << GET_INFO_FOR_KEY(pValueExpressionLeaf, "text") << ", " << GET_INFO_FOR_KEY(pSizeExpressionLeaf, "text");
+
+			std::cout << ");" << std::endl;
+
+			bProcessChildren = false;
+		}
+		break;
 	}
 
 	if (bProcessChildren)
@@ -619,7 +683,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 				eASTNodeType == ASTNodeType::ASTNode_FUNCTIONEND
 			) {
 				continue;
-			}
+		}
 			printAST(pChildNode);
 		}
 	}
@@ -788,8 +852,8 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 				case ASTNodeType::ASTNode_FUNCTIONDEF:
 				case ASTNodeType::ASTNode_FUNCTIONCALL:
 				case ASTNodeType::ASTNode_WHILE:
-				case ASTNodeType::ASTNode_PRINT:
 				case ASTNodeType::ASTNode_STRUCTDEF:
+				case ASTNodeType::ASTNode_PRINT:
 				{
 					populateStrings(pNode, sVector);
 				}
@@ -987,6 +1051,36 @@ void GrammerUtils::populateCode(Tree* pNode)
 				bProcessStatements = false;					// Since we are processing the child statements in "handleMalloc()"
 			}
 			break;
+			case ASTNodeType::ASTNode_MEMSET:
+			{
+				handleMemSet(pNode);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleMemSet()"
+			}
+			break;
+			case ASTNodeType::ASTNode_MEMCPY:
+			{
+				handleMemCpy(pNode);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleMemCpy()"
+			}
+			break;
+			case ASTNodeType::ASTNode_MEMCMP:
+			{
+				handleMemCmp(pNode);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleMemCmp()"
+			}
+			break;
+			case ASTNodeType::ASTNode_MEMCHR:
+			{
+				handleMemChr(pNode);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleMemChr()"
+			}
+			break;
+			case ASTNodeType::ASTNode_SIZEOF:
+			{
+				handleSizeOf(pNode);
+				bProcessStatements = false;					// Since we are processing the child statements in "handleSizeOf()"
+			}
+			break;
 			case ASTNodeType::ASTNode_FREE:
 			{
 				handleFree(pNode);
@@ -1123,6 +1217,10 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::PRTI:
 		case OPCODE::PRTS:
 		case OPCODE::MALLOC:
+		case OPCODE::MEMSET:
+		case OPCODE::MEMCPY:
+		case OPCODE::MEMCMP:
+		case OPCODE::MEMCHR:
 		case OPCODE::RET:
 		{
 #if (VERBOSE == 1)
@@ -2796,6 +2894,138 @@ void GrammerUtils::handleMalloc(Tree* pNode)
 													// The address of allocated memory location will be pushed onto the STACK.
 }
 
+void GrammerUtils::handleMemSet(Tree* pNode)
+{
+	/////////////////////////////////////////////////
+	// 1. Fetch Pointer to the block of memory to fill & store it onto the stack.
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "src")));
+
+	/////////////////////////////////////////////////
+	// 2. Value to be set.
+	Tree* pValueLeaf = pNode->m_pLeftNode;
+	assert(pValueLeaf != nullptr);
+	if (pValueLeaf != nullptr)
+	{
+		populateCode(pValueLeaf);
+	}
+
+	/////////////////////////////////////////////////
+	// 3. Number of bytes to be set to the value.
+	Tree* pSizeLeaf = pNode->m_pRightNode;
+	assert(pSizeLeaf != nullptr);
+	if (pSizeLeaf != nullptr)
+	{
+		populateCode(pSizeLeaf);
+	}
+
+	/////////////////////////////////////////////////
+	// 4. 'MEMSET' will find the 3 operands onto the STACK.
+	EMIT_1(OPCODE::MEMSET, 0);
+}
+
+void GrammerUtils::handleMemCpy(Tree* pNode)
+{
+	/////////////////////////////////////////////////
+	// 1. Fetch Pointer to the destination array where the content is to be copied & store it onto the stack.
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "src")));
+
+	/////////////////////////////////////////////////
+	// 2. Fetch Pointer to the source of data to be copied & store it onto the stack.
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "dst")));
+
+	/////////////////////////////////////////////////
+	// 3. Number of bytes to copy.
+	Tree* pSizeLeaf = pNode->m_pRightNode;
+	assert(pSizeLeaf != nullptr);
+	if (pSizeLeaf != nullptr)
+	{
+		populateCode(pSizeLeaf);
+	}
+
+	/////////////////////////////////////////////////
+	// 4. 'MEMCPY' will find the 3 operands onto the STACK.
+	EMIT_1(OPCODE::MEMCPY, 0);
+}
+
+void GrammerUtils::handleMemCmp(Tree* pNode)
+{
+	/////////////////////////////////////////////////
+	// 1. Fetch Pointer to block of memory & store it onto the stack.
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "src")));
+
+	/////////////////////////////////////////////////
+	// 2. Fetch Pointer to block of memory & store it onto the stack.
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "dst")));
+
+	/////////////////////////////////////////////////
+	// 3. Number of bytes to compare.
+	Tree* pSizeLeaf = pNode->m_pRightNode;
+	assert(pSizeLeaf != nullptr);
+	if (pSizeLeaf != nullptr)
+	{
+		populateCode(pSizeLeaf);
+	}
+
+	/////////////////////////////////////////////////
+	// 4. 'MEMCMP' will find the 2 operands onto the STACK.
+	EMIT_1(OPCODE::MEMCMP, 0);
+
+	/////////////////////////////////////////////////
+	// 5. Fetch the return value of 'memCmp' into 'EAX'
+	EMIT_1(OPCODE::POPR, EREGISTERS::RAX);
+}
+
+void GrammerUtils::handleMemChr(Tree* pNode)
+{
+	/////////////////////////////////////////////////
+	// 1. Fetch Pointer to the block of memory where the search is performed & store it onto the stack.
+	EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(GET_INFO_FOR_KEY(pNode, "src")));
+
+	/////////////////////////////////////////////////
+	// 2. Value to be searched.
+	Tree* pValueLeaf = pNode->m_pLeftNode;
+	assert(pValueLeaf != nullptr);
+	if (pValueLeaf != nullptr)
+	{
+		populateCode(pValueLeaf);
+	}
+
+	/////////////////////////////////////////////////
+	// 3. Number of bytes to be analyzed.
+	Tree* pSizeLeaf = pNode->m_pRightNode;
+	assert(pSizeLeaf != nullptr);
+	if (pSizeLeaf != nullptr)
+	{
+		populateCode(pSizeLeaf);
+	}
+
+	/////////////////////////////////////////////////
+	// 4. 'MEMCHR' will find the 3 operands onto the STACK.
+	EMIT_1(OPCODE::MEMCHR, 0);
+}
+
+void GrammerUtils::handleSizeOf(Tree* pNode)
+{
+	Tree* pStringNode = pNode->m_pLeftNode;
+	assert(pStringNode != nullptr);
+	if (pStringNode != nullptr)
+	{
+		std::string sSizeOfArgumet = GET_INFO_FOR_KEY(pStringNode, "text");
+		int32_t iSize = sizeOf(sSizeOfArgumet);
+		assert(iSize > 0);
+		if (iSize > 0)
+		{
+			/////////////////////////////////////////////////
+			// 1. 
+			EMIT_1(OPCODE::PUSHI, iSize);
+
+			/////////////////////////////////////////////////
+			// 2. 
+			EMIT_1(OPCODE::POPR, EREGISTERS::RAX);
+		}
+	}
+}
+
 void GrammerUtils::handleFree(Tree* pNode)
 {
 	////////////////////////////////////////////////////////////////////
@@ -3034,6 +3264,7 @@ void GrammerUtils::handleStatements(Tree* pNode)
 			case ASTNodeType::ASTNode_PRINT:
 			{
 				std::vector<Tree*> vStatements = pNode->m_vStatements;
+
 				switch (pChildNode->m_eASTNodeType)
 				{
 					case ASTNodeType::ASTNode_INTEGER:
@@ -3078,7 +3309,7 @@ int32_t GrammerUtils::sizeOf(std::string sType)
 		}
 	}
 
-	return 1;
+	return 0;
 }
 
 int32_t GrammerUtils::castValueFor(std::string sType)

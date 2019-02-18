@@ -49,6 +49,10 @@ enum class OPCODE
 	STA,
 	CLR,
 	VTBL,
+	MEMSET,
+	MEMCPY,
+	MEMCMP,
+	MEMCHR,
 	HLT
 };
 
@@ -191,6 +195,10 @@ class VirtualMachine
 		void						sta(OPCODE eOpcode);
 		void						clrMem(OPCODE eOpCode);
 		void						call(OPCODE eOpCode);
+		void						memSet(OPCODE eOpCode);
+		void						memCpy(OPCODE eOpCode);
+		void						memCmp(OPCODE eOpCode);
+		void						memChr(OPCODE eOpCode);
 
 		int32_t						getConsumedMemory();
 		int32_t						getAvailableMemory();

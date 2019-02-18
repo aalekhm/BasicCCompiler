@@ -456,8 +456,21 @@ void buf_test()
 	assert(buf_len(asdf) == 0);
 }
 
-int main(int argc, char* argv[])
+int main_2(int argc, char* argv[])
 {
 	buf_test();
+	exit(EXIT_SUCCESS);
+}
+
+struct Example
+{
+	int32_t iInt1 = 11;
+	int32_t iInt2 = {};
+	int8_t iInt3 = {};
+};
+
+int main(int argc, char* argv[])
+{
+	Example eg;
 	exit(EXIT_SUCCESS);
 }

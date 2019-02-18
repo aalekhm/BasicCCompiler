@@ -97,6 +97,11 @@ class GrammerUtils
 		static void									handleSwitchCases(Tree* pNode, std::vector<uint32_t>& vCaseStartOffsets, std::vector<uint32_t>& vCaseBreakJmpHoles);
 		static void									handleSwitchCaseEpilogues(Tree* pNode, std::vector<uint32_t>& vCaseBreakJmpHoles);
 		static void									handleMalloc(Tree* pNode);
+		static void									handleMemSet(Tree* pNode);
+		static void									handleMemCpy(Tree* pNode);
+		static void									handleMemCmp(Tree* pNode);
+		static void									handleMemChr(Tree* pNode);
+		static void									handleSizeOf(Tree* pNode);
 		static void									handleFree(Tree* pNode);
 		static void									handleStatics(Tree* pNode);
 		static void									handleTypeStructs(Tree* pNode);

@@ -284,6 +284,10 @@ enum class OPCODE
 	STA,
 	CLR,
 	VTBL,
+	MEMSET,
+	MEMCPY,
+	MEMCMP,
+	MEMCHR,
 	HLT,
 };
 
@@ -464,6 +468,12 @@ enum class ASTNodeType
 	ASTNode_CONSTRUCTORCALLEND,
 	ASTNode_MEMBERACCESS,
 	ASTNode_MEMBERACCESSDEREF,
+	ASTNode_MEMSET,
+	ASTNode_MEMCPY,
+	ASTNode_MEMCMP,
+	ASTNode_MEMCHR,
+	ASTNode_SIZEOF,
+	TK_UNKNOWN
 };
 
 typedef struct Tree
@@ -632,7 +642,7 @@ typedef struct StructInfo
 		scanStructForMemberVariables(pNode);
 	}
 
-	int32_t sizeOfMe()					// sizeOf 'this'
+	int32_t sizeOfMe()					// sizeOf 'this' in bytes.
 	{
 		int32_t iSizeOf = (sizeof(int32_t) * m_vMemberVariables.size());
 		iSizeOf += (sizeof(int32_t) * (m_bHasVTable ? 1 : 0)); // VTABLE pointer
@@ -640,7 +650,7 @@ typedef struct StructInfo
 		return iSizeOf;
 	}
 
-	int32_t sizeOf()					// sizeOf 'this' + sizeOf 'parent'
+	int32_t sizeOf()					// sizeOf 'this' + sizeOf 'parent' in bytes.
 	{
 		if (m_iSizeOf < 0)
 		{

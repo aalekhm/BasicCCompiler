@@ -26,6 +26,11 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("for");
 			GrammerUtils::m_vKeywords.push_back("print");
 			GrammerUtils::m_vKeywords.push_back("putc");
+			GrammerUtils::m_vKeywords.push_back("memSet");
+			GrammerUtils::m_vKeywords.push_back("memCpy");
+			GrammerUtils::m_vKeywords.push_back("memCmp");
+			GrammerUtils::m_vKeywords.push_back("memChr");
+			GrammerUtils::m_vKeywords.push_back("sizeOf");
 			GrammerUtils::m_vKeywords.push_back("new");
 			GrammerUtils::m_vKeywords.push_back("malloc");
 			GrammerUtils::m_vKeywords.push_back("free");
@@ -80,6 +85,11 @@ class TinyCReader {
 		bool print_list();
 		bool print_list_0();
 		bool putc();
+		bool memSet();
+		bool memCpy();
+		bool memCmp();
+		bool memChr();
+		bool sizeOf();
 		bool putcList();
 		bool bracesstmtlist();
 		bool newStructPtr();
@@ -163,6 +173,7 @@ class TinyCReader {
 		std::string 				getCurrentScopeString();
 		
 		Tree*						getStructNodeByName(std::string sStructName);
+		void						handleFunctionCallInExpr();
 	protected:
 		
 	private:
