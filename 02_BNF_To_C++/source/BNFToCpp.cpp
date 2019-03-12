@@ -42,8 +42,8 @@ bool BNFToCpp::tokenize(const char* sGrammerFile)
 				{
 					Token tok = st->nextToken();
 
-					//if (!(tok.getType() == TokenType::Type::TK_EOL || tok.getType() == TokenType::Type::TK_WHITESPACE))
-					//	std::cout << "BNFToCpp::tokenize() << Token :: " << TokenType::toString(tok.getType()) << "\t" << tok.getText() << std::endl;
+					//if (!(tok.getType() == TokenType_::Type::TK_EOL || tok.getType() == TokenType_::Type::TK_WHITESPACE))
+					//	std::cout << "BNFToCpp::tokenize() << Token :: " << TokenType_::toString(tok.getType()) << "\t" << tok.getText() << std::endl;
 
 					m_vTokens.push_back(tok);
 				}
@@ -67,10 +67,10 @@ void BNFToCpp::nonTerminalize()
 	{
 		bAddToken = true;
 
-		TokenType::Type eTokenType = tok.getType();
+		TokenType_::Type eTokenType = tok.getType();
 		switch (eTokenType)
 		{
-			case TokenType::Type::TK_BNFNONTERMINAL:
+			case TokenType_::Type::TK_BNFNONTERMINAL:
 			{
 				if (pCurrentNonTerminal == nullptr)
 				{
@@ -82,7 +82,7 @@ void BNFToCpp::nonTerminalize()
 				}
 			}
 			break;
-			case TokenType::Type::TK_STRING:
+			case TokenType_::Type::TK_STRING:
 			{
 				if (strcmp(tok.getText(), "") == 0)
 					continue;
@@ -90,12 +90,12 @@ void BNFToCpp::nonTerminalize()
 				m_vKeywords.push_back(tok);
 			}
 			break;
-			case TokenType::Type::TK_WHITESPACE:
-			case TokenType::Type::TK_EOL:
-			case TokenType::Type::TK_EOI:
-			case TokenType::Type::TK_SINGLELINECOMMENT:
-			case TokenType::Type::TK_MULTILINECOMMENT:
-			case TokenType::Type::TK_BNFASSIGNMENT:
+			case TokenType_::Type::TK_WHITESPACE:
+			case TokenType_::Type::TK_EOL:
+			case TokenType_::Type::TK_EOI:
+			case TokenType_::Type::TK_SINGLELINECOMMENT:
+			case TokenType_::Type::TK_MULTILINECOMMENT:
+			case TokenType_::Type::TK_BNFASSIGNMENT:
 			{
 				continue;
 			}
@@ -107,7 +107,7 @@ void BNFToCpp::nonTerminalize()
 			pCurrentNonTerminal->addToken(tok);
 		}
 
-		if(eTokenType == TokenType::Type::TK_SEMICOL)
+		if(eTokenType == TokenType_::Type::TK_SEMICOL)
 			pCurrentNonTerminal = nullptr;
 	}
 }
@@ -221,12 +221,12 @@ void BNFToCpp::writeFromFile(RandomAccessFile* rafOutDest, const char* sSrcFileN
 void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName, Token tok)
 {
 	char sLine[4096] = { 0 };
-	TokenType::Type eTokenType = tok.getType();
+	TokenType_::Type eTokenType = tok.getType();
 	std::string sValue = tok.getText();
 
 	switch(eTokenType)
 	{
-		case TokenType::Type::TK_BNFNONTERMINAL:
+		case TokenType_::Type::TK_BNFNONTERMINAL:
 		{
 			if (m_eGrammerState == EGrammerState::WRITING_FUNCTION_START)
 			{
@@ -274,19 +274,19 @@ void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName,
 			}
 		}
 		break;
-		case TokenType::Type::TK_BNFCODE:
+		case TokenType_::Type::TK_BNFCODE:
 		{
 			sprintf(sLine, "%s", sValue.c_str());	WRITE_LINE(rafOut, sLine);
 		}
 		break;
-		case TokenType::Type::TK_STRING:
-		case TokenType::Type::TK_IDENTIFIER:
+		case TokenType_::Type::TK_STRING:
+		case TokenType_::Type::TK_IDENTIFIER:
 			if (m_bOptional)
 			{
-				if (TokenType::Type::TK_INVALID == TokenType::fromString(sValue))
-					sprintf(sLine, "if(!GrammerUtils::match(\"%s\", OPTIONAL)) {\r\n", sValue.c_str());
+				if (TokenType_::Type::TK_INVALID == TokenType_::fromString(sValue))
+					sprintf(sLine, "if(!GrammerUtils::match(\"%s\", OPTIONAL_)) {\r\n", sValue.c_str());
 				else
-					sprintf(sLine, "if(!GrammerUtils::match(TokenType::Type::%s, OPTIONAL)) {\r\n", sValue.c_str());
+					sprintf(sLine, "if(!GrammerUtils::match(TokenType_::Type::%s, OPTIONAL_)) {\r\n", sValue.c_str());
 																							WRITE_LINE(rafOut, sLine);
 				sprintf(sLine, "}\r\n");													WRITE_LINE(rafOut, sLine);
 				sprintf(sLine, "else {\r\n");												WRITE_LINE(rafOut, sLine);
@@ -296,10 +296,10 @@ void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName,
 			else
 			if (m_bWhile)
 			{
-				if (TokenType::Type::TK_INVALID == TokenType::fromString(sValue))
-					sprintf(sLine, "if(GrammerUtils::match(\"%s\", OPTIONAL)) {\r\n", sValue.c_str());
+				if (TokenType_::Type::TK_INVALID == TokenType_::fromString(sValue))
+					sprintf(sLine, "if(GrammerUtils::match(\"%s\", OPTIONAL_)) {\r\n", sValue.c_str());
 				else
-					sprintf(sLine, "if(GrammerUtils::match(TokenType::Type::%s, OPTIONAL)) {\r\n", sValue.c_str());
+					sprintf(sLine, "if(GrammerUtils::match(TokenType_::Type::%s, OPTIONAL_)) {\r\n", sValue.c_str());
 				WRITE_LINE(rafOut, sLine);
 				m_bWhile = false;
 			}
@@ -316,26 +316,26 @@ void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName,
 					sprintf(sLine, "}\r\nelse");		WRITE_LINE(rafOut, sLine);
 				}
 
-				if (TokenType::Type::TK_INVALID == TokenType::fromString(sValue))
-					sprintf(sLine, "if(GrammerUtils::match(\"%s\", OPTIONAL)) {", sValue.c_str());
+				if (TokenType_::Type::TK_INVALID == TokenType_::fromString(sValue))
+					sprintf(sLine, "if(GrammerUtils::match(\"%s\", OPTIONAL_)) {", sValue.c_str());
 				else
-					sprintf(sLine, "if(GrammerUtils::match(TokenType::Type::%s, OPTIONAL)) {", sValue.c_str());
+					sprintf(sLine, "if(GrammerUtils::match(TokenType_::Type::%s, OPTIONAL_)) {", sValue.c_str());
 				WRITE_LINE(rafOut, sLine);
 			}
 			else 
 			{
-				if (TokenType::Type::TK_INVALID == TokenType::fromString(sValue))
-					sprintf(sLine, "if(!GrammerUtils::match(\"%s\", MANDATORY))\r\nreturn false;", sValue.c_str());
+				if (TokenType_::Type::TK_INVALID == TokenType_::fromString(sValue))
+					sprintf(sLine, "if(!GrammerUtils::match(\"%s\", MANDATORY_))\r\nreturn false;", sValue.c_str());
 				else
-					sprintf(sLine, "if(!GrammerUtils::match(TokenType::Type::%s, MANDATORY))\r\nreturn false;", sValue.c_str());
+					sprintf(sLine, "if(!GrammerUtils::match(TokenType_::Type::%s, MANDATORY_))\r\nreturn false;", sValue.c_str());
 				WRITE_LINE(rafOut, sLine);
 			}
 		break;
-		case TokenType::Type::TK_CHARACTER:
+		case TokenType_::Type::TK_CHARACTER:
 		{
 			if (m_bOptional)
 			{
-				sprintf(sLine, "if(!GrammerUtils::match(\'%c\', OPTIONAL)) {\r\n", sValue[0]);		WRITE_LINE(rafOut, sLine);
+				sprintf(sLine, "if(!GrammerUtils::match(\'%c\', OPTIONAL_)) {\r\n", sValue[0]);		WRITE_LINE(rafOut, sLine);
 				sprintf(sLine, "}\r\n");															WRITE_LINE(rafOut, sLine);
 				sprintf(sLine, "else {\r\n");														WRITE_LINE(rafOut, sLine);
 
@@ -344,7 +344,7 @@ void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName,
 			else
 			if (m_bWhile)
 			{
-				sprintf(sLine, "if(GrammerUtils::match(\'%c\', OPTIONAL)) {\r\n", sValue[0]);		WRITE_LINE(rafOut, sLine);
+				sprintf(sLine, "if(GrammerUtils::match(\'%c\', OPTIONAL_)) {\r\n", sValue[0]);		WRITE_LINE(rafOut, sLine);
 				m_bWhile = false;
 			}
 			else
@@ -360,45 +360,45 @@ void BNFToCpp::onTokenCallback(RandomAccessFile* rafOut, const char* sClassName,
 					sprintf(sLine, "}\r\nelse");		WRITE_LINE(rafOut, sLine);
 				}
 
-				sprintf(sLine, "if(GrammerUtils::match(\'%c\', OPTIONAL)) {", sValue[0]);	WRITE_LINE(rafOut, sLine);
+				sprintf(sLine, "if(GrammerUtils::match(\'%c\', OPTIONAL_)) {", sValue[0]);	WRITE_LINE(rafOut, sLine);
 			}
 			else 
 			{
-				sprintf(sLine, "if(!GrammerUtils::match(\'%c\', MANDATORY))\r\nreturn false;", sValue[0]);	WRITE_LINE(rafOut, sLine);
+				sprintf(sLine, "if(!GrammerUtils::match(\'%c\', MANDATORY_))\r\nreturn false;", sValue[0]);	WRITE_LINE(rafOut, sLine);
 			}
 		}
 		break;
-		case TokenType::Type::TK_LBRACE:
+		case TokenType_::Type::TK_LBRACE:
 			WRITE_LINE(rafOut, "while(true) {");
 			m_bWhile = true;
 		break;
-		case TokenType::Type::TK_SEMICOL:
+		case TokenType_::Type::TK_SEMICOL:
 			WRITE_LINE(rafOut, "return true;\r\n");
 			WRITE_LINE(rafOut, "}\r\n");
 
 			m_eGrammerState = EGrammerState::WRITING_FUNCTION_START;
 		break;
-		case TokenType::Type::TK_LPAREN:
+		case TokenType_::Type::TK_LPAREN:
 			m_bORedFirst = true;
 		break;
-		case TokenType::Type::TK_RBRACE:
+		case TokenType_::Type::TK_RBRACE:
 			WRITE_LINE(rafOut, "}");
 			WRITE_LINE(rafOut, "else\r\nbreak;");
 			WRITE_LINE(rafOut, "}\r\n");
 			m_bWhile = false;
 		break;
-		case TokenType::Type::TK_RPAREN:
+		case TokenType_::Type::TK_RPAREN:
 			WRITE_LINE(rafOut, "return true;\r\n}");
 			WRITE_LINE(rafOut, "else\r\nreturn false;\r\n");
 			m_bORed = false;
 		break;
-		case TokenType::Type::TK_BITWISEOR:
+		case TokenType_::Type::TK_BITWISEOR:
 			m_bORed = true;
 		break;
-		case TokenType::Type::TK_LSQBRACKET:
+		case TokenType_::Type::TK_LSQBRACKET:
 			m_bOptional = true;
 		break;
-		case TokenType::Type::TK_RSQBRACKET:
+		case TokenType_::Type::TK_RSQBRACKET:
 			WRITE_LINE(rafOut, "}\r\n");
 			m_bOptional = false;
 		break;

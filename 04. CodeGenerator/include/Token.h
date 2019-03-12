@@ -3,12 +3,13 @@
 #include <string>
 #include <map>
 #include <assert.h>
+#include <iterator>
 
 #define NOT !
 #define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
 #define SET_INFO_FOR_KEY(__node__, __key__, __info__)		__node__->setAdditionalInfo(__key__, __info__)
 
-namespace TokenType
+namespace TokenType_
 {
 	enum class Type
 	{
@@ -150,7 +151,7 @@ namespace TokenType
 		return "";
 	}
 
-	inline TokenType::Type fromString(std::string sTokenType)
+	inline TokenType_::Type fromString(std::string sTokenType)
 	{
 		if (sTokenType == "TK_MUL")				return Type::TK_MUL;
 		else if (sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
@@ -221,19 +222,19 @@ namespace TokenType
 
 struct Token
 {
-	Token(TokenType::Type eTokenType, std::string sText, int iLine, int iColumn)
+	Token(TokenType_::Type eTokenType, std::string sText, int iLine, int iColumn)
 		: m_eTokenType(eTokenType)
 		, m_sText(sText)
 		, m_iLine(iLine)
 		, m_iColumn(iColumn)
 	{}
 
-	TokenType::Type		m_eTokenType;
+	TokenType_::Type		m_eTokenType;
 	std::string			m_sText;
 	int					m_iLine;
 	int					m_iColumn;
 
-	TokenType::Type		getType() { return m_eTokenType; }
+	TokenType_::Type		getType() { return m_eTokenType; }
 	const char*			getText() { return m_sText.c_str(); }
 };
 
@@ -473,6 +474,11 @@ enum class ASTNodeType
 	ASTNode_MEMCMP,
 	ASTNode_MEMCHR,
 	ASTNode_SIZEOF,
+	ASTNode_INTERFACEDEF,
+	ASTNode_INTERFACESTART,
+	ASTNode_INTERFACEEND,
+	ASTNode_INTERFACEEXTENDLIST,
+	ASTNode_STRUCTIMPLEMENTLIST,
 	TK_UNKNOWN
 };
 
@@ -560,6 +566,22 @@ typedef struct Tree
 		return sReturn;
 	}
 
+	void appendAdditionalInfo(std::string sKey, std::string sAppendValue)
+	{
+		std::map<std::string, std::string>::const_iterator itr = m_MapAdditionalInfo.find(sKey);
+		std::string sValue = "";
+		if (itr != m_MapAdditionalInfo.end())
+		{
+			sValue = m_MapAdditionalInfo[sKey];
+			sValue.append(sAppendValue);
+			m_MapAdditionalInfo[sKey] = sValue;
+		}
+		else
+		{
+			m_MapAdditionalInfo.insert(std::pair<std::string, std::string>(sKey, sAppendValue));
+		}
+	}
+
 	ASTNodeType			m_eASTNodeType;
 
 	std::vector<Tree*>	m_vStatements;
@@ -626,6 +648,62 @@ static E_VARIABLESCOPE toScope(std::string sE_VARIABLESCOPE)
 
 static std::map<std::string, Tree*>		m_MapVariableToASTNodeCache;
 
+typedef struct InterfaceInfo
+{
+	InterfaceInfo(Tree* pNode)
+	: m_pNode(pNode)
+	{
+		m_sInterfaceName = GET_INFO_FOR_KEY(pNode, "text");
+	}
+
+	void updateInterfaceList(std::map<std::string, InterfaceInfo*> mapGlobalInterfaces)
+	{
+		// Check if the interface extends any "interface"s !
+		Tree* pStructImplementsListNode = m_pNode->m_pRightNode;
+		assert(pStructImplementsListNode != nullptr);
+		if (pStructImplementsListNode != nullptr)
+		{
+			for (Tree* pStringNode : pStructImplementsListNode->m_vStatements)
+			{
+				std::string sInterfaceName = GET_INFO_FOR_KEY(pStringNode, "text");
+				InterfaceInfo* pInterfaceInfo = mapGlobalInterfaces[sInterfaceName];
+				assert(pInterfaceInfo != nullptr);
+				if (pInterfaceInfo != nullptr)
+				{
+					m_vInterfaceList.push_back(pInterfaceInfo);
+				}
+			}
+		}
+	}
+
+	void addFunction(void* vpFunctionInfo)
+	{
+		if (vpFunctionInfo != nullptr)
+		{
+			m_vMemberFunctions.push_back(vpFunctionInfo);
+		}
+	}
+
+	std::vector<void*> getAllFunctionList()
+	{
+		std::vector<void*> vFunctionList;
+
+		std::copy(m_vMemberFunctions.begin(), m_vMemberFunctions.end(), std::back_inserter(vFunctionList));
+		for (InterfaceInfo* pInterfaceInfo : m_vInterfaceList)
+		{
+			std::vector<void*> vParentFunctionList = pInterfaceInfo->getAllFunctionList();
+			std::copy(vParentFunctionList.begin(), vParentFunctionList.end(), std::back_inserter(vFunctionList));
+		}
+
+		return vFunctionList;
+	}
+
+	Tree*									m_pNode;
+	std::string								m_sInterfaceName;
+	std::vector<void*>						m_vMemberFunctions;
+	std::vector<InterfaceInfo*>				m_vInterfaceList;
+} InterfaceInfo;
+
 typedef struct StructInfo
 {
 	StructInfo(Tree* pNode)
@@ -639,6 +717,7 @@ typedef struct StructInfo
 	, m_bHasVTable(false)
 	{
 		m_sStructName = GET_INFO_FOR_KEY(pNode, "text");
+
 		scanStructForMemberVariables(pNode);
 	}
 
@@ -663,6 +742,41 @@ typedef struct StructInfo
 		}
 
 		return m_iSizeOf;
+	}
+
+	void updateParent(std::map<std::string, StructInfo*> mapGlobalStructs)
+	{
+		// Check if it inherits any Parent Struct
+		std::string sStructParentName = GET_INFO_FOR_KEY(m_pNode, "extends");
+		if (NOT sStructParentName.empty())
+		{
+			StructInfo* pParentStructInfo = mapGlobalStructs[sStructParentName];
+			assert(pParentStructInfo != nullptr);
+			if (pParentStructInfo != nullptr)
+			{
+				setParentStruct(pParentStructInfo);
+			}
+		}
+	}
+
+	void updateInterfaceList(std::map<std::string, InterfaceInfo*> mapGlobalInterfaces)
+	{
+		// Check if the struct implements any "interfaces" !
+		Tree* pStructImplementsListNode = m_pNode->m_pRightNode;
+		assert(pStructImplementsListNode != nullptr);
+		if (pStructImplementsListNode != nullptr)
+		{
+			for (Tree* pStringNode : pStructImplementsListNode->m_vStatements)
+			{
+				std::string sInterfaceName = GET_INFO_FOR_KEY(pStringNode, "text");
+				InterfaceInfo* pInterfaceInfo = mapGlobalInterfaces[sInterfaceName];
+				assert(pInterfaceInfo != nullptr);
+				if (pInterfaceInfo != nullptr)
+				{
+					m_vInterfaceList.push_back(pInterfaceInfo);
+				}
+			}
+		}
 	}
 
 	void setParentStruct(StructInfo* pParentStructInfo)
@@ -816,6 +930,8 @@ typedef struct StructInfo
 	std::vector<void*>						m_vMemberFunctions;
 	std::vector<Tree*>						m_vMemberVariables;
 	std::vector<void*>						m_vVirtualFunctionTable;
+	std::vector<InterfaceInfo*>				m_vInterfaceList;
+
 	bool									m_bHasConstructor;
 	bool									m_bHasDestructor;
 
@@ -836,6 +952,7 @@ typedef struct FunctionInfo
 	, m_pFunctionReturnType(pNode->m_pLeftNode)
 	, m_pFunctionArguments(pNode->m_pRightNode)
 	, m_pParentStructInfo(nullptr)
+	, m_pParentInterfaceInfo(nullptr)
 	, m_iPositionInVTABLE(-1)
 	{
 		scanFunctionForLocals(pNode);
@@ -852,7 +969,10 @@ typedef struct FunctionInfo
 				case ASTNodeType::ASTNode_TYPEARRAY:
 				case ASTNodeType::ASTNode_TYPESTRUCT:
 				{
-					m_vLocalVariables.push_back(pChild);
+					if (isUniqueLocalVariable(pChild))
+					{
+						m_vLocalVariables.push_back(pChild);
+					}
 				}
 				break;
 				case ASTNodeType::ASTNode_IF:
@@ -878,13 +998,82 @@ typedef struct FunctionInfo
 		{
 			switch (pChild->m_eASTNodeType)
 			{
-			case ASTNodeType::ASTNode_TYPE:
-			{
-				m_vArguments.push_back(pChild);
-			}
-			break;
+				case ASTNodeType::ASTNode_TYPE:
+				{
+					m_vArguments.push_back(pChild);
+				}
+				break;
 			}
 		}
+	}
+
+	void updateFunctionSignature()
+	{
+		std::string sReturnSignature = "";
+		{
+			switch (m_pFunctionReturnType->m_eASTNodeType)
+			{
+				case ASTNodeType::ASTNode_TYPE:
+				{
+					sReturnSignature.append("I");
+				}
+				break;
+			}
+
+			if (sReturnSignature.empty())
+				sReturnSignature = "V";
+		}
+
+		std::string sArgumentSignature = "";
+		{
+			for (Tree* pChild : m_pFunctionArguments->m_vStatements)
+			{
+				switch (pChild->m_eASTNodeType)
+				{
+					case ASTNodeType::ASTNode_TYPE:
+					{
+						sArgumentSignature.append("I");
+					}
+					break;
+				}
+			}
+
+			if (sArgumentSignature.empty())
+				sArgumentSignature = "V";
+		}
+
+		std::string sParent = "";
+		//{
+		//	if (m_pParentStructInfo != nullptr)
+		//		sParent = m_pParentStructInfo->m_sStructName;
+		//	else
+		//	if(m_pParentInterfaceInfo!= nullptr)
+		//		sParent = m_pParentInterfaceInfo->m_sInterfaceName;
+		//
+		//	sParent.append("::");
+		//}
+
+		m_sFunctionSignature = sReturnSignature + "_" + sParent + m_sFunctionName + "_" + sArgumentSignature;
+	}
+
+	bool isUniqueLocalVariable(Tree* pNode)
+	{
+		std::string sNodeGivenName = GET_INFO_FOR_KEY(pNode, "givenName");
+		std::string sNodeText = GET_INFO_FOR_KEY(pNode, "text");
+
+		for (Tree* pChild : m_vLocalVariables)
+		{
+			std::string sChildGivenName = GET_INFO_FOR_KEY(pChild, "givenName");
+			std::string sChildText = GET_INFO_FOR_KEY(pChild, "text");
+			if (	sNodeGivenName == sChildGivenName
+					&&
+					sNodeText == sChildText
+			) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	Tree* getLocalVariableASTNode(std::string sVariableName)
@@ -1061,7 +1250,7 @@ typedef struct FunctionInfo
 			m_vStaticVariables.push_back(pNode);
 	}
 
-	void setParent(StructInfo* pStructInfo)
+	void setParentStruct(StructInfo* pStructInfo)
 	{
 		m_pParentStructInfo = pStructInfo;
 
@@ -1075,9 +1264,15 @@ typedef struct FunctionInfo
 		}
 	}
 
+	void setParentInterface(InterfaceInfo* pInterfaceInfo)
+	{
+		m_pParentInterfaceInfo = pInterfaceInfo;
+	}
+
 	Tree*							m_pNode;
 	int32_t							m_iStartOffsetInCode;
 	std::string						m_sFunctionName;
+	std::string						m_sFunctionSignature;
 
 	Tree*							m_pFunctionReturnType;
 	Tree*							m_pFunctionArguments;
@@ -1087,6 +1282,7 @@ typedef struct FunctionInfo
 
 	static std::vector<Tree*>		m_vStaticVariables;
 	StructInfo*						m_pParentStructInfo;
+	InterfaceInfo*					m_pParentInterfaceInfo;
 
 	int32_t							m_iPositionInVTABLE;
 } FunctionInfo;

@@ -6,13 +6,121 @@
 										"</code>"
 										{ <objectList> };
 										
-<objectList>					::=		( 	<structDeclaration>
+<objectList>					::=		( 	<interfaceDeclaration>
+											|
+											<structDeclaration>
 											|
 											<staticDeclaration>
 											|
 											<functionDef>
 										) ;
 										
+<interfaceDeclaration>			::=		"interface"
+										TK_IDENTIFIER
+															"<code>"
+																__START_INTERFACE__
+																std::string sInterfaceName = PREV_TOKEN_TEXT;
+																__START_BLOCK_STRING__(sInterfaceName)
+																
+																Tree* pInterfaceDefNode = makeLeaf(ASTNodeType::ASTNode_INTERFACEDEF, sInterfaceName.c_str());
+																Tree* pInterfaceExtendsListNode = makeLeaf(ASTNodeType::ASTNode_INTERFACEEXTENDLIST, "");
+																{
+																	pInterfaceDefNode->m_pRightNode = pInterfaceExtendsListNode;
+																	
+																	m_pASTCurrentNode->addChild(pInterfaceDefNode);
+																	addInterfaceType(sInterfaceName);
+																}
+																
+																std::string sStructParentList = "";
+															"</code>"
+										[	':'
+											TK_IDENTIFIER	"<code>"
+																pInterfaceExtendsListNode->addChild( makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT) );
+															"</code>"
+											{ 	','
+												TK_IDENTIFIER
+															"<code>"
+																pInterfaceExtendsListNode->addChild( makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT) );
+															"</code>"
+											}
+															"<code>"
+																SET_INFO_FOR_KEY(pInterfaceDefNode, "extends", sStructParentList);
+															"</code>"
+										]
+										
+										'{'					"<code>"
+																Tree* pTemp = nullptr;
+																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
+																m_pASTCurrentNode = pInterfaceDefNode;
+																
+																Tree* pInterfaceStartNode = makeLeaf(ASTNodeType::ASTNode_INTERFACESTART, "");
+																m_pASTCurrentNode->addChild(pInterfaceStartNode);
+															"</code>"
+											{ <interfaceObjectList> [';'] }
+												
+										'}'					"<code>"
+																__END_INTERFACE__
+																__END_CURRENT_BLOCK__
+																
+																Tree* pInterfaceEndNode = makeLeaf(ASTNodeType::ASTNode_INTERFACEEND, "");
+																m_pASTCurrentNode->addChild(pInterfaceEndNode);
+																m_vInterfaces.push_back(pInterfaceDefNode);
+
+																m_pASTCurrentNode = pTemp;
+															"</code>"
+										';' ;
+										
+<interfaceObjectList>			::= 	<functionDeclaration> ;
+
+<functionDeclaration>			::=		"inline"// "virtual"
+															"<code>"
+																std::string sPrevText = PREV_TOKEN_TEXT;
+															"</code>"
+										TK_IDENTIFIER		"<code>"
+																std::string sReturnType = PREV_TOKEN_TEXT;
+															"</code>"
+										TK_FUNCTIONCALL		"<code>"
+																std::string sFunctionName = PREV_TOKEN_TEXT;
+																
+																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
+																Tree* pReturnTypeNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType.c_str());
+																Tree* pArgListNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONARGLIST, "");
+																{
+																	pReturnTypeNode->m_pParentNode = pFunctionDefNode;
+																	pArgListNode->m_pParentNode = pFunctionDefNode;
+																	
+																	m_pASTCurrentNode->addChild(pFunctionDefNode);
+																	
+																	pFunctionDefNode->m_pLeftNode = pReturnTypeNode;
+																	pFunctionDefNode->m_pRightNode = pArgListNode;
+																	
+																	if(sPrevText == "virtual")
+																	{
+																		SET_INFO_FOR_KEY(pFunctionDefNode, "isVirtual", "virtual");
+																	}
+																}
+															"</code>"
+										'('					"<code>"
+																Tree* pTemp = nullptr;
+																{
+																	pTemp = m_pASTCurrentNode; // Save Root Node temporarily
+																	m_pASTCurrentNode = pArgListNode;
+																}
+															"</code>"
+										[ <functionArgumentDefList>	]
+															"<code>"
+																m_pASTCurrentNode = pTemp;
+															"</code>"
+										')' 
+										//"=" TK_INTEGER
+															"<code>"
+																SET_INFO_FOR_KEY(pFunctionDefNode, "isPure", "pure");
+																
+																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
+																m_pASTCurrentNode->addChild(pFuncEndNode);
+															"</code>"
+										;
+
 <structDeclaration>				::=		"struct"
 										TK_IDENTIFIER
 															"<code>"
@@ -21,14 +129,30 @@
 																__START_BLOCK_STRING__(sStructName)
 																
 																Tree* pStructDefNode = makeLeaf(ASTNodeType::ASTNode_STRUCTDEF, sStructName.c_str());
-																m_pASTCurrentNode->addChild(pStructDefNode);
-																addStructType(sStructName);
+																Tree* pStructImplementsListNode = makeLeaf(ASTNodeType::ASTNode_STRUCTIMPLEMENTLIST, "");
+																{
+																	pStructDefNode->m_pRightNode = pStructImplementsListNode;
+																	
+																	m_pASTCurrentNode->addChild(pStructDefNode);
+																	addStructType(sStructName);
+																}
 															"</code>"
 										[ 	':' 
 											TK_IDENTIFIER 	"<code>"
 																std::string sStructParentName = PREV_TOKEN_TEXT;
 																SET_INFO_FOR_KEY(pStructDefNode, "extends", sStructParentName);
 															"</code>"
+										]
+										[	"implements"
+											TK_IDENTIFIER	"<code>"
+																pStructImplementsListNode->addChild( makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT) );
+															"</code>"
+											{ 	','	
+												TK_IDENTIFIER
+															"<code>"
+																pStructImplementsListNode->addChild( makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT) );
+															"</code>"
+											}
 										]
 										'{'					"<code>"
 																Tree* pTemp = nullptr;
@@ -56,7 +180,29 @@
 											<newPtrOrArrayOrInt>
 										);
 										
-<structInlineFunction>			::=		"inline" ["virtual"] <functionDef>;
+<structInlineFunction>			::=							"<code>"
+																std::string sOverrideOrImplementor = "";
+															"</code>"
+										[
+											TK_STRING		"<code>"
+																// "@Override" or "@Implementor" identifier
+																sOverrideOrImplementor = PREV_TOKEN_TEXT;
+															"</code>"
+										]
+										"inline" 
+										["virtual"] 
+										<functionDef> 		"<code>"
+																Tree* pFunctionDefNode = m_pASTCurrentNode->getLastStatement();
+																assert(pFunctionDefNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONDEF);
+																if(	pFunctionDefNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONDEF
+																	&&
+																	NOT sOverrideOrImplementor.empty()
+																)
+																{
+																	SET_INFO_FOR_KEY(pFunctionDefNode, "@Override | @Implementor", sOverrideOrImplementor);
+																}
+															"</code>"
+										;
 										
 <staticDeclaration>				::=		"static"
 										( <staticPtr> );
@@ -79,13 +225,17 @@
 										'*'
 										TK_IDENTIFIER		"<code>"
 																Tree* pStaticPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPESTATIC, PREV_TOKEN_TEXT);
-																pStaticPtrNode->m_bIsPointerType = true;
-																SET_INFO_FOR_KEY(pStaticPtrNode, "givenName", PREV_TOKEN_TEXT);
-																SET_INFO_FOR_KEY(pStaticPtrNode, "type", sPointerType);
-																SET_INFO_FOR_KEY(pStaticPtrNode, "scope", toString(E_VARIABLESCOPE::STATIC));
+																{
+																	GrammerUtils::m_vUserDefinedVariables.push_back(PREV_TOKEN_TEXT);
 																
-																m_pASTCurrentNode->addChild(pStaticPtrNode);
-																FunctionInfo::addStaticVariable(pStaticPtrNode);
+																	pStaticPtrNode->m_bIsPointerType = true;
+																	SET_INFO_FOR_KEY(pStaticPtrNode, "givenName", PREV_TOKEN_TEXT);
+																	SET_INFO_FOR_KEY(pStaticPtrNode, "type", sPointerType);
+																	SET_INFO_FOR_KEY(pStaticPtrNode, "scope", toString(E_VARIABLESCOPE::STATIC));
+																
+																	m_pASTCurrentNode->addChild(pStaticPtrNode);
+																	FunctionInfo::addStaticVariable(pStaticPtrNode);
+																}
 															"</code>"
 										';';
 
@@ -906,6 +1056,9 @@
 																Tree* pStructPtrNode = makeLeaf(ASTNodeType::ASTNode_TYPESTRUCT, sFullyQualifiedVariableName.c_str());
 																Tree* pTemp = nullptr;
 																{
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sFullyQualifiedVariableName);
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sVariableName);
+
 																	pStructPtrNode->m_sAdditionalInfo.append(sVariableName);
 																	pStructPtrNode->m_bIsPointerType = true;
 																	SET_INFO_FOR_KEY(pStructPtrNode, "givenName", sVariableName);
@@ -973,6 +1126,9 @@
 														{
 															pTemp = m_pASTCurrentNode;
 															
+															GrammerUtils::m_vUserDefinedVariables.push_back(sFullyQualifiedVariableName);
+															GrammerUtils::m_vUserDefinedVariables.push_back(sVariableName);
+
 															pPrimPtrNode->m_sAdditionalInfo.append(sVariableName);
 															pPrimPtrNode->m_bIsPointerType = true;
 															SET_INFO_FOR_KEY(pPrimPtrNode, "givenName", sVariableName);
@@ -1015,6 +1171,9 @@
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
+																	
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sFullyQualifiedVariableName);
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sVariableName);
 																	
 																	pPrimTypeArrayNode->m_sAdditionalInfo.append(sVariableName);
 																	pPrimTypeArrayNode->m_bIsPointerType = true;
@@ -1082,13 +1241,16 @@
 																Tree* pTemp = nullptr;
 																{
 																	pTemp = m_pASTCurrentNode;
+																	
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sFullyQualifiedVariableName);
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sVariableName);
 																
 																	pPrimIntNode->m_sAdditionalInfo.append(sVariableName);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sVariableName);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "type", sPrimitiveType);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
-																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																	
+																	pPrimIntNode->m_pParentNode = m_pASTCurrentNode;
 																	m_pASTCurrentNode = pPrimIntNode;
 																}
 															"</code>"
@@ -1146,7 +1308,7 @@
 										
 <assignmentDerefArray>			::=		TK_DEREFARRAY
 													"<code>"
-														TokenType::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
+														TokenType_::Type eTokenType = GrammerUtils::m_pPrevToken.m_eTokenType;
 														std::string sVariableName = GrammerUtils::m_pPrevToken.m_sText;
 														std::string sFullyQualifiedVariableName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sVariableName);
 														assert(!sFullyQualifiedVariableName.empty());
@@ -1527,6 +1689,8 @@
 																	std::string sOperand = GET_INFO_FOR_KEY(m_pASTCurrentNode, "text");
 																	sOperand.append("->");
 																	sOperand.append(PREV_TOKEN_TEXT);
+																	
+																	GrammerUtils::m_vUserDefinedVariables.push_back(sOperand);
 																	
 																	m_vPostFix.push_back(sOperand);
 																}

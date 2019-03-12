@@ -119,6 +119,7 @@
     <ClCompile Include="source\VirtualMachine.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\ConsoleColor.h" />
     <ClInclude Include="include\RandomAccessFile.h" />
     <ClInclude Include="include\VirtualMachine.h" />
   </ItemGroup>

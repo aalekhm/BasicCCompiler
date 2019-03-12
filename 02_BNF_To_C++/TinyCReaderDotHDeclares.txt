@@ -19,6 +19,9 @@
 		bool 						isValidStructType(std::string sType);
 		Tree* 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
 		
+		void 						addInterfaceType(std::string sType);
+		bool 						isValidInterfaceType(std::string sType);
+		
 		void						pushLocalHeapVar(std::string sVariableName);
 		void						startBlockMarker();
 		void						endBlockMarker();
@@ -40,7 +43,9 @@
 		Tree*						m_pASTCurrentNode;
 		
 		std::vector<std::string>	m_sBlockStringList;
+		bool						m_bInterfaceInProcess;
 		bool						m_bStructInProcess;
 		bool						m_bFunctionInProcess;
 		
 		std::vector<Tree*>			m_vStructs;
+		std::vector<Tree*>			m_vInterfaces;

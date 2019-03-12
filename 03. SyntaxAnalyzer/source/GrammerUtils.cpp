@@ -3,13 +3,17 @@
 #include "ByteArrayInputStream.h"
 #include <assert.h>
 #include "TinyCReader.h"
+#include <windows.h>
 
-Token									GrammerUtils::m_pToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
-Token									GrammerUtils::m_pPrevToken(TokenType::Type::TK_UNKNOWN, "", -1, -1);
+Token									GrammerUtils::m_pToken(TokenType_::Type::TK_UNKNOWN, "", -1, -1);
+Token									GrammerUtils::m_pPrevToken(TokenType_::Type::TK_UNKNOWN, "", -1, -1);
 
 std::vector<std::string>				GrammerUtils::m_vKeywords;
 std::vector<std::string>				GrammerUtils::m_vTypes;
 std::vector<std::string>				GrammerUtils::m_vUserDefinedTypes;
+std::vector<std::string>				GrammerUtils::m_vUserDefinedInterfaces;
+std::vector<std::string>				GrammerUtils::m_vUserDefinedFunctions;
+std::vector<std::string>				GrammerUtils::m_vUserDefinedVariables;
 
 StringTokenizer*						GrammerUtils::m_pStrTok = NULL;
 int										GrammerUtils::iTabCount = 0;
@@ -17,12 +21,15 @@ std::vector<std::string>				GrammerUtils::m_vStrings;
 int8_t									GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
 std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapGlobalFunctions;
 std::map<std::string, StructInfo*>		GrammerUtils::m_MapGlobalStructs;
+std::map<std::string, InterfaceInfo*>	GrammerUtils::m_MapGlobalInterfaces;
 FunctionInfo*							GrammerUtils::m_pCurrentFunction;
 StructInfo*								GrammerUtils::m_pCurrentStruct;
+InterfaceInfo*							GrammerUtils::m_pCurrentInterface;
 ByteArrayOutputStream*					GrammerUtils::m_pBAOS;
 ByteArrayInputStream*					GrammerUtils::m_pBAIS;
 
 std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
+HANDLE									GrammerUtils::m_HColor;
 
 #define VERBOSE	1
 #define EMIT_1(__ICODE__, __OPERAND__)					emit(__ICODE__, (int32_t)__OPERAND__);
@@ -46,8 +53,9 @@ std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
 #define IS_STATEMENT_INSIDE_FUNCTION					if(m_pCurrentFunction != nullptr)
 #define CREATE_NODE_OF_AST(__eASTType__, __TEXT__)		createNodeOfType(__eASTType__, __TEXT__)
 
-#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
-#define SET_INFO_FOR_KEY(__node__, __key__, __info__)		__node__->setAdditionalInfo(__key__, __info__)
+#define GET_INFO_FOR_KEY(__node__, __key__)						__node__->getAdditionalInfoFor(__key__)
+#define SET_INFO_FOR_KEY(__node__, __key__, __info__)			__node__->setAdditionalInfo(__key__, __info__)
+#define APPEND_INFO_FOR_KEY(__node__, __key__, __appendValue__)	__node__->appendAdditionalInfo(__key__, __appendValue__)
 
 CodeMap opCodeMap[] =
 {
@@ -122,8 +130,161 @@ RegisterMap registerMap[]
 	{ "RMAX", EREGISTERS::RMAX },
 };
 
+struct color
+{
+	color(WORD wAttribute)
+		: m_colorAttribute(wAttribute)
+	{};
+
+	WORD m_colorAttribute;
+};
+
+color red(FOREGROUND_RED | FOREGROUND_INTENSITY);
+color green(FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+color blue(FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+color white(FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+color yellow(FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+color magenta(FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+
+void colorize(const char* cStr)
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (GrammerUtils::isABuiltInType(cStr))
+	{
+		SetConsoleTextAttribute(	hStdout,
+									red.m_colorAttribute);
+	}
+	else
+	if (GrammerUtils::isAKeyword(cStr))
+	{
+		SetConsoleTextAttribute(	hStdout,
+									blue.m_colorAttribute);
+	}
+	else
+	if (GrammerUtils::isAUserDefinedType(cStr) || GrammerUtils::isAUserDefinedInterface(cStr))
+	{
+		SetConsoleTextAttribute(	hStdout,
+									yellow.m_colorAttribute);
+	}
+	else
+	if (GrammerUtils::isAUserDefinedFunction(cStr))
+	{
+		SetConsoleTextAttribute(	hStdout,
+									green.m_colorAttribute);
+	}
+	else
+	if (GrammerUtils::isAUserDefinedVariable(cStr))
+	{
+		SetConsoleTextAttribute(	hStdout,
+									magenta.m_colorAttribute);
+	}
+	else
+	{
+		SetConsoleTextAttribute(	hStdout,
+									white.m_colorAttribute);
+	}
+}
+
+std::ostream& operator<<(std::ostream& os, std::string sStr)
+{
+	colorize(sStr.c_str());
+	printf("%s", sStr.c_str());
+
+	return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const char* cStr)
+{
+	colorize(cStr);
+	printf("%s", cStr);
+
+	return os;
+}
+
+std::ostream& operator<<(std::ostream& os, color c)
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetConsoleTextAttribute(hStdout,
+		c.m_colorAttribute);
+
+	return os;
+}
+
+bool GrammerUtils::isABuiltInType(const char* cStr)
+{
+	std::string sStr = cStr;
+	for (std::string sType : m_vTypes)
+	{
+		if (sType == sStr)
+			return true;
+	}
+
+	return false;
+}
+
+bool GrammerUtils::isAKeyword(const char* cStr)
+{
+	std::string sStr = cStr;
+	for (std::string sType : m_vKeywords)
+	{
+		if (sType == sStr)
+			return true;
+	}
+
+	return false;
+}
+
+bool GrammerUtils::isAUserDefinedType(const char* cStr)
+{
+	std::string sStr = cStr;
+	for (std::string sType : m_vUserDefinedTypes)
+	{
+		if (sType == sStr)
+			return true;
+	}
+
+	return false;
+}
+
+bool GrammerUtils::isAUserDefinedInterface(const char* cStr)
+{
+	std::string sStr = cStr;
+	for (std::string sType : m_vUserDefinedInterfaces)
+	{
+		if (sType == sStr)
+			return true;
+	}
+
+	return false;
+}
+
+bool GrammerUtils::isAUserDefinedFunction(const char* cStr)
+{
+	std::string sStr = cStr;
+	for (std::string sType : m_vUserDefinedFunctions)
+	{
+		if (sType == sStr)
+			return true;
+	}
+
+	return false;
+}
+
+bool GrammerUtils::isAUserDefinedVariable(const char* cStr)
+{
+	std::string sStr = cStr;
+	for (std::string sType : m_vUserDefinedVariables)
+	{
+		if (sType == sStr)
+			return true;
+	}
+
+	return false;
+}
+
 void GrammerUtils::init()
 {
+	m_HColor = GetStdHandle(STD_OUTPUT_HANDLE); //just once
 }
 
 bool GrammerUtils::read(const char* sFile)
@@ -156,13 +317,13 @@ Token GrammerUtils::getNextToken()
 {
 	m_pToken = m_pStrTok->nextToken();
 
-	if (m_pToken.getType() == TokenType::Type::TK_EOL
+	if (m_pToken.getType() == TokenType_::Type::TK_EOL
 		||
-		m_pToken.getType() == TokenType::Type::TK_SINGLELINECOMMENT
+		m_pToken.getType() == TokenType_::Type::TK_SINGLELINECOMMENT
 		||
-		m_pToken.getType() == TokenType::Type::TK_MULTILINECOMMENT
+		m_pToken.getType() == TokenType_::Type::TK_MULTILINECOMMENT
 		||
-		m_pToken.getType() == TokenType::Type::TK_WHITESPACE
+		m_pToken.getType() == TokenType_::Type::TK_WHITESPACE
 	) {
 		getNextToken();
 	}
@@ -170,9 +331,9 @@ Token GrammerUtils::getNextToken()
 	return m_pToken;
 }
 
-bool GrammerUtils::match(TokenType::Type eTokenType, int TYPE)
+bool GrammerUtils::match(TokenType_::Type eTokenType, int TYPE)
 {
-	TokenType::Type eCurrentTokenType = m_pToken.getType();
+	TokenType_::Type eCurrentTokenType = m_pToken.getType();
 
 	bool bIsAMatch = (eCurrentTokenType == eTokenType && !isOneOfTheKeywords(m_pToken.getText()));
 	if (bIsAMatch)
@@ -240,15 +401,54 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 
 	switch (pNode->m_eASTNodeType)
 	{
-		case ASTNodeType::ASTNode_STRUCTDEF:
+		case ASTNodeType::ASTNode_INTERFACEDEF:
 		{
-			std::cout << "struct " << GET_INFO_FOR_KEY(pNode, "text");
+			std::cout << "interface" << " " << GET_INFO_FOR_KEY(pNode, "text");
 
 			std::string sExtends = GET_INFO_FOR_KEY(pNode, "extends");
 			if (NOT sExtends.empty())
 			{
 				std::cout << " : " << sExtends;
 			}
+			std::cout << std::endl;
+			std::cout << "{" << std::endl;
+			iTabCount++;
+
+			bProcessChildren = true;
+		}
+		break;
+		case ASTNodeType::ASTNode_STRUCTDEF:
+		{
+			std::cout << "struct" << " " << GET_INFO_FOR_KEY(pNode, "text");
+
+			// extends "parent struct"
+			std::string sExtends = GET_INFO_FOR_KEY(pNode, "extends");
+			if (NOT sExtends.empty())
+			{
+				std::cout << " : " << sExtends;
+			}
+
+			// implements "interface, ..."
+			{
+				Tree* pStructImplementsListNode = pNode->m_pRightNode;
+				assert(pStructImplementsListNode != nullptr);
+				if (pStructImplementsListNode != nullptr)
+				{
+					std::string sInterfaceList = "";
+					for (Tree* pStringNode : pStructImplementsListNode->m_vStatements)
+					{
+						std::string sInterfaceName = GET_INFO_FOR_KEY(pStringNode, "text");
+						sInterfaceList.append(sInterfaceName);
+						sInterfaceList.append(", ");
+					}
+
+					if (NOT sInterfaceList.empty())
+					{
+						std::cout << " implements " << sInterfaceList;
+					}
+				}
+			}
+
 			std::cout << std::endl;
 			std::cout << "{" << std::endl;
 			iTabCount++;
@@ -277,7 +477,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_TYPESTATIC:
 		{
-			std::cout << "static ";
+			std::cout << "static" << " ";
 			std::string sType = GET_INFO_FOR_KEY(pNode, "type");
 			std::cout << sType << "* " << GET_INFO_FOR_KEY(pNode, "text") << ";" << std::endl;
 		}
@@ -298,10 +498,21 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 				std::cout << GET_INFO_FOR_KEY(pArgNode, "type") << " " << pArgNode->m_sAdditionalInfo << ", ";
 			}
 
-			std::cout << ")" << std::endl;
-			printTabs();
-			std::cout << "{" << std::endl;
-			iTabCount++;
+			std::cout << ")";
+
+			if (GET_INFO_FOR_KEY(pNode, "isPure") == "pure")
+			{
+				std::cout << " = 0;" << std::endl;
+				bProcessChildren = false;
+			}
+			else
+			{
+				std::cout << std::endl;
+
+				printTabs();
+				std::cout << "{" << std::endl;
+				iTabCount++;
+			}
 		}
 		break;
 		case ASTNodeType::ASTNode_FUNCTIONCALL:
@@ -395,7 +606,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_MALLOC:
 		{
-			std::cout << "malloc(";
+			std::cout << "malloc" << "(";
 
 			Tree* pExpressionNode = pNode->m_pLeftNode;
 			std::cout << GET_INFO_FOR_KEY(pExpressionNode, "text");
@@ -435,37 +646,40 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 			{
 				case ASTNodeType::ASTNode_IDENTIFIER:
 				{
-					sIdentifierText += GET_INFO_FOR_KEY(pIdentifierNode, "text");
+					std::cout << GET_INFO_FOR_KEY(pIdentifierNode, "text");
 				}
 				break;
 				case ASTNodeType::ASTNode_DEREF:
 				case ASTNodeType::ASTNode_DEREFARRAY:
 				{
-					sIdentifierText = "@";
-					sIdentifierText += GET_INFO_FOR_KEY(pIdentifierNode, "text");
+					std::cout << "@";
+					std::cout << GET_INFO_FOR_KEY(pIdentifierNode, "text");
 				}
 				break;
 				case ASTNodeType::ASTNode_MEMBERACCESS:
 				{
-					sIdentifierText = GET_INFO_FOR_KEY(pNode, "text");
-					sIdentifierText += "->";
-					sIdentifierText += GET_INFO_FOR_KEY(pIdentifierNode, "text");
+					std::cout << GET_INFO_FOR_KEY(pNode, "text");
+					std::cout << "->";
+					std::cout << GET_INFO_FOR_KEY(pIdentifierNode, "text");
 
 					bPrintExpressionChilds = false;
 				}
+				break;
+				default:
+					std::cout << GET_INFO_FOR_KEY(pIdentifierNode, "text");
 				break;
 			}
 
 			if (pExpressionNode->m_vStatements.size() > 0 && bPrintExpressionChilds)
 			{
-				std::cout << sIdentifierText << " = ";
+				std::cout << " = ";
 				for (Tree* pChildNode : pExpressionNode->m_vStatements) // Eg. malloc(), memCmp(), memChr()
 				{
 					printAST(pChildNode, false);
 				}
 			}
 			else
-				std::cout << sIdentifierText << " = " << GET_INFO_FOR_KEY(pExpressionNode, "text") << ";" << std::endl;
+				std::cout << " = " << GET_INFO_FOR_KEY(pExpressionNode, "text") << ";" << std::endl;
 
 			// PostFix
 			if (pExpressionNode->m_pRightNode != nullptr)
@@ -483,7 +697,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_IF:
 		{
-			std::cout << "if(" << GET_INFO_FOR_KEY(pLeftNode, "text") << ")" << std::endl;
+			std::cout << "if" << "(" << GET_INFO_FOR_KEY(pLeftNode, "text") << ")" << std::endl;
 			printTabs();
 			std::cout << "{" << std::endl;
 
@@ -512,7 +726,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 				}
 			}
 
-			std::cout << "while(" << GET_INFO_FOR_KEY(pLeftNode, "text") << ")" << std::endl;
+			std::cout << "while" << "(" << GET_INFO_FOR_KEY(pLeftNode, "text") << ")" << std::endl;
 			printTabs();
 			std::cout << "{" << std::endl;
 
@@ -521,7 +735,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_SWITCH:
 		{
-			std::cout << "switch(" << GET_INFO_FOR_KEY(pNode->m_pLeftNode, "text") << ")" << std::endl;
+			std::cout << "switch" << "(" << GET_INFO_FOR_KEY(pNode->m_pLeftNode, "text") << ")" << std::endl;
 			printTabs();
 			std::cout << "{" << std::endl;
 
@@ -530,29 +744,38 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_SWITCHCASE:
 		{
-			std::cout << "case " << GET_INFO_FOR_KEY(pNode, "text") << ":" << std::endl;
+			std::cout << "case" << " " << GET_INFO_FOR_KEY(pNode, "text") << ":" << std::endl;
 			iTabCount++;
 		}
 		break;
 		case ASTNodeType::ASTNode_SWITCHDEFAULT:
 		{
-			std::cout << "default:" << std::endl;
+			std::cout << "default" << ":" << std::endl;
 			iTabCount++;
 		}
 		break;
 		case ASTNodeType::ASTNode_SWITCHBREAK:
 		{
-			std::cout << "break;" << std::endl;
+			std::cout << "break" << ";" << std::endl;
 			bProcessChildren = false;
 		}
 		break;
 		case ASTNodeType::ASTNode_PRINT:
 		{
-			std::cout << "print(";
+			std::cout << "print" << "(";
 			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
 			for (Tree* pChildNode : *vStatements)
 			{
-				std::cout << GET_INFO_FOR_KEY(pChildNode, "text") << ", ";
+				bool bIsString = (pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_STRING);
+				if (bIsString)
+					std::cout << "\"";
+
+				std::cout << GET_INFO_FOR_KEY(pChildNode, "text");
+
+				if (bIsString)
+					std::cout << "\"";
+
+				std::cout << ", ";
 			}
 			std::cout << ");" << std::endl;
 
@@ -561,7 +784,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_PUTC:
 		{
-			std::cout << "putc(";
+			std::cout << "putc" << "(";
 			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
 			for (Tree* pChildNode : *vStatements)
 			{
@@ -600,7 +823,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_FREE:
 		{
-			std::cout << "free(" << GET_INFO_FOR_KEY(pNode, "text") << ")";
+			std::cout << "free" << "(" << GET_INFO_FOR_KEY(pNode, "text") << ")";
 			std::cout << ";" << std::endl;
 
 			bProcessChildren = false;
@@ -608,7 +831,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_MEMSET:
 		{
-			std::cout << "memSet(" << GET_INFO_FOR_KEY(pNode, "text");
+			std::cout << "memSet" << "(" << GET_INFO_FOR_KEY(pNode, "text");
 
 			Tree* pValueExpressionLeaf = pNode->m_pLeftNode;
 			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
@@ -625,7 +848,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_MEMCPY:
 		{
-			std::cout << "memCpy(" << GET_INFO_FOR_KEY(pNode, "src") << ", " << GET_INFO_FOR_KEY(pNode, "dst") << ", ";
+			std::cout << "memCpy" << "(" << GET_INFO_FOR_KEY(pNode, "src") << ", " << GET_INFO_FOR_KEY(pNode, "dst") << ", ";
 
 			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
 			assert(pSizeExpressionLeaf != nullptr);
@@ -638,7 +861,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_MEMCMP:
 		{
-			std::cout << "memCmp(" << GET_INFO_FOR_KEY(pNode, "src") << ", " << GET_INFO_FOR_KEY(pNode, "dst") << ", ";
+			std::cout << "memCmp" << "(" << GET_INFO_FOR_KEY(pNode, "src") << ", " << GET_INFO_FOR_KEY(pNode, "dst") << ", ";
 
 			Tree* pSizeExpressionLeaf = pNode->m_pRightNode;
 			assert(pSizeExpressionLeaf != nullptr);
@@ -651,7 +874,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_MEMCHR:
 		{
-			std::cout << "memChr(" << GET_INFO_FOR_KEY(pNode, "src") << ", ";
+			std::cout << "memChr" << "(" << GET_INFO_FOR_KEY(pNode, "src") << ", ";
 
 			Tree* pValueExpressionLeaf = pNode->m_pLeftNode;
 			assert(pValueExpressionLeaf != nullptr);
@@ -674,7 +897,11 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		for (Tree* pChildNode : *vStatements)
 		{
 			ASTNodeType eASTNodeType = pChildNode->m_eASTNodeType;
-			if (eASTNodeType == ASTNodeType::ASTNode_STRUCTSTART
+			if (eASTNodeType == ASTNodeType::ASTNode_INTERFACESTART
+				||
+				eASTNodeType == ASTNodeType::ASTNode_INTERFACEEND
+				||
+				eASTNodeType == ASTNodeType::ASTNode_STRUCTSTART
 				||
 				eASTNodeType == ASTNodeType::ASTNode_STRUCTEND
 				||
@@ -847,7 +1074,8 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 		std::vector<Tree*> vStatements = pParentNode->m_vStatements;
 		for (Tree* pNode : vStatements)
 		{
-			switch (pNode->m_eASTNodeType)
+			ASTNodeType eASTNodeType = pNode->m_eASTNodeType;
+			switch (eASTNodeType)
 			{
 				case ASTNodeType::ASTNode_FUNCTIONDEF:
 				case ASTNodeType::ASTNode_FUNCTIONCALL:
@@ -919,6 +1147,17 @@ void GrammerUtils::populateCode(Tree* pNode)
 		// Prologues
 		switch (pNode->m_eASTNodeType)
 		{
+			case ASTNodeType::ASTNode_INTERFACEDEF:
+			{
+				handleInterfaceDef(pNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_INTERFACEEND:
+			{
+				handleInterfaceEnd(pNode);
+				bProcessStatements = false;
+			}
+			break;
 			case ASTNodeType::ASTNode_STRUCTDEF:
 			{
 				handleStructDef(pNode);
@@ -927,7 +1166,7 @@ void GrammerUtils::populateCode(Tree* pNode)
 			case ASTNodeType::ASTNode_STRUCTEND:
 			{
 				handleStructEnd(pNode);
-				bool bProcessStatements = false;
+				bProcessStatements = false;
 			}
 			break;
 			case ASTNodeType::ASTNode_TYPESTATIC:
@@ -1249,6 +1488,24 @@ int	GrammerUtils::getStringPosition(const char* sString)
 	}
 }
 
+void GrammerUtils::handleInterfaceDef(Tree* pNode)
+{
+	m_pCurrentInterface = new InterfaceInfo(pNode);
+	if (m_pCurrentInterface != nullptr)
+	{
+		// Save in Global Map
+		std::string sInterfaceName = GET_INFO_FOR_KEY(pNode, "text");
+		m_MapGlobalInterfaces[sInterfaceName] = m_pCurrentInterface;
+
+		m_pCurrentInterface->updateInterfaceList(m_MapGlobalInterfaces);
+	}
+}
+
+void GrammerUtils::handleInterfaceEnd(Tree* pNode)
+{
+	m_pCurrentInterface = nullptr;
+}
+
 void GrammerUtils::handleStructDef(Tree* pNode)
 {
 	m_pCurrentStruct = new StructInfo(pNode);
@@ -1258,17 +1515,8 @@ void GrammerUtils::handleStructDef(Tree* pNode)
 		std::string sStructName = GET_INFO_FOR_KEY(pNode, "text");
 		m_MapGlobalStructs[sStructName] = m_pCurrentStruct;
 
-		// Check if it inherits any Parent Struct
-		std::string sStructParentName = GET_INFO_FOR_KEY(pNode, "extends");
-		if (NOT sStructParentName.empty())
-		{
-			StructInfo* pParentStructInfo = m_MapGlobalStructs[sStructParentName];
-			assert(pParentStructInfo != nullptr);
-			if (pParentStructInfo != nullptr)
-			{
-				m_pCurrentStruct->setParentStruct(pParentStructInfo);
-			}
-		}
+		m_pCurrentStruct->updateParent(m_MapGlobalStructs);
+		m_pCurrentStruct->updateInterfaceList(m_MapGlobalInterfaces);
 	}
 }
 
@@ -1303,6 +1551,7 @@ void GrammerUtils::handleStructEnd(Tree* pNode)
 	}
 	else
 	{
+		assert(isStructObedient(m_pCurrentStruct));
 		createStructVTable(m_pCurrentStruct);
 		emitStructVTable(m_pCurrentStruct);
 		m_pCurrentStruct = nullptr;
@@ -1788,14 +2037,22 @@ void GrammerUtils::handleFunctionDef(Tree* pNode)
 		if (m_pCurrentStruct != nullptr)
 		{
 			m_pCurrentStruct->addFunction(m_pCurrentFunction);				// Add the function() a part of the Struct.
-			m_pCurrentFunction->setParent(m_pCurrentStruct);				// Make Struct as this function()'s parent.
+			m_pCurrentFunction->setParentStruct(m_pCurrentStruct);				// Make Struct as this function()'s parent.
 
 			handleStructConstructorOrDestructor(m_pCurrentFunction);
+		}
+		else
+		if (m_pCurrentInterface != nullptr)
+		{
+			m_pCurrentInterface->addFunction(m_pCurrentFunction);			// Add the function() a part of the Struct.
+			m_pCurrentFunction->setParentInterface(m_pCurrentInterface);				// Make Struct as this function()'s parent.
 		}
 		else
 		{
 			m_MapGlobalFunctions[sFuncName] = m_pCurrentFunction;
 		}
+
+		m_pCurrentFunction->updateFunctionSignature();
 	}
 }
 
@@ -2132,88 +2389,88 @@ void GrammerUtils::handleExpression(Tree* pNode)
 		Token prevTok = st->prevToken();
 		Token tok = st->nextToken();
 
-		TokenType::Type eCurrTokenType = tok.getType();
-		if (eCurrTokenType == TokenType::Type::TK_WHITESPACE || eCurrTokenType == TokenType::Type::TK_EOI || eCurrTokenType == TokenType::Type::TK_COMMA)
+		TokenType_::Type eCurrTokenType = tok.getType();
+		if (eCurrTokenType == TokenType_::Type::TK_WHITESPACE || eCurrTokenType == TokenType_::Type::TK_EOI || eCurrTokenType == TokenType_::Type::TK_COMMA)
 			continue;
 
 		switch (eCurrTokenType)
 		{
-			case TokenType::Type::TK_CHARACTER:
+			case TokenType_::Type::TK_CHARACTER:
 				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
 				break;
-			case TokenType::Type::TK_INTEGER:
+			case TokenType_::Type::TK_INTEGER:
 				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
 				break;
-			case TokenType::Type::TK_IDENTIFIER:
+			case TokenType_::Type::TK_IDENTIFIER:
 				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(tok.getText()));
 				break;
-			case TokenType::Type::TK_STRING:
+			case TokenType_::Type::TK_STRING:
 				EMIT_1(OPCODE::PUSHI, getStringPosition(tok.getText()));
 				break;
-			case TokenType::Type::TK_MUL:
+			case TokenType_::Type::TK_MUL:
 				EMIT_1(OPCODE::MUL, 0);
 				break;
-			case TokenType::Type::TK_DIV:
+			case TokenType_::Type::TK_DIV:
 				EMIT_1(OPCODE::DIV, 0);
 				break;
-			case TokenType::Type::TK_MOD:
+			case TokenType_::Type::TK_MOD:
 				EMIT_1(OPCODE::MOD, 0);
 				break;
-			case TokenType::Type::TK_ADD:
+			case TokenType_::Type::TK_ADD:
 				EMIT_1(OPCODE::ADD, 0);
 				break;
-			case TokenType::Type::TK_SUB:
+			case TokenType_::Type::TK_SUB:
 				EMIT_1(OPCODE::SUB, 0);
 				break;
-			case TokenType::Type::TK_LT:
+			case TokenType_::Type::TK_LT:
 				EMIT_1(OPCODE::JMP_LT, 0);
 				break;
-			case TokenType::Type::TK_LTEQ:
+			case TokenType_::Type::TK_LTEQ:
 				EMIT_1(OPCODE::JMP_LTEQ, 0);
 				break;
-			case TokenType::Type::TK_GT:
+			case TokenType_::Type::TK_GT:
 				EMIT_1(OPCODE::JMP_GT, 0);
 				break;
-			case TokenType::Type::TK_GTEQ:
+			case TokenType_::Type::TK_GTEQ:
 				EMIT_1(OPCODE::JMP_GTEQ, 0);
 				break;
-			case TokenType::Type::TK_EQ:
+			case TokenType_::Type::TK_EQ:
 				EMIT_1(OPCODE::JMP_EQ, 0);
 				break;
-			case TokenType::Type::TK_NEQ:
+			case TokenType_::Type::TK_NEQ:
 				EMIT_1(OPCODE::JMP_NEQ, 0);
 				break;
-			case TokenType::Type::TK_LOGICALAND:
+			case TokenType_::Type::TK_LOGICALAND:
 				EMIT_1(OPCODE::LOGICALAND, 0);
 				break;
-			case TokenType::Type::TK_LOGICALOR:
+			case TokenType_::Type::TK_LOGICALOR:
 				EMIT_1(OPCODE::LOGICALOR, 0);
 				break;
-			case TokenType::Type::TK_BITWISEAND:
+			case TokenType_::Type::TK_BITWISEAND:
 				EMIT_1(OPCODE::BITWISEAND, 0);
 				break;
-			case TokenType::Type::TK_BITWISEOR:
+			case TokenType_::Type::TK_BITWISEOR:
 				EMIT_1(OPCODE::BITWISEOR, 0);
 				break;
-			case TokenType::Type::TK_BITWISEXOR:
+			case TokenType_::Type::TK_BITWISEXOR:
 				EMIT_1(OPCODE::BITWISEXOR, 0);
 				break;
-			case TokenType::Type::TK_BITWISENOT:
+			case TokenType_::Type::TK_BITWISENOT:
 				EMIT_1(OPCODE::BITWISENOT, 0);
 				break;
-			case TokenType::Type::TK_BITWISELEFTSHIFT:
+			case TokenType_::Type::TK_BITWISELEFTSHIFT:
 				EMIT_1(OPCODE::BITWISELEFTSHIFT, 0);
 				break;
-			case TokenType::Type::TK_BITWISERIGHTSHIFT:
+			case TokenType_::Type::TK_BITWISERIGHTSHIFT:
 				EMIT_1(OPCODE::BITWISERIGHTSHIFT, 0);
 				break;
-			case TokenType::Type::TK_NOT:
+			case TokenType_::Type::TK_NOT:
 				EMIT_1(OPCODE::_NOT, 0);
 				break;
-			case TokenType::Type::TK_NEGATE:
+			case TokenType_::Type::TK_NEGATE:
 				EMIT_1(OPCODE::NEGATE, 0);
 				break;
-			case TokenType::Type::TK_DEREF:
+			case TokenType_::Type::TK_DEREF:
 			{
 				//////////////////////////////////////////////////////////////
 				// Send in the 'CAST' value of the pointer Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF)
@@ -2225,7 +2482,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				//////////////////////////////////////////////////////////////
 			}
 			break;
-			case TokenType::Type::TK_MEMBERACCESS:
+			case TokenType_::Type::TK_MEMBERACCESS:
 			{
 				//////////////////////////////////////////////////////////////
 				// Member Access has the following notation:
@@ -3411,6 +3668,51 @@ std::string GrammerUtils::getMemberTypeInStructHierarchy(std::string sMemberVari
 	std::string sType = GET_INFO_FOR_KEY(pVariableNode, "type");
 
 	return sType;
+}
+
+bool GrammerUtils::isStructObedient(StructInfo* pStructInfo)
+{
+	bool bIsObedient = true;
+	if (pStructInfo->m_vInterfaceList.size() > 0)
+	{
+		std::vector<void*> vImplementFunctionList;
+		for (InterfaceInfo* pInterfaceInfo : pStructInfo->m_vInterfaceList)
+		{
+			std::vector<void*> vInterfaceFunctionList = pInterfaceInfo->getAllFunctionList();
+			std::copy(vInterfaceFunctionList.begin(), vInterfaceFunctionList.end(), std::back_inserter(vImplementFunctionList));
+		}
+
+		std::vector<void*>::iterator itrInterfaceList = vImplementFunctionList.begin();
+		for (; itrInterfaceList != vImplementFunctionList.end(); ++itrInterfaceList)
+		{
+			FunctionInfo* pInterfaceFunctionInfo = (FunctionInfo*)*itrInterfaceList;
+			std::string sInterfaceFunctionSign = pInterfaceFunctionInfo->m_sFunctionSignature;
+			{
+				bool bHasImplemented = false;
+				std::vector<void*>::iterator itrStructFunctionList = pStructInfo->m_vMemberFunctions.begin();
+				for (; itrStructFunctionList != pStructInfo->m_vMemberFunctions.end(); ++itrStructFunctionList)
+				{
+					FunctionInfo* pStructFunctionInfo = (FunctionInfo*)*itrStructFunctionList;
+					std::string sStructFunctionSign = pStructFunctionInfo->m_sFunctionSignature;
+					if (sInterfaceFunctionSign == sStructFunctionSign)
+					{
+						bHasImplemented = true;
+						break;
+					}
+				}
+
+				if (NOT bHasImplemented)
+				{
+					bIsObedient = false;
+#if (VERBOSE == 1)
+					std::cout << red << "struct " << green << pStructInfo->m_sStructName << blue << " does not implement " << pInterfaceFunctionInfo->m_sFunctionName << "() == " << sInterfaceFunctionSign << white << std::endl;
+#endif
+				}
+			}
+		}
+	}
+
+	return bIsObedient;
 }
 
 void GrammerUtils::printHeaders(RandomAccessFile* pRaf, std::vector<std::string>& vStrings)

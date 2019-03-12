@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <algorithm>
 #include <iostream>
+#include "ConsoleColor.h"
 
 #define VERBOSE	1
 
@@ -475,16 +476,16 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			int32_t* pDS = (int32_t*)&RAM[DS_START_OFFSET];
 
 			int32_t iStringOffset = *(pDS + iTemp1);
-			printf("%s", &RAM[iStringOffset]);
+			std::cout << green << &RAM[iStringOffset];
 		}
 		break;
 		case OPCODE::PRTC:
 			iTemp1 = STACK[REGS.RSP++];
-			printf("%c", iTemp1);
+			std::cout << green << (char)iTemp1;
 		break;
 		case OPCODE::PRTI:
 			iTemp1 = STACK[REGS.RSP++];
-			printf("%d", iTemp1);
+			std::cout << green << iTemp1;
 		break;
 		case OPCODE::MALLOC:
 		{
@@ -494,7 +495,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			assert(iAddress >= 0);
 			STACK[--REGS.RSP] = iAddress;
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t[HEAP] Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << getConsumedMemory() << "/" << MAX_HEAP_SIZE << std::endl;
+			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << red << getConsumedMemory() << "/" << MAX_HEAP_SIZE << std::endl;
 #endif
 		}
 		break;
@@ -730,7 +731,7 @@ void VirtualMachine::sta(OPCODE eOpCode)
 		}
 
 #if (VERBOSE == 1)
-		std::cout << "\t\t\t\t\t\t[HEAP] " << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
+		std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP] " << blue << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
 #endif
 	}
 }
@@ -892,7 +893,7 @@ void VirtualMachine::dealloc(int32_t pAddress)
 		if (pAddress == pAllocHeapNode.m_pAddress)
 		{
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t[HEAP] Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << " ----- AVAILABLE: " << getAvailableMemory() << "/" << MAX_HEAP_SIZE << std::endl;
+			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << " ----- AVAILABLE: " << green << getAvailableMemory() << "/" << MAX_HEAP_SIZE << std::endl;
 #endif
 			/////////////////////////////////////////////////////////////////
 			// 3. Merge it with any preceding HeapNode.

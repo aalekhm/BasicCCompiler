@@ -32,5 +32,8 @@
     <ClInclude Include="include\RandomAccessFile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\ConsoleColor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

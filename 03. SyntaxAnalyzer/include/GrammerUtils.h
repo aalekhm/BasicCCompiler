@@ -1,15 +1,16 @@
 #pragma once
 
+#include <windows.h>
 #include <string>
 #include <map>
 #include "RandomAccessFile.h"
 #include "StringTokenizer.h"
 #include "Token.h"
 
-#define OPTIONAL			0
-#define MANDATORY			1
+#define OPTIONAL_			0
+#define MANDATORY_			1
 
-#define MAX_BYTECODE_SIZE	13 * 1024
+#define MAX_BYTECODE_SIZE	14 * 1024
 
 class ByteArrayOutputStream;
 class ByteArrayInputStream;
@@ -21,7 +22,7 @@ class GrammerUtils
 		static Token								getNextToken();
 		static Token								m_pPrevToken;
 
-		static bool									match(TokenType::Type eTokenType, int TYPE);
+		static bool									match(TokenType_::Type eTokenType, int TYPE);
 		static bool									match(std::string sText, int TYPE);
 		static bool									match(char ch, int TYPE);
 
@@ -34,6 +35,9 @@ class GrammerUtils
 		static std::vector<std::string>				m_vKeywords;
 		static std::vector<std::string>				m_vTypes;
 		static std::vector<std::string>				m_vUserDefinedTypes;
+		static std::vector<std::string>				m_vUserDefinedInterfaces;
+		static std::vector<std::string>				m_vUserDefinedFunctions;
+		static std::vector<std::string>				m_vUserDefinedVariables;
 
 		static int									iTabCount;
 		static void									printAST(Tree* pNode, bool bPrintTabs = true);
@@ -55,6 +59,8 @@ class GrammerUtils
 		static void									handleFunctionEnd(Tree* pNode);
 		static void									handleFunctionCall(Tree* pNode);
 
+		static void									handleInterfaceDef(Tree* pNode);
+		static void									handleInterfaceEnd(Tree* pNode);
 		static void									handleStructDef(Tree* pNode);
 		static void									handleStructConstructorOrDestructor(FunctionInfo* pNode);
 		static void									addASTForStructMemberVariableConstruction(FunctionInfo* pFunctionInfo);
@@ -133,16 +139,29 @@ class GrammerUtils
 		static int32_t								getMemberPositionInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo);
 		static std::string							getMemberTypeInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo);
 
-		static std::vector<std::string>				m_vStrings;
+		static bool									isStructObedient(StructInfo* pStructInfo);
 
-		static std::map<std::string, FunctionInfo*>	m_MapGlobalFunctions;
-		static std::map<std::string, StructInfo*>	m_MapGlobalStructs;
+		static std::vector<std::string>				m_vStrings;
 
 		static int8_t								m_iByteCode[MAX_BYTECODE_SIZE];
 
 		static ByteArrayOutputStream*				m_pBAOS;
 		static ByteArrayInputStream*				m_pBAIS;
+
+		static void*								m_HColor;
 	public:
+		static std::map<std::string, FunctionInfo*>	m_MapGlobalFunctions;
+		static std::map<std::string, StructInfo*>	m_MapGlobalStructs;
+		static std::map<std::string, InterfaceInfo*>m_MapGlobalInterfaces;
+
+		static bool									isABuiltInType(const char* cStr);
+		static bool									isAKeyword(const char* cStr);
+		static bool									isAUserDefinedType(const char* cStr);
+		static bool									isAUserDefinedInterface(const char* cStr);
+		static bool									isAUserDefinedFunction(const char* cStr);
+		static bool									isAUserDefinedVariable(const char* cStr);
+
 		static FunctionInfo*						m_pCurrentFunction;
 		static StructInfo*							m_pCurrentStruct;
+		static InterfaceInfo*						m_pCurrentInterface;
 };

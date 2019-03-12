@@ -9,15 +9,19 @@
 	removeLastFromBlockString(); \
 	endBlockMarker(); \
 
-#define __START_STRUCT__ m_bStructInProcess = true;
-#define __END_STRUCT__ m_bStructInProcess = false;
-
-#define __START_FUNCTION__ m_bFunctionInProcess = true;
-#define __END_FUNCTION__ m_bFunctionInProcess = false;
-
-#define PREV_TOKEN_TEXT GrammerUtils::m_pPrevToken.getText()
-#define GET_INFO_FOR_KEY(__node__, __key__)					__node__->getAdditionalInfoFor(__key__)
-#define SET_INFO_FOR_KEY(__node__, __key__, __info__)		__node__->setAdditionalInfo(__key__, __info__)
+#define __START_INTERFACE__ 										m_bInterfaceInProcess = true;
+#define __END_INTERFACE__ 											m_bInterfaceInProcess = false;
+										
+#define __START_STRUCT__ 											m_bStructInProcess = true;
+#define __END_STRUCT__ 												m_bStructInProcess = false;
+									
+#define __START_FUNCTION__ 											m_bFunctionInProcess = true;
+#define __END_FUNCTION__ 											m_bFunctionInProcess = false;
+									
+#define PREV_TOKEN_TEXT 											GrammerUtils::m_pPrevToken.getText()
+#define GET_INFO_FOR_KEY(__node__, __key__)							__node__->getAdditionalInfoFor(__key__)
+#define SET_INFO_FOR_KEY(__node__, __key__, __info__)				__node__->setAdditionalInfo(__key__, __info__)
+#define APPEND_INFO_FOR_KEY(__node__, __key__, __appendValue__)		__node__->appendAdditionalInfo(__key__, __appendValue__)
 	
 TinyCReader::TinyCReader()
 : m_bStructInProcess(false)
@@ -401,6 +405,27 @@ bool TinyCReader::isValidStructType(std::string sType)
 	return false;
 }
 
+void TinyCReader::addInterfaceType(std::string sType)
+{
+	GrammerUtils::m_vUserDefinedInterfaces.push_back(sType);
+}
+
+bool TinyCReader::isValidInterfaceType(std::string sType)
+{
+	for(std::string sInBuiltInterface : GrammerUtils::m_vUserDefinedInterfaces)
+	{
+		if(sType == sInBuiltInterface)
+		{
+			GrammerUtils::m_pPrevToken = GrammerUtils::m_pToken;
+			GrammerUtils::getNextToken();
+
+			return true;
+		}
+	}
+	
+	return false;
+}
+
 Tree* TinyCReader::hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType)
 {
 	Tree* pReturnNode = nullptr;
@@ -538,6 +563,9 @@ void TinyCReader::handleFunctionCallInExpr()
 		
 		Tree* pPrimIntNode = makeLeaf(ASTNodeType::ASTNode_TYPE, sFullyQualifiedTempVariableName.c_str());
 		{
+			GrammerUtils::m_vUserDefinedVariables.push_back(sFullyQualifiedTempVariableName);
+			GrammerUtils::m_vUserDefinedVariables.push_back(sFuncName);
+
 			pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 			SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
 			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");

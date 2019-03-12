@@ -1,20 +1,4 @@
 
-//
-//					  m_pASTCurrentNode
-//						     |
-//					  ASTNode_FUNCTIONDEF
-//			    _____________|_____________
-//			   |						   |
-//  ASTNode_FUNCTIONRETURNTYPE		ASTNode_FUNCTIONARGLIST
-//  			 |							 |
-//  ASTNode_PRIMITIVETYPEINT				 |
-//	    		OR							 |
-//  ASTNode_PRIMITIVETYPESTRING				 |
-//		    						_________|______________________...
-//			    				   |					|		   |...
-//				    ASTNode_PRIMITIVETYPEINT  ASTNode_PRIMITIVETYPESTRING
-//
-
 // https://rosettacode.org/wiki/Compiler/
 // http://dotnet.jku.at/applications/visualizer/
 // http://kenyatips.com/weird-programming-languages/
@@ -26,9 +10,66 @@
 // Programming an x64 compiler from scratch:
 //		https://www.youtube.com/watch?v=N9B2KeAWXgE&t
 //		https://www.youtube.com/watch?v=Mx29YQ4zAuM
+//	ManyButFinite.com
+//		https://manybutfinite.com/archives/
+// 			- Anatomy of a Program in Memory
+//				https://manybutfinite.com/post/anatomy-of-a-program-in-memory/
+// 			- How The Kernel Manages Your Memory
+//				https://manybutfinite.com/post/how-the-kernel-manages-your-memory/
+// 			- Page Cache, the Affair Between Memory and Files
+//				https://manybutfinite.com/post/page-cache-the-affair-between-memory-and-files/
+// 			- Journey to the Stack, Part I
+//				https://manybutfinite.com/post/journey-to-the-stack/
+// 			- Epilogues, Canaries, and Buffer Overflows
+//				https://manybutfinite.com/post/epilogues-canaries-buffer-overflows/
+// 			- Closures, Objects, and the Fauna of the Heap
+//				https://manybutfinite.com/post/closures-objects-heap/
+// 			- When Does Your OS Run?
+//				https://manybutfinite.com/post/when-does-your-os-run/
+// 			- What does an idle CPU do?
+//				https://manybutfinite.com/post/what-does-an-idle-cpu-do/
+// https://www.cs.bgu.ac.il/~spl121/Inheritance
+// https://feepingcreature.github.io/oop.html
+// https://www.installsetupconfig.com/win32programming/processtoolhelpapis12.html
+// http://www.abhisheksur.com/2011/09/internals-of-net-objects-and-use-of-sos.html
+// Music
+// 		http://musicforprogramming.net/?one
+// 		https://www.youtube.com/watch?v=PNhQakLdI9o
+// 		https://www.youtube.com/watch?v=4ZW6Eme9eVY
+// 		https://www.youtube.com/watch?v=qRLCwKosN_c&t=548s&list=PLkX4vguQdLMhph17ZMyFo66RqmvQnwlVx&index=3
+// https://ruslanspivak.com/lsbasi-part1/
 
+// ToDo:
+//		static methods in an 'interface'.
+//		'abstract' class...a class that does not implement all the methods of an 'interface'.
+//		one cannot create an object of an 'abstract' class.
 
-struct AAA
+interface IntfA
+{
+	inline void walk();
+};
+
+interface IntfB
+{
+	inline void talk();
+};
+
+interface IntfC : IntfA, IntfB
+{
+	inline void sleep();
+};
+
+interface IntfD
+{
+	inline void fuck();
+};
+
+interface IntfE
+{
+	inline void fuck();
+};
+
+struct AAA implements IntfC, IntfD, IntfE
 {
 	int32_t 	m_iAAAInt1 = 101;
 	int8_t 		m_aAAANumberList[8] = { 1, 2 * 1, 3, 4, 5, 6, 7, 8 };
@@ -60,6 +101,30 @@ struct AAA
 		print("In AAA");
 		putc(10);
 	}
+	
+	inline virtual void walk()
+	{
+		print("Walking...");
+		putc(10);
+	}
+	
+	inline virtual void talk()
+	{
+		print("Talking...");
+		putc(10);
+	}
+		
+	inline virtual void sleep()
+	{
+		print("Sleeping...");
+		putc(10);
+	}
+
+	inline virtual void fuck()
+	{
+		print("Fucking...");
+		putc(10);
+	}
 };
 
 struct BBB : AAA
@@ -67,6 +132,7 @@ struct BBB : AAA
 	int32_t 	m_iBBBInt1;
 	int8_t 		m_aBBBNumberList[8] = { 11, 12, 13, 14, 15, 16, 17, 18 };
 
+	"@Override"
 	inline virtual void printMembers()
 	{
 		print("<***********************************************************>");
@@ -101,6 +167,7 @@ struct CCC : BBB
 	int32_t 	m_iCCCInt1;
 	int8_t 		m_aCCCNumberList[8] = { 21, 22, 23, 24, 25, 26, 27, 28 };
 	
+	"@Override"
 	inline virtual void printMembers()
 	{
 		print("<############################################################>");
@@ -185,6 +252,7 @@ struct Tyre : MachinePart
 	int8_t 	m_iSpeed = 0;
 	int8_t 	m_iRating = 0;
 	
+	"@Override"
 	inline virtual void getPartNumber() 
 	{
 		this->getDescription();
@@ -203,6 +271,7 @@ struct Tyre : MachinePart
 		this->m_iUniquePartID = 143165576;
 	}
 
+	"@Override"
 	inline virtual void getDescription() 
 	{ 
 		print("In Tyre::getDescription");
@@ -335,6 +404,10 @@ void structTest()
 		print(pAAA->m_aAAANumberList[i], " ");
 	}
 	putc(10);
+	pAAA->walk();
+	pAAA->talk();
+	pAAA->sleep();
+	pAAA->fuck();
 
 	print("pBBB->m_aBBBNumberList = ");
 	for(int8_t i = 0; i < 8; i++)

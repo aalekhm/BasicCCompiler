@@ -10,7 +10,10 @@ class TinyCReader {
 		TinyCReader();
 
 		void addKeywords() {
+			GrammerUtils::m_vKeywords.push_back("interface");
+			GrammerUtils::m_vKeywords.push_back("inline");
 			GrammerUtils::m_vKeywords.push_back("struct");
+			GrammerUtils::m_vKeywords.push_back("implements");
 			GrammerUtils::m_vKeywords.push_back("inline");
 			GrammerUtils::m_vKeywords.push_back("virtual");
 			GrammerUtils::m_vKeywords.push_back("static");
@@ -46,6 +49,9 @@ class TinyCReader {
 
 		bool def();
 		bool objectList();
+		bool interfaceDeclaration();
+		bool interfaceObjectList();
+		bool functionDeclaration();
 		bool structDeclaration();
 		bool structObjectList();
 		bool structInlineFunction();
@@ -165,6 +171,9 @@ class TinyCReader {
 		bool 						isValidStructType(std::string sType);
 		Tree* 						hasNodeOfType(Tree* pNode, ASTNodeType eASTNodeType);
 		
+		void 						addInterfaceType(std::string sType);
+		bool 						isValidInterfaceType(std::string sType);
+		
 		void						pushLocalHeapVar(std::string sVariableName);
 		void						startBlockMarker();
 		void						endBlockMarker();
@@ -186,9 +195,11 @@ class TinyCReader {
 		Tree*						m_pASTCurrentNode;
 		
 		std::vector<std::string>	m_sBlockStringList;
+		bool						m_bInterfaceInProcess;
 		bool						m_bStructInProcess;
 		bool						m_bFunctionInProcess;
 		
 		std::vector<Tree*>			m_vStructs;
+		std::vector<Tree*>			m_vInterfaces;
 
 };
