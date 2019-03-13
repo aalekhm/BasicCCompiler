@@ -17,6 +17,7 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("inline");
 			GrammerUtils::m_vKeywords.push_back("virtual");
 			GrammerUtils::m_vKeywords.push_back("static");
+			GrammerUtils::m_vKeywords.push_back("static");
 			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
 			GrammerUtils::m_vKeywords.push_back("else");
@@ -113,7 +114,10 @@ class TinyCReader {
 		bool malloc();
 		bool assignmentDerefArray();
 		bool structMemberVariableAssignmentOrFunctionCall();
+		bool structStaticMemberAccess();
+		bool structObjectMemberAccess();
 		bool structMemberVariableLValueOrFunctionCall();
+		bool structVariableLValueOrArrayLValueOrFunctionCall();
 		bool structMemberVariableLValueArrayAccess();
 		bool assignmentRHS();
 		bool freePtrStatement();
@@ -139,8 +143,11 @@ class TinyCReader {
 		bool primary();
 		bool operands();
 		bool tk_identifier();
-		bool structMemberAccess();
+		bool structStaticOrObjectAccess();
+		bool structStaticAccess();
+		bool structObjectAccess();
 		bool structMemberVariableOrFunctionCall_RValue();
+		bool structMemberVariableOrFunctionCall_RValue_1();
 		bool structMemberVariableArrayInAnExpr();
 		bool structMemberFunctionCallInAnExpr();
 		bool unary_expr();

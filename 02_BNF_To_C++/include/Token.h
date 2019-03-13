@@ -68,11 +68,7 @@ namespace TokenType_
 		TK_DEREF,
 		TK_DEREFARRAY,
 		TK_MEMBERACCESS,
-		ASTNode_MEMSET,
-		ASTNode_MEMCPY,
-		ASTNode_MEMCMP,
-		ASTNode_MEMCHR,
-		ASTNode_SIZEOF,
+		TK_STATICMEMBERACCESS,
 		TK_UNKNOWN
 	};
 
@@ -142,6 +138,7 @@ namespace TokenType_
 			case Type::TK_DEREF:				return "TK_DEREF";
 			case Type::TK_DEREFARRAY:			return "TK_DEREFARRAY";
 			case Type::TK_MEMBERACCESS:			return "TK_MEMBERACCESS";
+			case Type::TK_STATICMEMBERACCESS:	return "TK_STATICMEMBERACCESS";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -212,6 +209,7 @@ namespace TokenType_
 		else if(sTokenType == "TK_DEREF")				return Type::TK_DEREF;
 		else if(sTokenType == "TK_DEREFARRAY")			return Type::TK_DEREFARRAY;
 		else if(sTokenType == "TK_MEMBERACCESS")		return Type::TK_MEMBERACCESS;
+		else if (sTokenType == "TK_STATICMEMBERACCESS")	return Type::TK_STATICMEMBERACCESS;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else											return Type::TK_INVALID;

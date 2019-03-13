@@ -190,7 +190,7 @@
 															"</code>"
 										]
 										"inline" 
-										["virtual"] 
+										["virtual"] ["static"]
 										<functionDef> 		"<code>"
 																Tree* pFunctionDefNode = m_pASTCurrentNode->getLastStatement();
 																assert(pFunctionDefNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONDEF);
@@ -265,6 +265,11 @@
 																	if(sPrevText == "virtual")
 																	{
 																		SET_INFO_FOR_KEY(pFunctionDefNode, "isVirtual", "virtual");
+																	}
+ 
+																	if(sPrevText == "static")
+																	{
+																		SET_INFO_FOR_KEY(pFunctionDefNode, "isStatic", "static");
 																	}
 																}
 															"</code>"
@@ -1361,26 +1366,66 @@
 										;
 										
 <structMemberVariableAssignmentOrFunctionCall>
-								::=		TK_MEMBERACCESS	"<code>"
-															std::string sObjectName = PREV_TOKEN_TEXT;
-															std::string sFullyQualifiedObjectName = "";
-															if (sObjectName == "this")
-																sFullyQualifiedObjectName = "this";
-															else
-																sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName.c_str());
-															
-															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
-															{
-																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
-																SET_INFO_FOR_KEY(pAssignmentNode, "givenName", PREV_TOKEN_TEXT);
-															}
+								::=		(	<structStaticMemberAccess>
+											|
+											<structObjectMemberAccess>
+										)
+										;
+										
+<structStaticMemberAccess>		::=		TK_STATICMEMBERACCESS
+														"<code>"
+															SAVE_PREV_TOKEN
+														"</code>"
+										':' ':'
+										<structMemberVariableLValueOrFunctionCall>
+										;
 
-															Tree* pTemp = nullptr;
-															pTemp = m_pASTCurrentNode;
-															m_pASTCurrentNode = pAssignmentNode;
+<structObjectMemberAccess>		::=		TK_MEMBERACCESS	"<code>"
+															SAVE_PREV_TOKEN
 														"</code>"
 										'-' '>'
-										<structMemberVariableLValueOrFunctionCall>	
+										<structMemberVariableLValueOrFunctionCall>
+										;
+										
+<structMemberVariableLValueOrFunctionCall>
+								::=						"<code>"
+															Token eSavedToken = SAVED_TOKEN;
+															Tree* pTemp = nullptr;
+															Tree* pAssignmentNode = nullptr;
+
+															std::string sObjectName = SAVED_TOKEN_TEXT;
+															
+															switch (eSavedToken.m_eTokenType)
+															{
+																case TokenType_::Type::TK_MEMBERACCESS:
+																{
+																	std::string sFullyQualifiedObjectName = "";
+																	if (sObjectName == "this")
+																		sFullyQualifiedObjectName = "this";
+																	else
+																		sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName.c_str());
+
+																	pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
+																	SET_INFO_FOR_KEY(pAssignmentNode, "accessType", "object");
+																}
+																break;
+																case TokenType_::Type::TK_STATICMEMBERACCESS:
+																{
+																	pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sObjectName.c_str());
+																	SET_INFO_FOR_KEY(pAssignmentNode, "accessType", "static");
+																}
+																break;
+															}
+															
+															{
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+																SET_INFO_FOR_KEY(pAssignmentNode, "givenName", sObjectName);
+
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pAssignmentNode;
+															}
+														"</code>"
+										<structVariableLValueOrArrayLValueOrFunctionCall>
 										[
 										'='				"<code>"
 															Tree* pTemp = nullptr;
@@ -1404,7 +1449,7 @@
 														"</code>"
 										;
 										
-<structMemberVariableLValueOrFunctionCall>
+<structVariableLValueOrArrayLValueOrFunctionCall>
 								::=		(	<functionCall>
 														"<code>"
 															m_pASTCurrentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
@@ -1619,7 +1664,7 @@
 																handleFunctionCallInExpr();
 															"</code>"
 											|
-											<structMemberAccess>
+											<structStaticOrObjectAccess>
 											|
 											<tk_identifier>
 											| 
@@ -1653,17 +1698,58 @@
 																m_vPostFix.push_back(sOperand);
 															"</code>"
 										);
+																				
+<structStaticOrObjectAccess>	::=		(	<structStaticAccess>
+											|
+											<structObjectAccess>
+										);
 										
-<structMemberAccess>			::=		TK_MEMBERACCESS		"<code>"
-																std::string sObjectName = PREV_TOKEN_TEXT;
-																std::string sFullyQualifiedObjectName = "";
-																if (sObjectName == "this")
-																	sFullyQualifiedObjectName = "this";
-																else
-																	sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
-																
-																Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
+<structStaticAccess>			::=		TK_STATICMEMBERACCESS
+															"<code>"
+																SAVE_PREV_TOKEN
+															"</code>"
+										':' ':'
+										<structMemberVariableOrFunctionCall_RValue>
+										;
+										
+<structObjectAccess>			::=		TK_MEMBERACCESS
+															"<code>"
+																SAVE_PREV_TOKEN
+															"</code>"
+										'-' '>'
+										<structMemberVariableOrFunctionCall_RValue>
+										;
+										
+<structMemberVariableOrFunctionCall_RValue>		
+								::=							"<code>"
+																Token eSavedToken = SAVED_TOKEN;
 																Tree* pTemp = nullptr;
+																Tree* pObjectAccessNode = nullptr;
+
+																std::string sObjectName = SAVED_TOKEN_TEXT;
+																
+																switch (eSavedToken.m_eTokenType)
+																{
+																	case TokenType_::Type::TK_MEMBERACCESS:
+																	{
+																		std::string sFullyQualifiedObjectName = "";
+																		if (sObjectName == "this")
+																			sFullyQualifiedObjectName = "this";
+																		else
+																			sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+																		
+																		pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
+																		SET_INFO_FOR_KEY(pObjectAccessNode, "accessType", "object");
+																	}
+																	break;
+																	case TokenType_::Type::TK_STATICMEMBERACCESS:
+																	{
+																		pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sObjectName.c_str());
+																		SET_INFO_FOR_KEY(pObjectAccessNode, "accessType", "static");
+																	}
+																	break;
+																}
+																
 																{
 																	pObjectAccessNode->m_sAdditionalInfo.append(sObjectName);
 																	SET_INFO_FOR_KEY(pObjectAccessNode, "givenName", sObjectName);
@@ -1674,15 +1760,14 @@
 																	m_pASTCurrentNode = pObjectAccessNode;
 																}
 															"</code>"
-										'-' '>'
-										<structMemberVariableOrFunctionCall_RValue>
+										<structMemberVariableOrFunctionCall_RValue_1>
 															"<code>"
 																m_pASTCurrentNode = pTemp;
 															"</code>"
 										;
 										
-<structMemberVariableOrFunctionCall_RValue>		
-								::=		(	<structMemberFunctionCallInAnExpr>		
+<structMemberVariableOrFunctionCall_RValue_1>
+								::=		(	<structMemberFunctionCallInAnExpr>
 											|
 											TK_IDENTIFIER	"<code>"
 																{
@@ -1770,7 +1855,6 @@
 																	m_vPostFix.push_back(sFullyQualifiedTempVariableName);
 																}
 															"</code>";
-										
 										
 <unary_expr>					::=		<unary_oper> <expr>;
 

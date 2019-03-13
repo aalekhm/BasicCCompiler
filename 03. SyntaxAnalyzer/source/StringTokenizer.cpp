@@ -384,6 +384,12 @@ Token StringTokenizer::readIdentifier()
 
 			return tok;
 		}
+				else
+		if (ch == ':' && peek(1) == ':')
+		{	
+			Token tok = createToken(TokenType_::Type::TK_STATICMEMBERACCESS);
+			return tok;
+		}
 		else
 			break;
 	}

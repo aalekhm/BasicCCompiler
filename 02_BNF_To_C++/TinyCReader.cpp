@@ -18,7 +18,13 @@
 #define __START_FUNCTION__ 											m_bFunctionInProcess = true;
 #define __END_FUNCTION__ 											m_bFunctionInProcess = false;
 									
+#define SAVE_CURRENT_TOKEN											GrammerUtils::m_pSavedToken = GrammerUtils::m_pToken;
+#define SAVE_PREV_TOKEN												GrammerUtils::m_pSavedToken = GrammerUtils::m_pPrevToken;
+
+#define SAVED_TOKEN 												GrammerUtils::m_pSavedToken
+#define SAVED_TOKEN_TEXT 											GrammerUtils::m_pSavedToken.getText()
 #define PREV_TOKEN_TEXT 											GrammerUtils::m_pPrevToken.getText()
+
 #define GET_INFO_FOR_KEY(__node__, __key__)							__node__->getAdditionalInfoFor(__key__)
 #define SET_INFO_FOR_KEY(__node__, __key__, __info__)				__node__->setAdditionalInfo(__key__, __info__)
 #define APPEND_INFO_FOR_KEY(__node__, __key__, __appendValue__)		__node__->appendAdditionalInfo(__key__, __appendValue__)
@@ -931,6 +937,14 @@ else {
 
 }
 
+if(!GrammerUtils::match("static", OPTIONAL_)) {
+
+}
+
+else {
+
+}
+
 if(!functionDef())
 return false;
 
@@ -1040,6 +1054,11 @@ return false;
 																	if(sPrevText == "virtual")
 																	{
 																		SET_INFO_FOR_KEY(pFunctionDefNode, "isVirtual", "virtual");
+																	}
+ 
+																	if(sPrevText == "static")
+																	{
+																		SET_INFO_FOR_KEY(pFunctionDefNode, "isStatic", "static");
 																	}
 																}
 															
@@ -2904,31 +2923,91 @@ return true;
 }
 
 bool TinyCReader::structMemberVariableAssignmentOrFunctionCall() {
+if(structStaticMemberAccess()) {
+return true;
+}
+else
+if(structObjectMemberAccess()) {
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::structStaticMemberAccess() {
+if(!GrammerUtils::match(TokenType_::Type::TK_STATICMEMBERACCESS, MANDATORY_))
+return false;
+
+															SAVE_PREV_TOKEN
+														
+if(!GrammerUtils::match(':', MANDATORY_))
+return false;
+if(!GrammerUtils::match(':', MANDATORY_))
+return false;
+if(!structMemberVariableLValueOrFunctionCall())
+return false;
+return true;
+
+}
+
+bool TinyCReader::structObjectMemberAccess() {
 if(!GrammerUtils::match(TokenType_::Type::TK_MEMBERACCESS, MANDATORY_))
 return false;
 
-															std::string sObjectName = PREV_TOKEN_TEXT;
-															std::string sFullyQualifiedObjectName = "";
-															if (sObjectName == "this")
-																sFullyQualifiedObjectName = "this";
-															else
-																sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName.c_str());
-															
-															Tree* pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
-															{
-																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
-																SET_INFO_FOR_KEY(pAssignmentNode, "givenName", PREV_TOKEN_TEXT);
-															}
-
-															Tree* pTemp = nullptr;
-															pTemp = m_pASTCurrentNode;
-															m_pASTCurrentNode = pAssignmentNode;
+															SAVE_PREV_TOKEN
 														
 if(!GrammerUtils::match('-', MANDATORY_))
 return false;
 if(!GrammerUtils::match('>', MANDATORY_))
 return false;
 if(!structMemberVariableLValueOrFunctionCall())
+return false;
+return true;
+
+}
+
+bool TinyCReader::structMemberVariableLValueOrFunctionCall() {
+
+															Token eSavedToken = SAVED_TOKEN;
+															Tree* pTemp = nullptr;
+															Tree* pAssignmentNode = nullptr;
+
+															std::string sObjectName = SAVED_TOKEN_TEXT;
+															
+															switch (eSavedToken.m_eTokenType)
+															{
+																case TokenType_::Type::TK_MEMBERACCESS:
+																{
+																	std::string sFullyQualifiedObjectName = "";
+																	if (sObjectName == "this")
+																		sFullyQualifiedObjectName = "this";
+																	else
+																		sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName.c_str());
+
+																	pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sFullyQualifiedObjectName.c_str());
+																	SET_INFO_FOR_KEY(pAssignmentNode, "accessType", "object");
+																}
+																break;
+																case TokenType_::Type::TK_STATICMEMBERACCESS:
+																{
+																	pAssignmentNode = makeLeaf(ASTNodeType::ASTNode_ASSIGN, sObjectName.c_str());
+																	SET_INFO_FOR_KEY(pAssignmentNode, "accessType", "static");
+																}
+																break;
+															}
+															
+															{
+																pAssignmentNode->m_pParentNode = m_pASTCurrentNode;
+																SET_INFO_FOR_KEY(pAssignmentNode, "givenName", sObjectName);
+
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pAssignmentNode;
+															}
+														
+if(!structVariableLValueOrArrayLValueOrFunctionCall())
 return false;
 if(!GrammerUtils::match('=', OPTIONAL_)) {
 
@@ -2962,7 +3041,7 @@ return true;
 
 }
 
-bool TinyCReader::structMemberVariableLValueOrFunctionCall() {
+bool TinyCReader::structVariableLValueOrArrayLValueOrFunctionCall() {
 if(functionCall()) {
 
 															m_pASTCurrentNode->m_eASTNodeType = ASTNodeType::ASTNode_MEMBERACCESS;
@@ -3458,7 +3537,7 @@ if(sizeOf()) {
 return true;
 }
 else
-if(structMemberAccess()) {
+if(structStaticOrObjectAccess()) {
 return true;
 }
 else
@@ -3521,19 +3600,83 @@ return true;
 
 }
 
-bool TinyCReader::structMemberAccess() {
+bool TinyCReader::structStaticOrObjectAccess() {
+if(structStaticAccess()) {
+return true;
+}
+else
+if(structObjectAccess()) {
+return true;
+}
+else
+return false;
+
+return true;
+
+}
+
+bool TinyCReader::structStaticAccess() {
+if(!GrammerUtils::match(TokenType_::Type::TK_STATICMEMBERACCESS, MANDATORY_))
+return false;
+
+																SAVE_PREV_TOKEN
+															
+if(!GrammerUtils::match(':', MANDATORY_))
+return false;
+if(!GrammerUtils::match(':', MANDATORY_))
+return false;
+if(!structMemberVariableOrFunctionCall_RValue())
+return false;
+return true;
+
+}
+
+bool TinyCReader::structObjectAccess() {
 if(!GrammerUtils::match(TokenType_::Type::TK_MEMBERACCESS, MANDATORY_))
 return false;
 
-																std::string sObjectName = PREV_TOKEN_TEXT;
-																std::string sFullyQualifiedObjectName = "";
-																if (sObjectName == "this")
-																	sFullyQualifiedObjectName = "this";
-																else
-																	sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
-																
-																Tree* pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
+																SAVE_PREV_TOKEN
+															
+if(!GrammerUtils::match('-', MANDATORY_))
+return false;
+if(!GrammerUtils::match('>', MANDATORY_))
+return false;
+if(!structMemberVariableOrFunctionCall_RValue())
+return false;
+return true;
+
+}
+
+bool TinyCReader::structMemberVariableOrFunctionCall_RValue() {
+
+																Token eSavedToken = SAVED_TOKEN;
 																Tree* pTemp = nullptr;
+																Tree* pObjectAccessNode = nullptr;
+
+																std::string sObjectName = SAVED_TOKEN_TEXT;
+																
+																switch (eSavedToken.m_eTokenType)
+																{
+																	case TokenType_::Type::TK_MEMBERACCESS:
+																	{
+																		std::string sFullyQualifiedObjectName = "";
+																		if (sObjectName == "this")
+																			sFullyQualifiedObjectName = "this";
+																		else
+																			sFullyQualifiedObjectName = getFullyQualifiedNameForVariable(m_pASTCurrentNode, sObjectName);
+																		
+																		pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sFullyQualifiedObjectName.c_str());
+																		SET_INFO_FOR_KEY(pObjectAccessNode, "accessType", "object");
+																	}
+																	break;
+																	case TokenType_::Type::TK_STATICMEMBERACCESS:
+																	{
+																		pObjectAccessNode = makeLeaf(ASTNodeType::ASTNode_MEMBERACCESS, sObjectName.c_str());
+																		SET_INFO_FOR_KEY(pObjectAccessNode, "accessType", "static");
+																	}
+																	break;
+																}
+																
 																{
 																	pObjectAccessNode->m_sAdditionalInfo.append(sObjectName);
 																	SET_INFO_FOR_KEY(pObjectAccessNode, "givenName", sObjectName);
@@ -3544,11 +3687,7 @@ return false;
 																	m_pASTCurrentNode = pObjectAccessNode;
 																}
 															
-if(!GrammerUtils::match('-', MANDATORY_))
-return false;
-if(!GrammerUtils::match('>', MANDATORY_))
-return false;
-if(!structMemberVariableOrFunctionCall_RValue())
+if(!structMemberVariableOrFunctionCall_RValue_1())
 return false;
 
 																m_pASTCurrentNode = pTemp;
@@ -3557,7 +3696,7 @@ return true;
 
 }
 
-bool TinyCReader::structMemberVariableOrFunctionCall_RValue() {
+bool TinyCReader::structMemberVariableOrFunctionCall_RValue_1() {
 if(structMemberFunctionCallInAnExpr()) {
 return true;
 }

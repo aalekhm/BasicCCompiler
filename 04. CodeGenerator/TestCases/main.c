@@ -125,6 +125,20 @@ struct AAA implements IntfC, IntfD, IntfE
 		print("Fucking...");
 		putc(10);
 	}
+	
+	inline static void staticFunc()
+	{
+		print("In StaticFunc...");
+		putc(10);
+	}
+
+	inline static int32_t staticFuncReturn()
+	{
+		print("In staticFuncReturn...");
+		putc(10);
+		
+		return 1977;
+	}
 };
 
 struct BBB : AAA
@@ -390,6 +404,11 @@ void structTest()
 {
 	AAA* pAAA = new AAA();
 	pAAA->printMembers();
+	AAA::staticFunc();
+	
+	int32_t iRet = (2 * AAA::staticFuncReturn()) * AAA::staticFuncReturn();
+	print("iRet = ", iRet);
+	putc(10);
 
 	BBB* pBBB = new BBB();
 	pBBB->printMembers();

@@ -469,8 +469,28 @@ struct Example
 	int8_t iInt3 = {};
 };
 
-int main(int argc, char* argv[])
+int main_3(int argc, char* argv[])
 {
 	Example eg;
+	exit(EXIT_SUCCESS);
+}
+
+class StaticExample
+{
+	public:
+		static void staticFunc()
+		{
+			std::cout << "In static function!" << std::endl;
+		};
+	protected:
+	private:
+};
+
+int main(int argc, char* argv[])
+{
+	StaticExample se;
+	se.staticFunc();
+	StaticExample::staticFunc();
+
 	exit(EXIT_SUCCESS);
 }

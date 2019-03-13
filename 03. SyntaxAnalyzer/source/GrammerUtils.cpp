@@ -7,6 +7,7 @@
 
 Token									GrammerUtils::m_pToken(TokenType_::Type::TK_UNKNOWN, "", -1, -1);
 Token									GrammerUtils::m_pPrevToken(TokenType_::Type::TK_UNKNOWN, "", -1, -1);
+Token									GrammerUtils::m_pSavedToken(TokenType_::Type::TK_UNKNOWN, "", -1, -1);
 
 std::vector<std::string>				GrammerUtils::m_vKeywords;
 std::vector<std::string>				GrammerUtils::m_vTypes;
@@ -31,7 +32,9 @@ ByteArrayInputStream*					GrammerUtils::m_pBAIS;
 std::vector<Tree*>						FunctionInfo::m_vStaticVariables;
 HANDLE									GrammerUtils::m_HColor;
 
-#define VERBOSE	1
+#define VERBOSE		1
+#define COLORIZE	0
+
 #define EMIT_1(__ICODE__, __OPERAND__)					emit(__ICODE__, (int32_t)__OPERAND__);
 #define EMIT_2(__ICODE__, __OPERAND1__, __OPERAND2__)	emit(__ICODE__, (int32_t)__OPERAND1__, (int32_t)__OPERAND2__);
 
@@ -130,6 +133,7 @@ RegisterMap registerMap[]
 	{ "RMAX", EREGISTERS::RMAX },
 };
 
+#if (COLORIZE == 1)
 struct color
 {
 	color(WORD wAttribute)
@@ -209,7 +213,7 @@ std::ostream& operator<<(std::ostream& os, color c)
 
 	return os;
 }
-
+#endif
 bool GrammerUtils::isABuiltInType(const char* cStr)
 {
 	std::string sStr = cStr;
@@ -458,7 +462,17 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		break;
 		case ASTNodeType::ASTNode_MEMBERACCESS:
 		{
-			std::cout << GET_INFO_FOR_KEY(pNode, "text") << "->";
+			std::string sAccessType = GET_INFO_FOR_KEY(pNode, "accessType");
+			if (sAccessType == "static")
+			{
+				std::cout << GET_INFO_FOR_KEY(pNode, "text") << "::";
+			}
+			else
+			if (sAccessType == "object")
+			{
+				std::cout << GET_INFO_FOR_KEY(pNode, "text") << "->";
+			}
+
 			if (pNode->m_vStatements.size() > 0)
 			{
 				Tree* pFirstChild = pNode->m_vStatements[0];
@@ -1808,6 +1822,7 @@ Tree* GrammerUtils::createThisFunctionCallWithoutArguments(const char* sFunction
 	{
 		SET_INFO_FOR_KEY(pMemberFunctionCall, "text", "this");
 		SET_INFO_FOR_KEY(pMemberFunctionCall, "givenName", "this");
+		SET_INFO_FOR_KEY(pMemberFunctionCall, "accessType", "object");
 
 		Tree* pFunctionCallNode = CREATE_NODE_OF_AST(ASTNodeType::ASTNode_FUNCTIONCALL, sFunctionName);
 		{
@@ -3381,7 +3396,9 @@ void GrammerUtils::handleTypeStructs(Tree* pNode)
 
 void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 {
+	std::string sAccessType = GET_INFO_FOR_KEY(pNode, "accessType");
 	std::string sPointerName = GET_INFO_FOR_KEY(pNode, "text");
+	std::string sType = "";
 	if (pNode->m_vStatements.size() > 0)
 	{
 		Tree* pFunctionCallNode = pNode->m_vStatements[0];
@@ -3391,27 +3408,36 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 			if (eChilsASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
 			{
 				int32_t iOffsetSize = 0x0BADC0DE;
-				if (sPointerName != "this")
+				if(sAccessType == "object")
 				{
-					std::string sType = GET_VARIABLE_NODETYPE(sPointerName);
-					SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sType);
-
-					// 1. Fetch 'this' into 'ECX' if its a variable name.
-					EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName));		// Get the 'this' pointer value
-					EMIT_1(OPCODE::POPR, EREGISTERS::RCX);							// & push it in 'ECX'
-				}
-				else
-				{
-					// Increment 'ECX' pointer by amount equivalent to the offset.
-					std::string sAdjustRegisterOffset = GET_INFO_FOR_KEY(pNode, "SUB_REG");
-					if (NOT sAdjustRegisterOffset.empty())
+					if (sPointerName != "this")
 					{
-						iOffsetSize = atoi(sAdjustRegisterOffset.c_str());
-						EMIT_2(	OPCODE::SUB_REG, 
-								(iOffsetSize >> (sizeof(int16_t) * 8)), 
-								(iOffsetSize & 0x0000FFFF));
+						sType = GET_VARIABLE_NODETYPE(sPointerName);
+
+						// 1. Fetch 'this' into 'ECX' if its a variable name.
+						EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(sPointerName));		// Get the 'this' pointer value
+						EMIT_1(OPCODE::POPR, EREGISTERS::RCX);							// & push it in 'ECX'
+					}
+					else
+					{
+						// Increment 'ECX' pointer by amount equivalent to the offset.
+						std::string sAdjustRegisterOffset = GET_INFO_FOR_KEY(pNode, "SUB_REG");
+						if (NOT sAdjustRegisterOffset.empty())
+						{
+							iOffsetSize = atoi(sAdjustRegisterOffset.c_str());
+							EMIT_2(	OPCODE::SUB_REG, 
+									(iOffsetSize >> (sizeof(int16_t) * 8)), 
+									(iOffsetSize & 0x0000FFFF));
+						}
 					}
 				}
+				else
+				if (sAccessType == "static")
+				{
+					sType = sPointerName;
+				}
+
+				SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sType);
 
 				// 2. Make the function call.
 				populateCode(pFunctionCallNode);
@@ -3422,11 +3448,14 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 				////EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
 
 				// Decrement 'ECX' pointer by amount equivalent to the offset.
-				if (iOffsetSize != 0x0BADC0DE)
+				if (sAccessType == "object")
 				{
-					EMIT_2(	OPCODE::SUB_REG, 
-							(iOffsetSize >> (sizeof(int16_t) * 8)), 
-							-(iOffsetSize & 0x0000FFFF));
+					if (iOffsetSize != 0x0BADC0DE)
+					{
+						EMIT_2(	OPCODE::SUB_REG, 
+								(iOffsetSize >> (sizeof(int16_t) * 8)), 
+								-(iOffsetSize & 0x0000FFFF));
+					}
 				}
 			}
 		}
@@ -3705,7 +3734,23 @@ bool GrammerUtils::isStructObedient(StructInfo* pStructInfo)
 				{
 					bIsObedient = false;
 #if (VERBOSE == 1)
-					std::cout << red << "struct " << green << pStructInfo->m_sStructName << blue << " does not implement " << pInterfaceFunctionInfo->m_sFunctionName << "() == " << sInterfaceFunctionSign << white << std::endl;
+					std::cout << 
+	#if (COLORIZE == 1)
+						red << 
+	#endif
+						"struct " << 
+	#if (COLORIZE == 1)
+						green <<
+	#endif
+						pStructInfo->m_sStructName << 
+	#if (COLORIZE == 1)
+						blue << 
+	#endif
+						" does not implement " << pInterfaceFunctionInfo->m_sFunctionName << "() == " << sInterfaceFunctionSign << 
+	#if (COLORIZE == 1)
+						white << 
+	#endif
+						std::endl;
 #endif
 				}
 			}

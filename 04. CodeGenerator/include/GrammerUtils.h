@@ -21,6 +21,7 @@ class GrammerUtils
 		static Token								m_pToken;
 		static Token								getNextToken();
 		static Token								m_pPrevToken;
+		static Token								m_pSavedToken;
 
 		static bool									match(TokenType_::Type eTokenType, int TYPE);
 		static bool									match(std::string sText, int TYPE);

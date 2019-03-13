@@ -18,7 +18,13 @@
 #define __START_FUNCTION__ 											m_bFunctionInProcess = true;
 #define __END_FUNCTION__ 											m_bFunctionInProcess = false;
 									
+#define SAVE_CURRENT_TOKEN											GrammerUtils::m_pSavedToken = GrammerUtils::m_pToken;
+#define SAVE_PREV_TOKEN												GrammerUtils::m_pSavedToken = GrammerUtils::m_pPrevToken;
+
+#define SAVED_TOKEN 												GrammerUtils::m_pSavedToken
+#define SAVED_TOKEN_TEXT 											GrammerUtils::m_pSavedToken.getText()
 #define PREV_TOKEN_TEXT 											GrammerUtils::m_pPrevToken.getText()
+
 #define GET_INFO_FOR_KEY(__node__, __key__)							__node__->getAdditionalInfoFor(__key__)
 #define SET_INFO_FOR_KEY(__node__, __key__, __info__)				__node__->setAdditionalInfo(__key__, __info__)
 #define APPEND_INFO_FOR_KEY(__node__, __key__, __appendValue__)		__node__->appendAdditionalInfo(__key__, __appendValue__)
