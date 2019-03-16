@@ -385,6 +385,17 @@ struct Person
 		return m_iAge;
 	}
 	
+	inline void pointerArgTest(CCC* pCCC)
+	{
+		print("<________________________________________________________________________>");
+		putc(10);
+		
+		pCCC->printMembers();
+		
+		print("</________________________________________________________________________>");
+		putc(10);
+	}
+	
 	// Note: The destructor function has a peculiar prefix of '#' unlike the usual '~'.
 	//		 This is done just to make parsing easier as '~' is also bitwisenot.
 	inline void #Person()
@@ -399,6 +410,19 @@ static int32_t* pStaticPtr_2;
 static int32_t* pStaticPtr_3;
 
 static int8_t* pStaticPtr_0_Start;
+
+void pointerArgTest(AAA* pAAA, BBB* pBBB, CCC* pCCC)
+{
+	print("<@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@>");
+	putc(10);
+	
+	pAAA->printMembers();
+	pBBB->printMembers();
+	pCCC->printMembers();
+	
+	print("</@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@>");
+	putc(10);	
+}
 
 void structTest()
 {
@@ -459,6 +483,8 @@ void structTest()
 	putc(10);
 	////////////////////////////////////////////////////////////////////////////////
 	
+	pointerArgTest(pAAA, pBBB, pCCC);
+
 	free(pAAA);
 	free(pBBB);
 	free(pCCC);
@@ -473,6 +499,9 @@ int32_t retNewFunc()
 	Person pPersonObj1 = new Person();		// OR (b) Person* pPersonObj1();
 	Person pPersonObj2 = new Person(10);	// OR (c) Person* pPersonObj2(10);
 	//Person pPersonObjs[4];				// OR (d) Person* pPersonObjs[4];
+	
+	CCC* pCCC = new CCC();
+	pPersonObj2->pointerArgTest(pCCC);
 
 	Tyre pTyre = new Tyre();
 	pTyre->m_iSpeed = 11;
@@ -724,6 +753,7 @@ int32_t retNewFunc()
 	free(pExampleObj0);
 	free(pPersonObj1);
 	free(pPersonObj2);
+	free(pCCC);
 
 	int32_t iReturnValue = 1977;
 	

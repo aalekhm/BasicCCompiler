@@ -212,7 +212,7 @@
 											return isValidType(sType);
 										"</code>"
 										;
-
+										
 <structType>					::=		"<code>"
 											std::string sType = GrammerUtils::m_pToken.getText(); 
 											return isValidStructType(sType);
@@ -305,12 +305,18 @@
 										;
 
 <functionArgumentDefList>		::=		{ <functionArgumentDefListMore> };
-<functionArgumentDefListMore>	::=		<primitiveTypeInt>
+<functionArgumentDefListMore>	::=		<argumentType>
 										[','];
 																				
-<primitiveTypeInt>				::= 	<primitiveType>		"<code>"
+<argumentType>					::= 	<variableType>		"<code>"
 																std::string sType = PREV_TOKEN_TEXT;
+																bool bIsAPointer = false;
 															"</code>"
+										[	
+											'*'				"<code>"
+																bIsAPointer = true;
+															"</code>"
+										]				
 										TK_IDENTIFIER		"<code>"
 																std::string sArgName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedArgName;
@@ -323,12 +329,18 @@
 																	SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sArgName);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "type", sType);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "scope", toString(E_VARIABLESCOPE::ARGUMENT));
+																	pPrimIntNode->m_bIsPointerType = bIsAPointer;
 																	
 																	m_pASTCurrentNode->addChild(pPrimIntNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
+																	m_pASTCurrentNode->m_sAdditionalInfo.append("int32_t_");
 																}
 															"</code>"
 										;										
+										
+<variableType>					::=		(	<primitiveType>
+											|
+											<structType>
+										);
 										
 <stmt_list> 					::=		{ <stmt> [';'] };
 
@@ -476,7 +488,7 @@
 															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
 															{
 																m_pASTCurrentNode->addChild(pStringNode);
-																m_pASTCurrentNode->m_sAdditionalInfo.append("S");
+																m_pASTCurrentNode->m_sAdditionalInfo.append("string_");
 															}
 														"</code>"
 											[',']
@@ -487,7 +499,7 @@
 																m_pASTCurrentNode->addChild(pExpressionLeftLeaf);
 																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 																
-																m_pASTCurrentNode->m_sAdditionalInfo.append("I");
+																m_pASTCurrentNode->m_sAdditionalInfo.append("int32_t_");
 															}
 														"</code>"
 											[',']
@@ -496,7 +508,7 @@
 																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pIntegerNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("C");
+																	m_pASTCurrentNode->m_sAdditionalInfo.append("char_");
 																}
 															"</code>"
 											|
@@ -504,7 +516,7 @@
 																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pCharacterNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
+																	m_pASTCurrentNode->m_sAdditionalInfo.append("int8_t_");
 																}
 															"</code>"
 										) ;

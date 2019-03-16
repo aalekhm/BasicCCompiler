@@ -1120,7 +1120,7 @@ return true;
 }
 
 bool TinyCReader::functionArgumentDefListMore() {
-if(!primitiveTypeInt())
+if(!argumentType())
 return false;
 if(!GrammerUtils::match(',', OPTIONAL_)) {
 
@@ -1134,12 +1134,24 @@ return true;
 
 }
 
-bool TinyCReader::primitiveTypeInt() {
-if(!primitiveType())
+bool TinyCReader::argumentType() {
+if(!variableType())
 return false;
 
 																std::string sType = PREV_TOKEN_TEXT;
+																bool bIsAPointer = false;
 															
+if(!GrammerUtils::match('*', OPTIONAL_)) {
+
+}
+
+else {
+
+
+																bIsAPointer = true;
+															
+}
+
 if(!GrammerUtils::match(TokenType_::Type::TK_IDENTIFIER, MANDATORY_))
 return false;
 
@@ -1154,11 +1166,27 @@ return false;
 																	SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sArgName);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "type", sType);
 																	SET_INFO_FOR_KEY(pPrimIntNode, "scope", toString(E_VARIABLESCOPE::ARGUMENT));
+																	pPrimIntNode->m_bIsPointerType = bIsAPointer;
 																	
 																	m_pASTCurrentNode->addChild(pPrimIntNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
+																	m_pASTCurrentNode->m_sAdditionalInfo.append("int32_t_");
 																}
 															
+return true;
+
+}
+
+bool TinyCReader::variableType() {
+if(primitiveType()) {
+return true;
+}
+else
+if(structType()) {
+return true;
+}
+else
+return false;
+
 return true;
 
 }
@@ -1434,7 +1462,7 @@ if(GrammerUtils::match(TokenType_::Type::TK_STRING, OPTIONAL_)) {
 															Tree* pStringNode = makeLeaf(ASTNodeType::ASTNode_STRING, PREV_TOKEN_TEXT);
 															{
 																m_pASTCurrentNode->addChild(pStringNode);
-																m_pASTCurrentNode->m_sAdditionalInfo.append("S");
+																m_pASTCurrentNode->m_sAdditionalInfo.append("string_");
 															}
 														
 if(!GrammerUtils::match(',', OPTIONAL_)) {
@@ -1455,7 +1483,7 @@ if(expr()) {
 																m_pASTCurrentNode->addChild(pExpressionLeftLeaf);
 																pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 																
-																m_pASTCurrentNode->m_sAdditionalInfo.append("I");
+																m_pASTCurrentNode->m_sAdditionalInfo.append("int32_t_");
 															}
 														
 if(!GrammerUtils::match(',', OPTIONAL_)) {
@@ -1474,7 +1502,7 @@ if(GrammerUtils::match(TokenType_::Type::TK_INTEGER, OPTIONAL_)) {
 																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pIntegerNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("C");
+																	m_pASTCurrentNode->m_sAdditionalInfo.append("char_");
 																}
 															
 return true;
@@ -1485,7 +1513,7 @@ if(GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
 																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
 																{
 																	m_pASTCurrentNode->addChild(pCharacterNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("I");
+																	m_pASTCurrentNode->m_sAdditionalInfo.append("int8_t_");
 																}
 															
 return true;

@@ -63,7 +63,8 @@ class TinyCReader {
 		bool functionDef();
 		bool functionArgumentDefList();
 		bool functionArgumentDefListMore();
-		bool primitiveTypeInt();
+		bool argumentType();
+		bool variableType();
 		bool stmt_list();
 		bool stmt();
 		bool prePostFixedIncrDecr();
