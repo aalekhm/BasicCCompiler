@@ -3407,6 +3407,7 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 			ASTNodeType eChilsASTNodeType = pFunctionCallNode->m_eASTNodeType;
 			if (eChilsASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
 			{
+				bool bResetRCXOffset = false;
 				int32_t iOffsetSize = 0x0BADC0DE;
 				if(sAccessType == "object")
 				{
@@ -3428,6 +3429,8 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 							EMIT_2(	OPCODE::SUB_REG, 
 									(iOffsetSize >> (sizeof(int16_t) * 8)), 
 									(iOffsetSize & 0x0000FFFF));
+
+							bResetRCXOffset = true;
 						}
 					}
 				}
@@ -3435,6 +3438,43 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 				if (sAccessType == "static")
 				{
 					sType = sPointerName;
+
+					std::string sFunctionName = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
+					StructInfo* pStructInfo = getStructByName(sType);
+					assert(pStructInfo != nullptr);
+					if (pStructInfo != nullptr)
+					{
+						FunctionInfo* pFunctionInfo = GrammerUtils::getFunctionByNameInStruct(sFunctionName, pStructInfo);
+						assert(pFunctionInfo != nullptr);
+						if (pFunctionInfo != nullptr)
+						{
+							std::string sIsStatic = GET_INFO_FOR_KEY(pFunctionInfo->m_pNode, "isStatic");
+							if (sIsStatic == "static")		// ClassName::staticFunctionName(); --> static function call.
+							{
+							}
+							else							// Parent::nonStaticFunctionName();  ==> call to the Parent's/GrandParent's non-static function.
+							{
+								// Check if there is a call to a Parent's/GrandParent's function from within a 'struct'.
+								if (m_pCurrentStruct != nullptr && m_pCurrentStruct->m_sStructName != sType)
+								{
+									int32_t iOffsetValue = m_pCurrentStruct->getOffsetToParent(sType);
+
+									// Shift the 'ECX' base object pointer by an amount equivalent to the offset to the Parent/GrandParent.
+									iOffsetSize = (int32_t)EREGISTERS::RCX;
+									iOffsetSize <<= sizeof(int16_t) * 8;
+									iOffsetSize |= (iOffsetValue & 0x0000FFFF);
+
+									EMIT_2(	OPCODE::SUB_REG, 
+											(iOffsetSize >> (sizeof(int16_t) * 8)), 
+											(iOffsetSize & 0x0000FFFF));
+
+									bResetRCXOffset = true;
+								}
+								else
+									assert(sIsStatic == "static");
+							}
+						}
+					}
 				}
 
 				SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sType);
@@ -3448,7 +3488,7 @@ void GrammerUtils::handleStructMemberAccess(Tree* pNode)
 				////EMIT_1(OPCODE::POPR, EREGISTERS::RCX);									// Clear off 'ECX'.
 
 				// Decrement 'ECX' pointer by amount equivalent to the offset.
-				if (sAccessType == "object")
+				if (bResetRCXOffset)
 				{
 					if (iOffsetSize != 0x0BADC0DE)
 					{
@@ -3698,6 +3738,24 @@ std::string GrammerUtils::getMemberTypeInStructHierarchy(std::string sMemberVari
 
 	return sType;
 }
+
+FunctionInfo* GrammerUtils::getFunctionByNameInStruct(std::string sFunctionName, StructInfo* pStructInfo)
+{
+	FunctionInfo* bReturnFunctionInfo = nullptr;
+	std::vector<void*>::const_iterator pFunctionItr = pStructInfo->m_vMemberFunctions.cbegin();
+	for (; pFunctionItr != pStructInfo->m_vMemberFunctions.cend(); ++pFunctionItr)
+	{
+		FunctionInfo* pFunctionInfo = (FunctionInfo*)*pFunctionItr;
+		if (pFunctionInfo->m_sFunctionName == sFunctionName)
+		{
+			bReturnFunctionInfo = pFunctionInfo;
+			break;
+		}
+	}
+
+	return bReturnFunctionInfo;
+}
+
 
 bool GrammerUtils::isStructObedient(StructInfo* pStructInfo)
 {

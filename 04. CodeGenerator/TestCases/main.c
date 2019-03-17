@@ -173,6 +173,9 @@ struct BBB : AAA
 
 		print("</***********************************************************>");
 		putc(10);
+		
+		// Call to parent::func();
+		AAA::printMembers();
 	}
 };
 
@@ -216,6 +219,12 @@ struct CCC : BBB
 
 		print("</############################################################>");
 		putc(10);
+	
+		// Call to Parent::func();
+		BBB::printMembers();
+
+		// Call to grandParent::func();
+		AAA::printMembers();
 	}
 	
 	inline void #CCC()

@@ -139,6 +139,7 @@ class GrammerUtils
 
 		static int32_t								getMemberPositionInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo);
 		static std::string							getMemberTypeInStructHierarchy(std::string sMemberVariableName, StructInfo* pStructInfo);
+		static FunctionInfo*						getFunctionByNameInStruct(std::string sFunctionName, StructInfo* pStructInfo);
 
 		static bool									isStructObedient(StructInfo* pStructInfo);
 

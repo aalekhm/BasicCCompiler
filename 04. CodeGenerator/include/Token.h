@@ -747,6 +747,24 @@ typedef struct StructInfo
 		return m_iSizeOf;
 	}
 
+	int32_t getOffsetToParent(std::string sParentName)
+	{
+		int32_t iReturnOffset = sizeOfMe();
+		if (m_ParentStructInfo != nullptr)
+		{
+			if (NOT (m_ParentStructInfo->m_sStructName == sParentName) )
+			{
+				iReturnOffset += m_ParentStructInfo->getOffsetToParent(sParentName);
+			}
+		}
+		else
+		{
+			assert(false);
+		}
+
+		return iReturnOffset;
+	}
+
 	void updateParent(std::map<std::string, StructInfo*> mapGlobalStructs)
 	{
 		// Check if it inherits any Parent Struct
@@ -809,23 +827,6 @@ typedef struct StructInfo
 		{
 			m_vMemberFunctions.push_back(vpFunctionInfo);
 		}
-	}
-
-	bool hasFunctionByName(std::string sFunctionName)
-	{
-		bool bReturn = false;
-		std::vector<void*>::const_iterator pFunctionItr = m_vMemberFunctions.cbegin();
-		for (; pFunctionItr != m_vMemberFunctions.cend(); ++pFunctionItr)
-		{
-			Tree* pFunctionNode = (Tree*)*pFunctionItr;
-			if (GET_INFO_FOR_KEY(pFunctionNode, "text") == sFunctionName)
-			{
-				bReturn = true;
-				break;
-			}
-		}
-
-		return bReturn;
 	}
 
 	int32_t structOffsetToVariable(const char* sVariableName)
