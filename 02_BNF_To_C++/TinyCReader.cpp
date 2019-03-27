@@ -2484,6 +2484,7 @@ if(!structType())
 return false;
 
 																std::string sStructType = PREV_TOKEN_TEXT;
+																bool bIsPointerType = false;
 															
 if(!GrammerUtils::match('*', OPTIONAL_)) {
 
@@ -2491,6 +2492,9 @@ if(!GrammerUtils::match('*', OPTIONAL_)) {
 
 else {
 
+
+																bIsPointerType = true;
+															
 }
 
 if(!GrammerUtils::match(TokenType_::Type::TK_IDENTIFIER, MANDATORY_))
@@ -2540,6 +2544,9 @@ return false;
 																	
 																	pFunctionCallNode->addChild(pFuncCallEndNode);
 																	m_pASTCurrentNode->addChild(pFunctionCallNode);
+																	
+																	if (NOT bIsPointerType && m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
+																		pushLocalHeapVar(sFullyQualifiedVariableName);
 																}
 																
 																SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sStructType);

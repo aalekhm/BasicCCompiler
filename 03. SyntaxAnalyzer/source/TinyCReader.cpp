@@ -23,7 +23,6 @@
 
 #define SAVED_TOKEN 												GrammerUtils::m_pSavedToken
 #define SAVED_TOKEN_TEXT 											GrammerUtils::m_pSavedToken.getText()
-#define PREV_TOKEN 													GrammerUtils::m_pPrevToken
 #define PREV_TOKEN_TEXT 											GrammerUtils::m_pPrevToken.getText()
 
 #define GET_INFO_FOR_KEY(__node__, __key__)							__node__->getAdditionalInfoFor(__key__)
@@ -1484,9 +1483,6 @@ bool TinyCReader::functionArgumentItem() {
 				m_pASTCurrentNode->addChild(pExpressionLeftLeaf);
 				pExpressionLeftLeaf->m_pParentNode = m_pASTCurrentNode;
 
-				std::string sLastToken = PREV_TOKEN_TEXT;
-				Token prevToken = PREV_TOKEN;
-
 				m_pASTCurrentNode->m_sAdditionalInfo.append("int32_t_");
 			}
 
@@ -2488,12 +2484,16 @@ bool TinyCReader::newStructPtr() {
 		return false;
 
 	std::string sStructType = PREV_TOKEN_TEXT;
+	bool bIsPointerType = false;
 
 	if (!GrammerUtils::match('*', OPTIONAL_)) {
 
 	}
 
 	else {
+
+
+		bIsPointerType = true;
 
 	}
 
@@ -2544,6 +2544,9 @@ bool TinyCReader::newStructPtr() {
 
 		pFunctionCallNode->addChild(pFuncCallEndNode);
 		m_pASTCurrentNode->addChild(pFunctionCallNode);
+
+		if (NOT bIsPointerType && m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
+			pushLocalHeapVar(sFullyQualifiedVariableName);
 	}
 
 	SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sStructType);

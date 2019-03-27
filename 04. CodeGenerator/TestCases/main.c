@@ -729,12 +729,16 @@ int32_t retNewFunc()
 	
 	if(mmi == 11)
 	{
+		Person pPersonObj_InsideIf;
+		
 		// Arrays will be deleted automatically at the END_OF_BLOCK
 		int8_t arr2[8] = {111, 222, 333, 444, 555};		//int32_t arr2[8];
 														//int32_t arr2[] = {10, 20, 30, 40};
 														//int32_t arr2[6] = {10, 20, 30, 40};
 		
 		print("arr2 inside if == ", arr2[0]);
+		
+		// Memory allocated by 'arr2' & 'pPersonObj_InsideIf' will be freed when the scope of 'if' ends.
 	}
 	
 	int32_t j = 0;
@@ -755,11 +759,9 @@ int32_t retNewFunc()
 	free(pNew);
 	free(pPtr_0);
 	
-	// Objects created by the notation in (a), (b) & (c) are created on the HEAP & need to be deleted MANUALLY.
-	// Although, objects created by (a) & (d) need to be deleted AUTOMATICALLY.
+	// Objects created by the notation in (a), (b), (c) & (d) are created on the HEAP & need to be deleted MANUALLY.
+	// Although, objects created by (a) & (d) will to be deleted AUTOMATICALLY just where the scope ends.
 	free(pTyre);
-	free(pMachinePart);
-	free(pExampleObj0);
 	free(pPersonObj1);
 	free(pPersonObj2);
 	free(pCCC);

@@ -1062,8 +1062,12 @@
 
 															"<code>"
 																std::string sStructType = PREV_TOKEN_TEXT;
+																bool bIsPointerType = false;
 															"</code>"
-										[ '*' ]
+										[ '*' 				"<code>"
+																bIsPointerType = true;
+															"</code>"
+										]
 										TK_IDENTIFIER		"<code>"
 																std::string sVariableName = PREV_TOKEN_TEXT;
 																std::string sFullyQualifiedVariableName;
@@ -1098,6 +1102,9 @@
 																	
 																	pFunctionCallNode->addChild(pFuncCallEndNode);
 																	m_pASTCurrentNode->addChild(pFunctionCallNode);
+																	
+																	if (NOT bIsPointerType && m_pASTCurrentNode->m_eASTNodeType != ASTNodeType::ASTNode_STRUCTDEF)
+																		pushLocalHeapVar(sFullyQualifiedVariableName);
 																}
 																
 																SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sStructType);
