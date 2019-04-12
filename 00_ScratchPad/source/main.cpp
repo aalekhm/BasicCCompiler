@@ -1,6 +1,9 @@
 #include <iostream>
 #include <vector>
 #include <assert.h>
+#include <map>
+#include "MetaVariable.h"
+#include "MetaFunction.h"
 
 enum class ENDIANNESS
 {
@@ -486,11 +489,172 @@ class StaticExample
 	private:
 };
 
-int main(int argc, char* argv[])
+int main_(int argc, char* argv[])
 {
 	StaticExample se;
 	se.staticFunc();
 	StaticExample::staticFunc();
+
+	exit(EXIT_SUCCESS);
+}
+
+std::map<std::string, void*> map_FunctionMap;
+uint32_t STACK[256] = { 0 };
+uint32_t ESP = 0;
+
+//template <typename R>
+//struct cmdCreator< R (*fffp)(void) >
+//{
+//	static void createCmd(const std::string& name, const std::string& desc, R(*fffp)(void))
+//	{
+//		std::cout << sFuncName << std::endl;
+//	}
+//};
+
+//template <typename TReturn>
+//struct SimpleFunc< TReturn (*)(void) >
+//{
+//	//TReturn retType;
+//	//TArg argType;
+//
+//	static void print(std::string& sFuncName, TReturn (*funcPtr)(void))
+//	{
+//		std::cout << sFuncName << std::endl;
+//	}
+//};
+
+template <typename R>
+void registerFunc(std::string sFuncName, R (*funcPtr)(void))
+{
+	//std::cout << R << std::endl;
+	//cmdCreator<funcPtr>::print(sFuncName, funcPtr);
+}
+
+void registerCPPFunction(std::string sFuncName, void* pFuncPtr)
+{
+	map_FunctionMap[sFuncName] = pFuncPtr;
+}
+
+bool f_VoidFuncVoid()
+{
+	return true;
+}
+
+void func1(int32_t iVal, const char* sStr)
+{
+	printf("In func1 iVal(%d), sStr(%s)\n", iVal, sStr);
+}
+
+void foo0() { std::cout << "In foo0()" << std::endl; }
+void foo1(int i) { std::cout << "In foo1(" << i << ")" << std::endl; }
+float foo2(int i, float f) { std::cout << "In foo2(" << i << ", " << f << ")" << std::endl; return 2 * f; }
+
+void callCPPFunc(std::string sFuncName)
+{
+	void* pFuncPtr = map_FunctionMap[sFuncName];
+	assert(pFuncPtr != nullptr);
+	if (pFuncPtr != nullptr)
+	{
+		uint32_t iArg1 = STACK[--ESP];
+		uint32_t iArg2 = STACK[--ESP];
+		__asm // Compile using "_x86" platform
+		{
+			push iArg1
+			push iArg2
+
+			call pFuncPtr
+
+			pop eax
+			pop eax
+		}
+	}
+}
+
+int main(int argc, char* argv[])
+{
+	void* iFuncAddr = &func1;
+	const char* sStr = "Hello World";
+
+	registerFunc("func1", f_VoidFuncVoid);
+	registerCPPFunction("func1", &func1);
+
+	// Variable Reflection
+	{
+		short iShort = -1;
+		int iInt = 10;
+		double fDouble = 3.1415;
+		float fFloat = 3.1415f * 2;
+		const char* sTempStr = "Hello World!";
+
+		std::cout	<< "name: " << GetMetaType(iInt).Name() << "\n"
+					<< "size: " << GetMetaType(iInt).SizeOf() << std::endl;
+		std::cout	<< "name: " << GetMetaType(sTempStr).Name() << "\n"
+					<< "size: " << GetMetaType(sTempStr).SizeOf() << std::endl;
+
+		PrintMetaTypeInfo(GetMetaType(iInt));
+		PrintMetaTypeInfo(GetMetaType(sTempStr));
+		
+		META_REGISTER_VAR(iShort);
+		META_REGISTER_VAR(iInt);
+		META_REGISTER_VAR(fDouble);
+		META_REGISTER_VAR(fFloat);
+		META_REGISTER_VAR(sTempStr);
+		MetaPrintVariables(std::cout);
+
+		int i = Cast<int>(&fFloat, GetMetaType(fFloat));
+		std::cout << "i = " << i << std::endl;
+
+		const char* s = Cast<const char*>(&fFloat, GetMetaType(fFloat));
+		std::cout << "s = " << s << std::endl;
+
+		float fVal = Cast<float>(&s, GetMetaType(s));
+		std::cout << "fVal = " << fVal << " " << GetMetaType(s).ToString(&s) << std::endl;
+	}
+
+	// Function Reflection
+	{
+		FunctionSignature sig0(foo0);
+		PrintFunctionInfo(sig0);
+		FunctionSignature sig1(foo1);
+		PrintFunctionInfo(sig1);
+		FunctionSignature sig2(foo2);
+		PrintFunctionInfo(sig2);
+
+		MetaFunction g_metaFunction_foo0("foo0", foo0);
+		g_metaFunction_foo0.Apply(0, 0, 0);
+
+		int iInt = 11;
+		MetaFunction g_metaFunction_foo1("foo1", foo1);
+		g_metaFunction_foo1.Apply(0, &Variable(iInt), 1);
+
+		float fRet = 0;
+		float fFloat = 11.11;
+		Variable args[] = { iInt, fFloat };
+		MetaFunction g_metaFunction_foo2("foo2", foo2);
+		g_metaFunction_foo2.Apply(fRet, args, 2);
+
+		Variable argsFun1[] = { iInt, sStr };
+		MetaFunction g_metaFunction_func1("func1", func1);
+		g_metaFunction_func1.Apply(fRet, argsFun1, 2);
+
+		//META_REGISTER_FUN(foo0);
+		//META_REGISTER_FUN(foo1);
+		//META_REGISTER_FUN(foo2);
+		//META_REGISTER_FUN(func1);
+
+		bool b = true;
+	}
+
+	//__asm 
+	{
+	//	__asm mov eax, 0x12345678;
+	//	__asm mov ecx, eax;
+		
+		STACK[ESP++] = 0x12345678;
+		STACK[ESP++] = (uint32_t)sStr;
+	}
+
+	callCPPFunc("func1");
 
 	exit(EXIT_SUCCESS);
 }

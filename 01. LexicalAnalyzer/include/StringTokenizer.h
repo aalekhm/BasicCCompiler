@@ -35,13 +35,14 @@ protected:
 		void						initRead();
 		char						peek(int iOffset);
 		void						consume(int iOffset);
-		Token						createToken(TokenType::Type eTokenType);
+		Token						createToken(TokenType_::Type eTokenType);
 		Token						readNumber();
 		Token						readEOL();
 		Token						readString();
 		Token						readCharacter();
 		Token						readDefault(char ch0);
 		Token						readIdentifier();
+		Token						readSystemIdentifier();
 		Token						readBNFNonTerminal();
 		Token						readBNFCode();
 		Token						readSingleLineComment();

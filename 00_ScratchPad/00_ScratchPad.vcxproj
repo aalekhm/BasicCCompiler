@@ -22,7 +22,14 @@
     <ClCompile Include="source\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\Apply.h" />
+    <ClInclude Include="include\AutoLister.h" />
+    <ClInclude Include="include\FunctionSignature.h" />
+    <ClInclude Include="include\MetaFunction.h" />
+    <ClInclude Include="include\MetaType.h" />
+    <ClInclude Include="include\MetaVariable.h" />
     <ClInclude Include="include\Singleton.h" />
+    <ClInclude Include="include\Variable.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9B2CBB38-17E9-4F3E-9745-EB9522B3FD9C}</ProjectGuid>
@@ -80,6 +87,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>include</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

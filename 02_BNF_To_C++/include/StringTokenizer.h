@@ -42,6 +42,7 @@ protected:
 		Token						readCharacter();
 		Token						readDefault(char ch0);
 		Token						readIdentifier();
+		Token						readSystemIdentifier();
 		Token						readBNFNonTerminal();
 		Token						readBNFCode();
 		Token						readSingleLineComment();

@@ -2,7 +2,7 @@
 #include <string>
 #include <assert.h>
 
-namespace TokenType
+namespace TokenType_
 {
 	enum class Type
 	{
@@ -67,6 +67,9 @@ namespace TokenType
 		TK_SWITCH,
 		TK_DEREF,
 		TK_DEREFARRAY,
+		TK_MEMBERACCESS,
+		TK_STATICMEMBERACCESS,
+		TK_SYSTEMFUNCTIONCALL,
 		TK_UNKNOWN
 	};
 
@@ -135,6 +138,9 @@ namespace TokenType
 			case Type::TK_SWITCH:				return "TK_SWITCH";
 			case Type::TK_DEREF:				return "TK_DEREF";
 			case Type::TK_DEREFARRAY:			return "TK_DEREFARRAY";
+			case Type::TK_MEMBERACCESS:			return "TK_MEMBERACCESS";
+			case Type::TK_STATICMEMBERACCESS:	return "TK_STATICMEMBERACCESS";
+			case Type::TK_SYSTEMFUNCTIONCALL:	return "TK_SYSTEMFUNCTIONCALL";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -142,7 +148,7 @@ namespace TokenType
 		return "";
 	}
 
-	inline TokenType::Type fromString(std::string sTokenType)
+	inline TokenType_::Type fromString(std::string sTokenType)
 	{
 			 if(sTokenType == "TK_MUL")					return Type::TK_MUL;
 		else if(sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
@@ -204,26 +210,29 @@ namespace TokenType
 		else if(sTokenType == "TK_SWITCH")				return Type::TK_SWITCH;
 		else if(sTokenType == "TK_DEREF")				return Type::TK_DEREF;
 		else if(sTokenType == "TK_DEREFARRAY")			return Type::TK_DEREFARRAY;
+		else if(sTokenType == "TK_MEMBERACCESS")		return Type::TK_MEMBERACCESS;
+		else if (sTokenType == "TK_STATICMEMBERACCESS")	return Type::TK_STATICMEMBERACCESS;
+		else if (sTokenType == "TK_SYSTEMFUNCTIONCALL")	return Type::TK_SYSTEMFUNCTIONCALL;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
-		else return Type::TK_INVALID;
+		else											return Type::TK_INVALID;
 	}
 }
 
 struct Token
 {
-	Token(TokenType::Type eTokenType, std::string sText, int iLine, int iColumn)
-	: m_eTokenType(eTokenType)
-	, m_sText(sText)
-	, m_iLine(iLine)
-	, m_iColumn(iColumn)
+	Token(TokenType_::Type eTokenType, std::string sText, int iLine, int iColumn)
+		: m_eTokenType(eTokenType)
+		, m_sText(sText)
+		, m_iLine(iLine)
+		, m_iColumn(iColumn)
 	{}
 
-	TokenType::Type		m_eTokenType;
+	TokenType_::Type	m_eTokenType;
 	std::string			m_sText;
 	int					m_iLine;
 	int					m_iColumn;
 
-	TokenType::Type		getType() { return m_eTokenType; }
+	TokenType_::Type	getType() { return m_eTokenType; }
 	const char*			getText() { return m_sText.c_str(); }
 };

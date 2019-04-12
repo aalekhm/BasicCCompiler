@@ -3,6 +3,7 @@
 											addType("int8_t");
 											addType("int16_t");
 											addType("int32_t");
+											addType("float");
 										"</code>"
 										{ <objectList> };
 										
@@ -344,7 +345,10 @@
 										
 <stmt_list> 					::=		{ <stmt> [';'] };
 
-<stmt>      					::=   	( 	<functionCall>
+<stmt>      					::=   	( 	
+											<systemFunctionCall>
+											|
+											<functionCall>
 											|
 											<structMemberVariableAssignmentOrFunctionCall>
 											|
@@ -460,6 +464,30 @@
 													"</code>"
 										;
 
+<systemFunctionCall>			::=		TK_SYSTEMFUNCTIONCALL
+														"<code>"
+															std::string sIdentifier = PREV_TOKEN_TEXT;
+														"</code>"
+										'('				"<code>"
+															Tree* pSystemFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL, sIdentifier.c_str());
+															Tree* pTemp = nullptr;
+															{
+																m_pASTCurrentNode->addChild(pSystemFunctionCallNode);
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pSystemFunctionCallNode;
+															}
+														"</code>"
+										[ <functionArgumentList> ]
+										')'
+														"<code>"
+															Tree* pSystemFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND, sIdentifier.c_str());
+															m_pASTCurrentNode->addChild(pSystemFuncCallEndNode);
+															
+															m_pASTCurrentNode = pTemp;
+														"</code>"
+										;
+										
 <functionCall>					::=		TK_FUNCTIONCALL	"<code>"
 															std::string sIdentifier = PREV_TOKEN_TEXT;
 														"</code>"
@@ -503,22 +531,6 @@
 															}
 														"</code>"
 											[',']
-											|
-											TK_INTEGER	"<code>"
-																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
-																{
-																	m_pASTCurrentNode->addChild(pIntegerNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("char_");
-																}
-															"</code>"
-											|
-											TK_CHARACTER	"<code>"
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
-																{
-																	m_pASTCurrentNode->addChild(pCharacterNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("int8_t_");
-																}
-															"</code>"
 										) ;
 
 <ifelseStatement>				::= 	<ifStatement>;
@@ -1688,6 +1700,11 @@
 											<tk_identifier>
 											| 
 											TK_INTEGER		"<code>"
+																sOperand = PREV_TOKEN_TEXT;
+																m_vPostFix.push_back(sOperand);
+															"</code>"
+											|
+											TK_FLOAT		"<code>"
 																sOperand = PREV_TOKEN_TEXT;
 																m_vPostFix.push_back(sOperand);
 															"</code>"

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include "ConsoleColor.h"
+#include "meta/MetaFunction.h"
 
 #define VERBOSE	1
 
@@ -96,6 +97,15 @@ struct CodeMap
 	{ "MEMCPY",		OPCODE::MEMCPY,		1,  PRIMIIVETYPE::INT_32 },
 	{ "MEMCMP",		OPCODE::MEMCMP,		1,  PRIMIIVETYPE::INT_32 },
 	{ "MEMCHR",		OPCODE::MEMCHR,		1,  PRIMIIVETYPE::INT_32 },
+	{ "SYSCALL",	OPCODE::SYSCALL,	2,  PRIMIIVETYPE::INT_32 },
+	{ "PUSHF",		OPCODE::PUSHF,		2,  PRIMIIVETYPE::INT_32 },
+
+	{ "MULF",		OPCODE::MULF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "DIVF",		OPCODE::DIVF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "ADDF",		OPCODE::ADDF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "SUBF",		OPCODE::SUBF,		1,  PRIMIIVETYPE::INT_8 },
+
+	{ "PRTF",		OPCODE::PRTF,		1,  PRIMIIVETYPE::INT_8 },
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
@@ -223,6 +233,8 @@ void VirtualMachine::load(const char* iByteCode, int iBuffLength)
 	int iEndOffset = 0;
 	iEndOffset = loadBSS(iByteCode, 0, iBuffLength);
 	iEndOffset = loadCode(iByteCode, iEndOffset, iBuffLength);
+
+	scriptTest();
 }
 
 void VirtualMachine::execute(const char* iByteCode)
@@ -242,300 +254,356 @@ OPCODE VirtualMachine::fetch()
 void VirtualMachine::eval(OPCODE eOpCode)
 {
 	int32_t iOperand = 0, iTemp1 = 0, iTemp2 = 0;
+	float fTemp1 = 0.0f, fTemp2 = 0.0f;
 	switch (eOpCode)
 	{
-		case OPCODE::FETCH:
+	case OPCODE::FETCH:
+	{
+		int32_t iVariable = READ_OPERAND(eOpCode);
 		{
-			int32_t iVariable = READ_OPERAND(eOpCode);
-			{
-				int32_t iValue = getValueIn(iVariable);
-				STACK[--REGS.RSP] = iValue;
-			}
+			int32_t iValue = getValueIn(iVariable);
+			STACK[--REGS.RSP] = iValue;
 		}
+	}
+	break;
+	case OPCODE::STORE:
+	{
+		store(eOpCode);
+	}
+	break;
+	case OPCODE::PUSH:
+	case OPCODE::PUSHI:
+		iOperand = READ_OPERAND(eOpCode);
+		STACK[--REGS.RSP] = iOperand;
 		break;
-		case OPCODE::STORE:
-		{
-			store(eOpCode);
-		}
+	case OPCODE::PUSHF:
+		iOperand = READ_OPERAND(eOpCode);
+		STACK[--REGS.RSP] = iOperand;
 		break;
-		case OPCODE::PUSH:
-		case OPCODE::PUSHI:
-			iOperand = READ_OPERAND(eOpCode);
-			STACK[--REGS.RSP] = iOperand;
+	case OPCODE::PUSHR:
+		pushr(eOpCode);
 		break;
-		case OPCODE::PUSHR:
-			pushr(eOpCode);
+	case OPCODE::POP:
+	case OPCODE::POPI:
 		break;
-		case OPCODE::POP:
-		case OPCODE::POPI:
+	case OPCODE::POPR:
+		popr(eOpCode);
 		break;
-		case OPCODE::POPR:
-			popr(eOpCode);
-		break;
-		case OPCODE::CALL:
-		{
-			call(eOpCode);
-		}
-		break;
-		case OPCODE::RET:
-			REGS.EIP = STACK[REGS.RSP++];			// Pop the Return address off the stack.
-		break;
-		case OPCODE::SUB_REG:
-			subreg(eOpCode);
-		break;
-		case OPCODE::MUL:
-			iTemp1 = STACK[REGS.RSP++];
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 *= iTemp2;
+	case OPCODE::CALL:
+	{
+		call(eOpCode);
+	}
+	break;
+	case OPCODE::SYSCALL:
+	{
+		sysCall(eOpCode);
+	}
+	break;
+	case OPCODE::RET:
+		REGS.EIP = STACK[REGS.RSP++];			// Pop the Return address off the stack.
+	break;
+	case OPCODE::SUB_REG:
+		subreg(eOpCode);
+	break;
+	case OPCODE::MUL:
+	{
+		iTemp1 = STACK[REGS.RSP++];
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 *= iTemp2;
 
-			STACK[--REGS.RSP] = iTemp1;
-		break;
-		case OPCODE::DIV:
-			iTemp1 = STACK[REGS.RSP++];
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp2 /= iTemp1;
+		STACK[--REGS.RSP] = iTemp1;
+	}
+	break;
+	case OPCODE::MULF:
+	{
+		memcpy_s(&fTemp1, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
+		memcpy_s(&fTemp2, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
 
-			STACK[--REGS.RSP] = iTemp2;
-		break;
-		case OPCODE::MOD:
-			iTemp1 = STACK[REGS.RSP++];
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp2 %= iTemp1;
+		fTemp1 *= fTemp2;
 
-			STACK[--REGS.RSP] = iTemp2;
-		break;
-		case OPCODE::ADD:
-			iTemp1 = STACK[REGS.RSP++];
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 += iTemp2;
+		memcpy_s(&STACK[--REGS.RSP], sizeof(float), &fTemp1, sizeof(float));
+	}
+	break;
+	case OPCODE::DIV:
+		iTemp1 = STACK[REGS.RSP++];
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp2 /= iTemp1;
 
-			STACK[--REGS.RSP] = iTemp1;
-		break;
-		case OPCODE::SUB:
-			iTemp1 = STACK[REGS.RSP++];
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp2 -= iTemp1;
+		STACK[--REGS.RSP] = iTemp2;
+	break;
+	case OPCODE::DIVF:
+	{
+		memcpy_s(&fTemp1, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
+		memcpy_s(&fTemp2, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
 
-			STACK[--REGS.RSP] = iTemp2;
-		break;
-		case OPCODE::JMP_LT:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+		fTemp2 /= fTemp1;
 
-			if (iTemp1 < iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
-		break;
-		case OPCODE::JMP_LTEQ:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+		memcpy_s(&STACK[--REGS.RSP], sizeof(float), &fTemp2, sizeof(float));
+	}
+	break;
+	case OPCODE::MOD:
+		iTemp1 = STACK[REGS.RSP++];
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp2 %= iTemp1;
 
-			if (iTemp1 <= iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
+		STACK[--REGS.RSP] = iTemp2;
 		break;
-		case OPCODE::JMP_GT:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::ADD:
+		iTemp1 = STACK[REGS.RSP++];
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 += iTemp2;
 
-			if (iTemp1 > iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
+		STACK[--REGS.RSP] = iTemp1;
 		break;
-		case OPCODE::JMP_GTEQ:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::ADDF:
+	{
+		memcpy_s(&fTemp1, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
+		memcpy_s(&fTemp2, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
 
-			if (iTemp1 >= iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
-		break;
-		case OPCODE::JMP_EQ:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+		fTemp1 += fTemp2;
 
-			if (iTemp1 == iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
-		break;
-		case OPCODE::JMP_NEQ:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+		memcpy_s(&STACK[--REGS.RSP], sizeof(float), &fTemp1, sizeof(float));
+	}
+	break;
+	case OPCODE::SUB:
+		iTemp1 = STACK[REGS.RSP++];
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp2 -= iTemp1;
 
-			if (iTemp1 != iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
+		STACK[--REGS.RSP] = iTemp2;
 		break;
-		case OPCODE::LOGICALOR:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::SUBF:
+	{
+		memcpy_s(&fTemp1, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
+		memcpy_s(&fTemp2, sizeof(float), &STACK[REGS.RSP++], sizeof(float));
 
-			if (iTemp1 || iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
-		break;
-		case OPCODE::LOGICALAND:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+		fTemp2 -= fTemp1;
 
-			if (iTemp1 && iTemp2)
-				STACK[--REGS.RSP] = 1;
-			else
-				STACK[--REGS.RSP] = 0;
-		break;
-		case OPCODE::BITWISEOR:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+		memcpy_s(&STACK[--REGS.RSP], sizeof(float), &fTemp2, sizeof(float));
+	}
+	break;
+	case OPCODE::JMP_LT:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
 
-			STACK[--REGS.RSP] = (iTemp1 | iTemp2);
+		if (iTemp1 < iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::BITWISEAND:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::JMP_LTEQ:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
 
-			STACK[--REGS.RSP] = (iTemp1 & iTemp2);
+		if (iTemp1 <= iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::BITWISEXOR:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::JMP_GT:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
 
-			STACK[--REGS.RSP] = (iTemp1 ^ iTemp2);
+		if (iTemp1 > iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::BITWISENOT:
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::JMP_GTEQ:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
 
-			STACK[--REGS.RSP] = (~iTemp1);
+		if (iTemp1 >= iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::BITWISELEFTSHIFT:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::JMP_EQ:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
 
-			STACK[--REGS.RSP] = (iTemp1 << iTemp2);
+		if (iTemp1 == iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::BITWISERIGHTSHIFT:
-			iTemp2 = STACK[REGS.RSP++];
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::JMP_NEQ:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
 
-			STACK[--REGS.RSP] = (iTemp1 >> iTemp2);
+		if (iTemp1 != iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::_NOT:
-			iTemp1 = STACK[REGS.RSP++];
-			if(iTemp1 > 0)
-				STACK[--REGS.RSP] = 0;
-			else
-				STACK[--REGS.RSP] = 1;
+	case OPCODE::LOGICALOR:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		if (iTemp1 || iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::LDA:
-		{
-			// LDA - Load Value from memory address in Accumulator(in our case, the STACK)
-			lda(eOpCode);
-		}
+	case OPCODE::LOGICALAND:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		if (iTemp1 && iTemp2)
+			STACK[--REGS.RSP] = 1;
+		else
+			STACK[--REGS.RSP] = 0;
 		break;
-		case OPCODE::STA:
-		{
-			// STA - Store Value in Accumulator(in our case, the STACK) to memory address
-			sta(eOpCode);
-		}
+	case OPCODE::BITWISEOR:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		STACK[--REGS.RSP] = (iTemp1 | iTemp2);
 		break;
-		case OPCODE::CLR:
-		{
-			clrMem(eOpCode);
-		}
+	case OPCODE::BITWISEAND:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		STACK[--REGS.RSP] = (iTemp1 & iTemp2);
 		break;
-		case OPCODE::NEGATE:
-			iTemp1 = STACK[REGS.RSP++];
-			STACK[--REGS.RSP] = -iTemp1;
+	case OPCODE::BITWISEXOR:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		STACK[--REGS.RSP] = (iTemp1 ^ iTemp2);
 		break;
-		case OPCODE::JMP:
-			iOperand = READ_OPERAND(eOpCode);
+	case OPCODE::BITWISENOT:
+		iTemp1 = STACK[REGS.RSP++];
+
+		STACK[--REGS.RSP] = (~iTemp1);
+		break;
+	case OPCODE::BITWISELEFTSHIFT:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		STACK[--REGS.RSP] = (iTemp1 << iTemp2);
+		break;
+	case OPCODE::BITWISERIGHTSHIFT:
+		iTemp2 = STACK[REGS.RSP++];
+		iTemp1 = STACK[REGS.RSP++];
+
+		STACK[--REGS.RSP] = (iTemp1 >> iTemp2);
+		break;
+	case OPCODE::_NOT:
+		iTemp1 = STACK[REGS.RSP++];
+		if (iTemp1 > 0)
+			STACK[--REGS.RSP] = 0;
+		else
+			STACK[--REGS.RSP] = 1;
+		break;
+	case OPCODE::LDA:
+	{
+		// LDA - Load Value from memory address in Accumulator(in our case, the STACK)
+		lda(eOpCode);
+	}
+	break;
+	case OPCODE::STA:
+	{
+		// STA - Store Value in Accumulator(in our case, the STACK) to memory address
+		sta(eOpCode);
+	}
+	break;
+	case OPCODE::CLR:
+	{
+		clrMem(eOpCode);
+	}
+	break;
+	case OPCODE::NEGATE:
+		iTemp1 = STACK[REGS.RSP++];
+		STACK[--REGS.RSP] = -iTemp1;
+		break;
+	case OPCODE::JMP:
+		iOperand = READ_OPERAND(eOpCode);
+		REGS.EIP = iOperand;
+		break;
+	case OPCODE::JZ:
+		iOperand = READ_OPERAND(eOpCode);
+		iTemp1 = STACK[REGS.RSP++];
+		if (iTemp1 == 0)
 			REGS.EIP = iOperand;
 		break;
-		case OPCODE::JZ:
-			iOperand = READ_OPERAND(eOpCode);
-			iTemp1 = STACK[REGS.RSP++];
-			if(iTemp1 == 0)
-				REGS.EIP = iOperand;
+	case OPCODE::JNZ:
+		iOperand = READ_OPERAND(eOpCode);
+		iTemp1 = STACK[REGS.RSP++];
+		if (iTemp1 > 0)
+			REGS.EIP = iOperand;
 		break;
-		case OPCODE::JNZ:
-			iOperand = READ_OPERAND(eOpCode);
-			iTemp1 = STACK[REGS.RSP++];
-			if(iTemp1 > 0)
-				REGS.EIP = iOperand;
-		break;
-		case OPCODE::PRTS:
-		{
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::PRTS:
+	{
+		iTemp1 = STACK[REGS.RSP++];
 
-			int32_t* pDS = (int32_t*)&RAM[DS_START_OFFSET];
+		int32_t* pDS = (int32_t*)&RAM[DS_START_OFFSET];
 
-			int32_t iStringOffset = *(pDS + iTemp1);
-			std::cout << green << &RAM[iStringOffset];
-		}
+		int32_t iStringOffset = *(pDS + iTemp1);
+		std::cout << green << &RAM[iStringOffset];
+	}
+	break;
+	case OPCODE::PRTC:
+		iTemp1 = STACK[REGS.RSP++];
+		std::cout << green << (char)iTemp1;
 		break;
-		case OPCODE::PRTC:
-			iTemp1 = STACK[REGS.RSP++];
-			std::cout << green << (char)iTemp1;
+	case OPCODE::PRTI:
+		iTemp1 = STACK[REGS.RSP++];
+		std::cout << green << iTemp1;
 		break;
-		case OPCODE::PRTI:
-			iTemp1 = STACK[REGS.RSP++];
-			std::cout << green << iTemp1;
+	case OPCODE::PRTF:
+		fTemp1 = STACK[REGS.RSP++];
+		std::cout << green << fTemp1;
 		break;
-		case OPCODE::MALLOC:
-		{
-			iTemp1 = STACK[REGS.RSP++];
+	case OPCODE::MALLOC:
+	{
+		iTemp1 = STACK[REGS.RSP++];
 
-			int32_t iAddress = malloc(iTemp1);
-			assert(iAddress >= 0);
-			STACK[--REGS.RSP] = iAddress;
+		int32_t iAddress = malloc(iTemp1);
+		assert(iAddress >= 0);
+		STACK[--REGS.RSP] = iAddress;
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << red << getConsumedMemory() << "/" << MAX_HEAP_SIZE << std::endl;
+		std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << red << getConsumedMemory() << "/" << MAX_HEAP_SIZE << std::endl;
 #endif
-		}
-		break;
-		case OPCODE::FREE:
+	}
+	break;
+	case OPCODE::FREE:
+	{
+		int32_t iVariable = READ_OPERAND(eOpCode);
 		{
-			int32_t iVariable = READ_OPERAND(eOpCode);
-			{
-				int32_t iAddress = getValueIn(iVariable);
-				dealloc(iAddress);
-			}
+			int32_t iAddress = getValueIn(iVariable);
+			dealloc(iAddress);
 		}
-		break;
-		case OPCODE::VTBL:
-		{
+	}
+	break;
+	case OPCODE::VTBL:
+	{
 
-		}
-		break;
-		case OPCODE::MEMSET:
-		{
-			memSet(eOpCode);
-		}
-		break;
-		case OPCODE::MEMCPY:
-		{
-			memCpy(eOpCode);
-		}
-		break;
-		case OPCODE::MEMCMP:
-		{
-			memCmp(eOpCode);
-		}
-		break;
-		case OPCODE::MEMCHR:
-		{
-			memChr(eOpCode);
-		}
-		break;
-		case OPCODE::HLT:
-			m_bRunning = false;
-		break;
+	}
+	break;
+	case OPCODE::MEMSET:
+	{
+		memSet(eOpCode);
+	}
+	break;
+	case OPCODE::MEMCPY:
+	{
+		memCpy(eOpCode);
+	}
+	break;
+	case OPCODE::MEMCMP:
+	{
+		memCmp(eOpCode);
+	}
+	break;
+	case OPCODE::MEMCHR:
+	{
+		memChr(eOpCode);
+	}
+	break;
+	case OPCODE::HLT:
+		m_bRunning = false;
+	break;
 	}
 
 	assert(abs(REGS.RSP) < MAX_STACK_SIZE);
@@ -547,38 +615,38 @@ int64_t VirtualMachine::readOperandFor(OPCODE eOpCode)
 	CodeMap pMachineInstruction = opCodeMap[(int)eOpCode];
 	switch (pMachineInstruction.ePRIMIIVETYPE)
 	{
-		case PRIMIIVETYPE::INT_8:
-		{
-			int8_t iByte = *((int8_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
-			REGS.EIP += sizeof(int8_t);
+	case PRIMIIVETYPE::INT_8:
+	{
+		int8_t iByte = *((int8_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+		REGS.EIP += sizeof(int8_t);
 
-			return iByte;
-		}
-		break;
-		case PRIMIIVETYPE::INT_16:
-		{
-			int16_t iShort = *((int16_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
-			REGS.EIP += sizeof(int16_t);
+		return iByte;
+	}
+	break;
+	case PRIMIIVETYPE::INT_16:
+	{
+		int16_t iShort = *((int16_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+		REGS.EIP += sizeof(int16_t);
 
-			return iShort;
-		}
-		break;
-		case PRIMIIVETYPE::INT_32:
-		{
-			int32_t iInt = *((int32_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
-			REGS.EIP += sizeof(int32_t);
+		return iShort;
+	}
+	break;
+	case PRIMIIVETYPE::INT_32:
+	{
+		uint32_t iInt = *((uint32_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+		REGS.EIP += sizeof(uint32_t);
 
-			return iInt;
-		}
-		break;
-		case PRIMIIVETYPE::INT_64:
-		{
-			int64_t iLong = *((int64_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
-			REGS.EIP += sizeof(int64_t);
+		return iInt;
+	}
+	break;
+	case PRIMIIVETYPE::INT_64:
+	{
+		int64_t iLong = *((int64_t*)&RAM[CS_START_OFFSET + REGS.EIP]);
+		REGS.EIP += sizeof(int64_t);
 
-			return iLong;
-		}
-		break;
+		return iLong;
+	}
+	break;
 	}
 }
 
@@ -587,29 +655,29 @@ void VirtualMachine::pushr(OPCODE eOpCode)
 	int32_t iOperand = READ_OPERAND(eOpCode);
 	switch (iOperand)
 	{
-		case (int)EREGISTERS::RAX:	// Accumulator
-			STACK[--REGS.RSP] = REGS.RAX;
+	case (int)EREGISTERS::RAX:	// Accumulator
+		STACK[--REGS.RSP] = REGS.RAX;
 		break;
-		case (int)EREGISTERS::RCX:	// Counter
-			STACK[--REGS.RSP] = REGS.RCX;
+	case (int)EREGISTERS::RCX:	// Counter
+		STACK[--REGS.RSP] = REGS.RCX;
 		break;
-		case (int)EREGISTERS::RDX:	// Data
-			STACK[--REGS.RSP] = REGS.RDX;
+	case (int)EREGISTERS::RDX:	// Data
+		STACK[--REGS.RSP] = REGS.RDX;
 		break;
-		case (int)EREGISTERS::RBX:	// Base
-			STACK[--REGS.RSP] = REGS.RBX;
+	case (int)EREGISTERS::RBX:	// Base
+		STACK[--REGS.RSP] = REGS.RBX;
 		break;
-		case (int)EREGISTERS::RSP:	// Stack Pointer
-			STACK[--REGS.RSP] = REGS.RSP;
+	case (int)EREGISTERS::RSP:	// Stack Pointer
+		STACK[--REGS.RSP] = REGS.RSP;
 		break;
-		case (int)EREGISTERS::RBP:	// Stack Base Pointer
-			STACK[--REGS.RSP] = REGS.RBP;
+	case (int)EREGISTERS::RBP:	// Stack Base Pointer
+		STACK[--REGS.RSP] = REGS.RBP;
 		break;
-		case (int)EREGISTERS::RSI:	// Source
-			STACK[--REGS.RSP] = REGS.RSI;
+	case (int)EREGISTERS::RSI:	// Source
+		STACK[--REGS.RSP] = REGS.RSI;
 		break;
-		case (int)EREGISTERS::RDI:	// Destination
-			STACK[--REGS.RSP] = REGS.RDI;
+	case (int)EREGISTERS::RDI:	// Destination
+		STACK[--REGS.RSP] = REGS.RDI;
 		break;
 	}
 }
@@ -619,29 +687,29 @@ void VirtualMachine::popr(OPCODE eOpCode)
 	int32_t iOperand = READ_OPERAND(eOpCode);
 	switch (iOperand)
 	{
-		case (int)EREGISTERS::RAX:	// Accumulator
-			REGS.RAX = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RAX:	// Accumulator
+		REGS.RAX = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RCX:	// Counter
-			REGS.RCX = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RCX:	// Counter
+		REGS.RCX = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RDX:	// Data
-			REGS.RDX = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RDX:	// Data
+		REGS.RDX = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RBX:	// Base
-			REGS.RBX = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RBX:	// Base
+		REGS.RBX = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RSP:	// Stack Pointer
-			REGS.RSP = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RSP:	// Stack Pointer
+		REGS.RSP = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RBP:	// Stack Base Pointer
-			REGS.RBP = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RBP:	// Stack Base Pointer
+		REGS.RBP = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RSI:	// Source
-			REGS.RSI = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RSI:	// Source
+		REGS.RSI = STACK[REGS.RSP++];
 		break;
-		case (int)EREGISTERS::RDI:	// Destination
-			REGS.RDI = STACK[REGS.RSP++];
+	case (int)EREGISTERS::RDI:	// Destination
+		REGS.RDI = STACK[REGS.RSP++];
 		break;
 	}
 }
@@ -653,29 +721,29 @@ void VirtualMachine::subreg(OPCODE eOpCode)
 
 	switch (iOperand)
 	{
-		case (int)EREGISTERS::RAX:	// Accumulator
-			REGS.RAX += iOperand2;
+	case (int)EREGISTERS::RAX:	// Accumulator
+		REGS.RAX += iOperand2;
 		break;
-		case (int)EREGISTERS::RCX:	// Counter
-			REGS.RCX += iOperand2;
+	case (int)EREGISTERS::RCX:	// Counter
+		REGS.RCX += iOperand2;
 		break;
-		case (int)EREGISTERS::RDX:	// Data
-			REGS.RDX += iOperand2;
+	case (int)EREGISTERS::RDX:	// Data
+		REGS.RDX += iOperand2;
 		break;
-		case (int)EREGISTERS::RBX:	// Base
-			REGS.RBX += iOperand2;
+	case (int)EREGISTERS::RBX:	// Base
+		REGS.RBX += iOperand2;
 		break;
-		case (int)EREGISTERS::RSP:	// Stack Pointer
-			REGS.RSP += iOperand2;
+	case (int)EREGISTERS::RSP:	// Stack Pointer
+		REGS.RSP += iOperand2;
 		break;
-		case (int)EREGISTERS::RBP:	// Stack Base Pointer
-			REGS.RBP += iOperand2;
+	case (int)EREGISTERS::RBP:	// Stack Base Pointer
+		REGS.RBP += iOperand2;
 		break;
-		case (int)EREGISTERS::RSI:	// Source
-			REGS.RSI += iOperand2;
+	case (int)EREGISTERS::RSI:	// Source
+		REGS.RSI += iOperand2;
 		break;
-		case (int)EREGISTERS::RDI:	// Destination
-			REGS.RDI += iOperand2;
+	case (int)EREGISTERS::RDI:	// Destination
+		REGS.RDI += iOperand2;
 		break;
 	}
 }
@@ -691,9 +759,8 @@ void VirtualMachine::lda(OPCODE eOpCode)
 	pAddress_8 += (iArrayIndex * iVarType);
 	int32_t* pAddress = (int32_t*)pAddress_8;
 
-	int32_t iValue = ((*pAddress) & iOperand);
-
-	STACK[--REGS.RSP] = iValue;
+	int8_t* iLValueAddr = (int8_t*)&STACK[--REGS.RSP];
+	memcpy(iLValueAddr, pAddress, iVarType);
 }
 
 void VirtualMachine::sta(OPCODE eOpCode)
@@ -701,38 +768,18 @@ void VirtualMachine::sta(OPCODE eOpCode)
 	int32_t iVariable = READ_OPERAND(eOpCode);			// STA_VM_4. Pointer Variable.
 	int32_t iVarType = STACK[REGS.RSP++];				// STA_VM_3. Variable TYPE (int8_t = 1, int16_t = 2, int32_t = 4).
 	int32_t iArrayIndex = STACK[REGS.RSP++];			// STA_VM_2. ArrayIndex.
-	int32_t iRValue = STACK[REGS.RSP++];				// STA_VM_1. RValue to be stored, picked up from the STACK.
+	int32_t* iRValueAddr = (int32_t*)&STACK[REGS.RSP++];	// STA_VM_1. RValue to be stored, picked up from the STACK.
 
 	int32_t iAddress = getValueIn(iVariable);
 	{
 		int8_t* pAddress_8 = (int8_t*)&HEAP[iAddress];
 		pAddress_8 += (iArrayIndex*iVarType);
+	
+		memcpy(pAddress_8, iRValueAddr, iVarType);
 
-		switch (iVarType)
-		{
-			case 1:
-			{
-				int8_t* pAddress = (int8_t*)pAddress_8;
-				*pAddress = (iRValue & 0xFF);
-			}
-			break;
-			case 2:
-			{
-				int16_t* pAddress = (int16_t*)pAddress_8;
-				*pAddress = (iRValue & 0xFFFF);
-			}
-			break;
-			case 4:
-			{
-				int32_t* pAddress = (int32_t*)pAddress_8;
-				*pAddress = (iRValue & 0xFFFFFFFF);
-			}
-			break;
-		}
-
-#if (VERBOSE == 1)
-		std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP] " << blue << iAddress << "[" << iArrayIndex << "] = " << iRValue << std::endl;
-#endif
+		#if (VERBOSE == 1)
+				std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP] " << blue << iAddress << "[" << iArrayIndex << "] = " << *iRValueAddr << std::endl;
+		#endif
 	}
 }
 
@@ -782,7 +829,7 @@ void VirtualMachine::call(OPCODE eOpCode)
 		int32_t iPosition = (iOperand1_CallAddressType & 0x0000FFFF);							// POS_IN_VTABLE
 		int32_t iVTABLEAddress = getValueIn(((int32_t)E_VARIABLESCOPE::MEMBER << 16) | 0);		// RCX ==>	[-VTABLE_ADDR-][--MEMBER_VAR_0--][--MEMBER_VAR_1--][--MEMBER_VAR_2--]...[-VTABLE_ADDR_BASE1-][--MEMBER_VAR_0--][--MEMBER_VAR_1--]...
 																								//			|<--4 bytes-->|<----4 bytes---->|<----4 bytes---->|<----4 bytes---->|...
-		
+
 		int32_t* pIntPtr = (int32_t*)&CODE[iVTABLEAddress + (sizeof(int32_t) * iPosition)];		// VTABLE ==>	[-VIRT_FUN_ADDR_0-][-VIRT_FUN_ADDR_1-][-VIRT_FUN_ADDR_2-]...
 																								//				|<-----4 bytes---->|<-----4 bytes---->|<-----4 bytes---->...
 
@@ -791,6 +838,21 @@ void VirtualMachine::call(OPCODE eOpCode)
 
 	REGS.RBP = REGS.RSP;					// ESP is now the new EBP.
 	REGS.EIP = iJumpAddress;				// Jump to the call address.
+}
+
+void VirtualMachine::sysCall(OPCODE eOpCode)
+{
+	int32_t iOperand = READ_OPERAND(eOpCode);;
+	int16_t iStringID = (iOperand >> sizeof(int16_t) * 8);
+	int16_t iArgCount = (iOperand & 0x0000FFFF);
+
+	int32_t* pDS = (int32_t*)&RAM[DS_START_OFFSET];
+	int32_t iStringOffset = *(pDS + iStringID);
+
+	const char* sSysFuncName = (const char*)&RAM[iStringOffset];
+	executeScriptFunction(sSysFuncName, iArgCount);
+
+	REGS.RSP += iArgCount;
 }
 
 void VirtualMachine::memSet(OPCODE eOpCode)
@@ -848,11 +910,11 @@ int32_t VirtualMachine::malloc(int32_t iSize)
 	for (; itrUnAllocList != m_vUnAllocatedList.end(); ++itrUnAllocList)
 	{
 		HeapNode& pUnAllocHeapNode = *itrUnAllocList;
-		if(iSize <= pUnAllocHeapNode.m_iSize)
+		if (iSize <= pUnAllocHeapNode.m_iSize)
 		{
 			iReturnAddress = pUnAllocHeapNode.m_pAddress;
 			m_vAllocatedList.push_back(HeapNode(pUnAllocHeapNode.m_pAddress, iSize));
-			
+
 			if (iSize == pUnAllocHeapNode.m_iSize)
 			{
 				m_vUnAllocatedList.erase(itrUnAllocList);
@@ -884,7 +946,7 @@ void VirtualMachine::dealloc(int32_t pAddress)
 
 	/////////////////////////////////////////////////////////////////
 	// 1. Iterate through the 'Allocated' list.
-	for (; itrAllocList != m_vAllocatedList.end();  ++itrAllocList)
+	for (; itrAllocList != m_vAllocatedList.end(); ++itrAllocList)
 	{
 		HeapNode& pAllocHeapNode = *itrAllocList;
 
@@ -909,14 +971,14 @@ void VirtualMachine::dealloc(int32_t pAddress)
 			}
 
 			{
-				std::vector<HeapNode>::iterator itr = std::find_if(	m_vUnAllocatedList.begin(), 
-																	m_vUnAllocatedList.end(), 
-																	[pAllocHeapNode](HeapNode& pHeapNode) {
-																		return (	pAllocHeapNode.m_pAddress >= pHeapNode.m_pAddress
-																					&&
-																					(pAllocHeapNode.m_pAddress + pAllocHeapNode.m_iSize) <= (pHeapNode.m_pAddress + pHeapNode.m_iSize)
-																				);
-																	});
+				std::vector<HeapNode>::iterator itr = std::find_if(m_vUnAllocatedList.begin(),
+					m_vUnAllocatedList.end(),
+					[pAllocHeapNode](HeapNode& pHeapNode) {
+					return (pAllocHeapNode.m_pAddress >= pHeapNode.m_pAddress
+						&&
+						(pAllocHeapNode.m_pAddress + pAllocHeapNode.m_iSize) <= (pHeapNode.m_pAddress + pHeapNode.m_iSize)
+						);
+				});
 				if (itr == m_vUnAllocatedList.end())
 				{
 					m_vUnAllocatedList.push_back(HeapNode(pAllocHeapNode.m_pAddress, pAllocHeapNode.m_iSize));
@@ -951,7 +1013,7 @@ void VirtualMachine::merge()
 
 	std::vector<HeapNode>::iterator itrUnAllocList = m_vUnAllocatedList.begin();
 	int32_t iCount = 0;
-	while(iCount < m_vUnAllocatedList.size())
+	while (iCount < m_vUnAllocatedList.size())
 	{
 		HeapNode& pUnAllocHeapNode = m_vUnAllocatedList.at(iCount);
 		if (iCount > 0)
@@ -980,31 +1042,31 @@ int32_t VirtualMachine::getValueIn(int32_t iVariable)
 	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||
 		eVariableType == E_VARIABLESCOPE::LOCAL
-	) {
+		) {
 		if (eVariableType == E_VARIABLESCOPE::ARGUMENT)
 			iVariablePos *= -1;
 
 		iValue = STACK[REGS.RBP - iVariablePos];
 	}
 	else
-	if (eVariableType == E_VARIABLESCOPE::MEMBER)
-	{
-		/////////////////////////////// OBJECT ALIGNMENT IN HEAP ///////////////////////////
-		// RCX ==>	[-VTABLE_ADDR-][--MEMBER_VAR_0--][--MEMBER_VAR_1--][--MEMBER_VAR_2--]...[-VTABLE_ADDR_BASE1-][--MEMBER_VAR_0--][--MEMBER_VAR_1--]...
-		//			|<--4 bytes-->|<----4 bytes---->|<----4 bytes---->|<----4 bytes---->|...
-		//
-		// VTABLE ==>	[-VIRT_FUN_ADDR_0-][-VIRT_FUN_ADDR_1-][-VIRT_FUN_ADDR_2-]...
-		//				|<-----4 bytes---->|<-----4 bytes---->|<-----4 bytes---->...
-		////////////////////////////////////////////////////////////////////////////////////
+		if (eVariableType == E_VARIABLESCOPE::MEMBER)
+		{
+			/////////////////////////////// OBJECT ALIGNMENT IN HEAP ///////////////////////////
+			// RCX ==>	[-VTABLE_ADDR-][--MEMBER_VAR_0--][--MEMBER_VAR_1--][--MEMBER_VAR_2--]...[-VTABLE_ADDR_BASE1-][--MEMBER_VAR_0--][--MEMBER_VAR_1--]...
+			//			|<--4 bytes-->|<----4 bytes---->|<----4 bytes---->|<----4 bytes---->|...
+			//
+			// VTABLE ==>	[-VIRT_FUN_ADDR_0-][-VIRT_FUN_ADDR_1-][-VIRT_FUN_ADDR_2-]...
+			//				|<-----4 bytes---->|<-----4 bytes---->|<-----4 bytes---->...
+			////////////////////////////////////////////////////////////////////////////////////
 
-		int32_t iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
-		int32_t* pIntPtr = (int32_t*)(HEAP + iAddress);
-		iValue = (*pIntPtr);
-	}
-	else // STATIC variable saved on the HEAP
-	{
-		iValue = GLOBALS[iVariablePos];
-	}
+			int32_t iAddress = REGS.RCX + (sizeof(int32_t) * iVariablePos);
+			int32_t* pIntPtr = (int32_t*)(HEAP + iAddress);
+			iValue = (*pIntPtr);
+		}
+		else // STATIC variable saved on the HEAP
+		{
+			iValue = GLOBALS[iVariablePos];
+		}
 
 	return iValue;
 }
@@ -1020,23 +1082,23 @@ void VirtualMachine::store(OPCODE eOpCode)
 	if (eVariableType == E_VARIABLESCOPE::ARGUMENT
 		||
 		eVariableType == E_VARIABLESCOPE::LOCAL
-	) {
+		) {
 		if (eVariableType == E_VARIABLESCOPE::ARGUMENT)
 			iVariablePos *= -1;
 
 		STACK[REGS.RBP - iVariablePos] = STACK[REGS.RSP++];
 	}
 	else
-	if (eVariableType == E_VARIABLESCOPE::MEMBER)
-	{
-		int32_t* iIntPtr = (int32_t*)(HEAP + REGS.RCX);
-		iIntPtr += iVariablePos;
-		*iIntPtr = STACK[REGS.RSP++];
-	}
-	else // STATIC variable saved on the HEAP
-	{
-		GLOBALS[iVariablePos] = STACK[REGS.RSP++];
-	}
+		if (eVariableType == E_VARIABLESCOPE::MEMBER)
+		{
+			int32_t* iIntPtr = (int32_t*)(HEAP + REGS.RCX);
+			iIntPtr += iVariablePos;
+			*iIntPtr = STACK[REGS.RSP++];
+		}
+		else // STATIC variable saved on the HEAP
+		{
+			GLOBALS[iVariablePos] = STACK[REGS.RSP++];
+		}
 }
 
 int32_t VirtualMachine::getConsumedMemory()
@@ -1059,4 +1121,107 @@ int32_t VirtualMachine::getAvailableMemory()
 	}
 
 	return iAvailableMemory;
+}
+
+void* VirtualMachine::getStackPointerFromTOS(int32_t iOffset)
+{
+	assert(abs(REGS.RSP + iOffset) < MAX_STACK_SIZE);
+	return &STACK[REGS.RSP + iOffset];
+}
+
+// Dummy System Functions.
+void glLoadIdentity()
+{
+	std::cout << blue << "In glLoadIdentity();" << std::endl;
+}
+
+void glClearColor(int32_t iRed, int32_t iGreen, int32_t iBlue, int32_t iAlpha)
+{
+	std::cout << blue << "In glClearColor(" << iRed << ", " << iGreen << ", " << iBlue << ", " << iAlpha << ");" << std::endl;
+}
+
+void glColor3f(float fRed, float fGreen, float fBlue)
+{
+	std::cout << blue << "In glColor3f(" << fRed << ", " << fGreen << ", " << fBlue << ");" << std::endl;
+}
+
+int32_t retFunc(int32_t iValue)
+{
+	std::cout << blue << "In iValue(" << iValue << ", retValue = " << (iValue * 3) << ");" << std::endl;
+	return iValue * 3;
+}
+
+META_REGISTER_FUN(glLoadIdentity);
+META_REGISTER_FUN(glClearColor);
+META_REGISTER_FUN(glColor3f);
+META_REGISTER_FUN(retFunc);
+
+void VirtualMachine::scriptTest()
+{
+	// Script Test
+	{
+		GetFunctionByName("glLoadIdentity")->call(nullptr, nullptr, 0);
+
+		int32_t iRed = 128, iGreen = 64, iBlue = 32, iAlpha = 255;
+		Variable iArgs[] = { iRed, iGreen, iBlue, iAlpha };
+		GetFunctionByName("glClearColor")->call(nullptr, iArgs, 4);
+
+		float fRed = 128.1f, fGreen = 64.2f, fBlue = 32.3f;
+		Variable fArgs[] = { fRed, fGreen, fBlue };
+		GetFunctionByName("glColor3f")->call(nullptr, fArgs, 4);
+
+		int32_t iRetValue = 0;
+		Variable iRetVar(iRetValue);
+		Variable iArg(iRed);
+		GetFunctionByName("retFunc")->call(iRetVar, &iArg, 1);
+	}
+}
+
+void VirtualMachine::executeScriptFunction(const char* sFuncName, int32_t iArgCount)
+{
+	MetaFunction* pMetaFunction = GetFunctionByName(sFuncName);
+	assert(pMetaFunction != nullptr);
+	if (pMetaFunction != nullptr)
+	{
+		// Return Value
+		Variable ret;
+		{
+			ret.m_MetaType = pMetaFunction->getRetType();
+			if (ret.m_MetaType->sizeOf() > 0)
+				ret.m_Var = ret.m_MetaType->newAlloc();
+		}
+
+		// Function Arguments
+		Variable* pArgs = new Variable[iArgCount];// (Variable*)::malloc(iArgCount * sizeof(Variable));
+		{
+			for (int32_t i = 0; i < pMetaFunction->getArgCount(); i++)
+			{
+				const MetaType* pArgMetaType = pMetaFunction->getArgType(i);
+				pArgs[i].m_MetaType = pArgMetaType;
+				pArgs[i].m_Var = pArgs[i].m_MetaType->newAlloc();
+				pArgs[i].m_MetaType->setValueFrom(pArgs[i].m_Var, getStackPointerFromTOS(i));
+			}
+		}
+
+		// Function Call
+		pMetaFunction->call(ret, pArgs, iArgCount);
+
+		// Check Return type & push it on the 'STACK'.
+		size_t iRetVarSize = ret.m_MetaType->sizeOf();
+		if (iRetVarSize > 0)
+		{
+			memcpy_s(&STACK[--REGS.RSP], iRetVarSize, ret.m_Var, iRetVarSize);
+		}
+
+		// Function Cleanup
+		{
+			for (int32_t i = 0; i < pMetaFunction->getArgCount(); i++)
+			{
+				pArgs[i].m_MetaType->deleteAlloc(pArgs[i].m_Var);
+			}
+			delete[] pArgs;
+			if (ret.m_MetaType->sizeOf() > 0)
+				ret.m_MetaType->deleteAlloc(ret.m_Var);
+		}
+	}
 }

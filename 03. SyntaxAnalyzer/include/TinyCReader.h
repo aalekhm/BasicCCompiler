@@ -71,6 +71,7 @@ class TinyCReader {
 		bool preFixIncrDecr();
 		bool postFixIncrDecr();
 		bool returnStatement();
+		bool systemFunctionCall();
 		bool functionCall();
 		bool functionArgumentList();
 		bool functionArgumentItem();

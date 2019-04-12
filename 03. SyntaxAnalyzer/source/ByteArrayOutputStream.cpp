@@ -139,3 +139,44 @@ void ByteArrayOutputStream::writeLongAtPos(int64_t iLong, uint32_t iCurrentPos)
 		writeIntAtPos(iLong & 0xffffffff, iCurrentPos);
 	}
 }
+
+void ByteArrayOutputStream::writeFloat(float fFloat)
+{
+	assert((m_iCurrentPos + 3) < m_iArraySize);
+
+	if (m_eEndianness == ENDIANNESS::LITTLE)
+	{
+		//writeShort(iInt & 0xffff);
+		//writeShort((iInt >> 16) & 0xffff);
+
+		float* pFloat = (float*)&m_pByteArray[m_iCurrentPos];
+		*pFloat = fFloat;
+		m_iCurrentPos += sizeof(float);
+	}
+	else
+	{
+		//writeShort((fFloat >> 16) & 0xffff);
+		//writeShort(fFloat & 0xffff);
+	}
+}
+
+void ByteArrayOutputStream::writeFloatAtPos(float fFloat, uint32_t iCurrentPos)
+{
+	assert((iCurrentPos + 3) < m_iArraySize);
+
+	if (m_eEndianness == ENDIANNESS::LITTLE)
+	{
+		//writeShortAtPos(iLong & 0xffff, iCurrentPos);
+		//iCurrentPos += sizeof(int16_t);
+		//writeShortAtPos((iLong >> 16) & 0xffff, iCurrentPos);
+
+		float* pFloat = (float*)&m_pByteArray[iCurrentPos];
+		*pFloat = fFloat;
+	}
+	else
+	{
+		//writeShortAtPos((fFloat >> 16) & 0xffff, iCurrentPos);
+		//iCurrentPos += sizeof(int16_t);
+		//writeShortAtPos(fFloat & 0xffff, iCurrentPos);
+	}
+}

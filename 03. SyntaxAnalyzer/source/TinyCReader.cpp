@@ -596,6 +596,7 @@ bool TinyCReader::def() {
 	addType("int8_t");
 	addType("int16_t");
 	addType("int32_t");
+	addType("float");
 
 	while (true) {
 		if (objectList()) {
@@ -1212,79 +1213,83 @@ bool TinyCReader::stmt_list() {
 }
 
 bool TinyCReader::stmt() {
-	if (functionCall()) {
+	if (systemFunctionCall()) {
 		return true;
 	}
 	else
-		if (structMemberVariableAssignmentOrFunctionCall()) {
+		if (functionCall()) {
 			return true;
 		}
 		else
-			if (prePostFixedIncrDecr()) {
+			if (structMemberVariableAssignmentOrFunctionCall()) {
 				return true;
 			}
 			else
-				if (assignmentDerefArray()) {
+				if (prePostFixedIncrDecr()) {
 					return true;
 				}
 				else
-					if (newPtrOrArrayOrInt()) {
+					if (assignmentDerefArray()) {
 						return true;
 					}
 					else
-						if (newStructPtr()) {
+						if (newPtrOrArrayOrInt()) {
 							return true;
 						}
 						else
-							if (assignmentRHS()) {
+							if (newStructPtr()) {
 								return true;
 							}
 							else
-								if (ifelseStatement()) {
+								if (assignmentRHS()) {
 									return true;
 								}
 								else
-									if (whileStatement()) {
+									if (ifelseStatement()) {
 										return true;
 									}
 									else
-										if (forStatement()) {
+										if (whileStatement()) {
 											return true;
 										}
 										else
-											if (switchStatement()) {
+											if (forStatement()) {
 												return true;
 											}
 											else
-												if (print()) {
+												if (switchStatement()) {
 													return true;
 												}
 												else
-													if (putc()) {
+													if (print()) {
 														return true;
 													}
 													else
-														if (memSet()) {
+														if (putc()) {
 															return true;
 														}
 														else
-															if (memCpy()) {
+															if (memSet()) {
 																return true;
 															}
 															else
-																if (bracesstmtlist()) {
+																if (memCpy()) {
 																	return true;
 																}
 																else
-																	if (returnStatement()) {
+																	if (bracesstmtlist()) {
 																		return true;
 																	}
 																	else
-																		if (freePtrStatement()) {
+																		if (returnStatement()) {
 																			return true;
 																		}
 																		else
-																			return false;
+																			if (freePtrStatement()) {
+																				return true;
+																			}
+																			else
+																				return false;
 
 	return true;
 
@@ -1409,6 +1414,41 @@ bool TinyCReader::returnStatement() {
 
 }
 
+bool TinyCReader::systemFunctionCall() {
+	if (!GrammerUtils::match(TokenType_::Type::TK_SYSTEMFUNCTIONCALL, MANDATORY_))
+		return false;
+
+	std::string sIdentifier = PREV_TOKEN_TEXT;
+
+	if (!GrammerUtils::match('(', MANDATORY_))
+		return false;
+
+	Tree* pSystemFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL, sIdentifier.c_str());
+	Tree* pTemp = nullptr;
+	{
+		m_pASTCurrentNode->addChild(pSystemFunctionCallNode);
+
+		pTemp = m_pASTCurrentNode;
+		m_pASTCurrentNode = pSystemFunctionCallNode;
+	}
+
+	if (!functionArgumentList()) {
+	}
+	else {
+	}
+
+	if (!GrammerUtils::match(')', MANDATORY_))
+		return false;
+
+	Tree* pSystemFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND, sIdentifier.c_str());
+	m_pASTCurrentNode->addChild(pSystemFuncCallEndNode);
+
+	m_pASTCurrentNode = pTemp;
+
+	return true;
+
+}
+
 bool TinyCReader::functionCall() {
 	if (!GrammerUtils::match(TokenType_::Type::TK_FUNCTIONCALL, MANDATORY_))
 		return false;
@@ -1497,29 +1537,7 @@ bool TinyCReader::functionArgumentItem() {
 			return true;
 		}
 		else
-			if (GrammerUtils::match(TokenType_::Type::TK_INTEGER, OPTIONAL_)) {
-
-				Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
-				{
-					m_pASTCurrentNode->addChild(pIntegerNode);
-					m_pASTCurrentNode->m_sAdditionalInfo.append("char_");
-				}
-
-				return true;
-			}
-			else
-				if (GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
-
-					Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
-					{
-						m_pASTCurrentNode->addChild(pCharacterNode);
-						m_pASTCurrentNode->m_sAdditionalInfo.append("int8_t_");
-					}
-
-					return true;
-				}
-				else
-					return false;
+			return false;
 
 	return true;
 
@@ -3588,18 +3606,26 @@ bool TinyCReader::operands() {
 							return true;
 						}
 						else
-							if (GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
+							if (GrammerUtils::match(TokenType_::Type::TK_FLOAT, OPTIONAL_)) {
 
 								sOperand = PREV_TOKEN_TEXT;
-								char pStr[255] = { 0 };
-								sprintf_s(pStr, "%d", sOperand.c_str()[0]);
-
-								m_vPostFix.push_back(pStr);
+								m_vPostFix.push_back(sOperand);
 
 								return true;
 							}
 							else
-								return false;
+								if (GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
+
+									sOperand = PREV_TOKEN_TEXT;
+									char pStr[255] = { 0 };
+									sprintf_s(pStr, "%d", sOperand.c_str()[0]);
+
+									m_vPostFix.push_back(pStr);
+
+									return true;
+								}
+								else
+									return false;
 
 	return true;
 

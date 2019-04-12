@@ -59,6 +59,7 @@ class GrammerUtils
 		static void									handleFunctionStart(Tree* pNode);
 		static void									handleFunctionEnd(Tree* pNode);
 		static void									handleFunctionCall(Tree* pNode);
+		static void									handleSystemFunctionCall(Tree* pNode);
 
 		static void									handleInterfaceDef(Tree* pNode);
 		static void									handleInterfaceEnd(Tree* pNode);
@@ -123,10 +124,12 @@ class GrammerUtils
 		static void									storeValueAtPosForVariable(int32_t iPos, const char* sType, Tree* pNode);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);
+		static void									emitF(OPCODE eOPCODE, float fOperand);
 		static void									emit(OPCODE eOPCODE, int iOperand1, int iOperand2);
 
 		static void									emitByte(int8_t iCode);
 		static void									emitInt(int32_t iCode);
+		static void									emitFloat(float fCode);
 
 		static void									emitIntAtPos(int32_t iCode, uint32_t iOffset);
 

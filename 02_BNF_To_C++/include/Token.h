@@ -69,6 +69,7 @@ namespace TokenType_
 		TK_DEREFARRAY,
 		TK_MEMBERACCESS,
 		TK_STATICMEMBERACCESS,
+		TK_SYSTEMFUNCTIONCALL,
 		TK_UNKNOWN
 	};
 
@@ -139,6 +140,7 @@ namespace TokenType_
 			case Type::TK_DEREFARRAY:			return "TK_DEREFARRAY";
 			case Type::TK_MEMBERACCESS:			return "TK_MEMBERACCESS";
 			case Type::TK_STATICMEMBERACCESS:	return "TK_STATICMEMBERACCESS";
+			case Type::TK_SYSTEMFUNCTIONCALL:	return "TK_SYSTEMFUNCTIONCALL";
 
 			case Type::TK_UNKNOWN:				return "TK_UNKNOWN";
 		}
@@ -210,6 +212,7 @@ namespace TokenType_
 		else if(sTokenType == "TK_DEREFARRAY")			return Type::TK_DEREFARRAY;
 		else if(sTokenType == "TK_MEMBERACCESS")		return Type::TK_MEMBERACCESS;
 		else if (sTokenType == "TK_STATICMEMBERACCESS")	return Type::TK_STATICMEMBERACCESS;
+		else if (sTokenType == "TK_SYSTEMFUNCTIONCALL")	return Type::TK_SYSTEMFUNCTIONCALL;
 
 		else if(sTokenType == "TK_UNKNOWN")				return Type::TK_UNKNOWN;
 		else											return Type::TK_INVALID;
@@ -219,17 +222,17 @@ namespace TokenType_
 struct Token
 {
 	Token(TokenType_::Type eTokenType, std::string sText, int iLine, int iColumn)
-	: m_eTokenType(eTokenType)
-	, m_sText(sText)
-	, m_iLine(iLine)
-	, m_iColumn(iColumn)
+		: m_eTokenType(eTokenType)
+		, m_sText(sText)
+		, m_iLine(iLine)
+		, m_iColumn(iColumn)
 	{}
 
-	TokenType_::Type		m_eTokenType;
+	TokenType_::Type	m_eTokenType;
 	std::string			m_sText;
 	int					m_iLine;
 	int					m_iColumn;
 
-	TokenType_::Type		getType() { return m_eTokenType; }
+	TokenType_::Type	getType() { return m_eTokenType; }
 	const char*			getText() { return m_sText.c_str(); }
 };

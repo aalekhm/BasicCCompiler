@@ -44,6 +44,44 @@
 //		'abstract' class...a class that does not implement all the methods of an 'interface'.
 //		one cannot create an object of an 'abstract' class.
 
+// RE:
+//		http://blog.chmodxx.net/reading-list/
+
+// Scripting:
+//		http://www.drdobbs.com/cpp/extracting-function-parameter-and-return/240000586#disqus_thread
+//		https://web.archive.org/web/20151230105916/https://code.google.com/p/dconsole/
+//		https://alejandrohitti.com/2015/06/21/template-metaprogramming-in-cpp/
+//		https://www.randygaul.net/2014/12/18/small-c-reflection-demo/
+//		https://www.randygaul.net/2014/01/01/automated-lua-binding/
+//		https://www.randygaul.net/2013/12/30/c-function-binding-2/
+//		https://www.randygaul.net/category/templates/
+
+// EH:
+//		https://github.com/Hack-with-Github/Awesome-Hacking
+
+// ToDo:
+//		- [DONE] 'float' as primitive type along with 'int8_t', 'int16_t' & 'int32_t'.
+
+void systemCallTest()
+{
+	print("In systemCallTest");
+	putc(10);
+
+	float fFloat = 11.1 * 2.3;
+	print("fFloat = ", fFloat);
+	putc(10);	
+	
+	// "$_" before a function denotes a 'System Function' call.
+	//		- A 'System Function' is a C++ function that can be called from the script.
+	$_glLoadIdentity();
+	$_glClearColor(1, 0, 0, 0);
+	$_glColor3f(-0.25 + 1, 21.9 * 7.3, fFloat);
+	
+	int32_t iRetValue = $_retFunc(11);
+	print("iRetValue = ", iRetValue);
+	putc(10);
+}
+
 interface IntfA
 {
 	inline void walk();
@@ -1152,7 +1190,9 @@ void main()
 		
 	int32_t a = (1 * ((1 * (5 * 15)) / 10));
 	print("a = ", a);
+	putc(10);
 	
+	systemCallTest();
 	structTest();
 	
 	tempFunc(55, 101);

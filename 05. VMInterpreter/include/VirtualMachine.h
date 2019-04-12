@@ -53,11 +53,18 @@ enum class OPCODE
 	MEMCPY,
 	MEMCMP,
 	MEMCHR,
+	SYSCALL,
+	PUSHF,
+	MULF,
+	DIVF,
+	ADDF,
+	SUBF,
+	PRTF,
 	HLT
 };
 
 #define MAX_BYTECODE_SIZE			14 * 1024
-#define MAX_DATA_SIZE				3584
+#define MAX_DATA_SIZE				3712
 #define MAX_HEAP_SIZE				768
 #define MAX_STACK_SIZE				256
 #define MAX_RAM_SIZE				MAX_BYTECODE_SIZE + MAX_DATA_SIZE + MAX_HEAP_SIZE + MAX_STACK_SIZE
@@ -195,6 +202,7 @@ class VirtualMachine
 		void						sta(OPCODE eOpcode);
 		void						clrMem(OPCODE eOpCode);
 		void						call(OPCODE eOpCode);
+		void						sysCall(OPCODE eOpCode);
 		void						memSet(OPCODE eOpCode);
 		void						memCpy(OPCODE eOpCode);
 		void						memCmp(OPCODE eOpCode);
@@ -202,6 +210,12 @@ class VirtualMachine
 
 		int32_t						getConsumedMemory();
 		int32_t						getAvailableMemory();
+
+		void*						getStackPointerFromTOS(int32_t iOffset);
+
+		// Scripting
+		void						executeScriptFunction(const char* sFuncName, int32_t iArgCount);
+		void						scriptTest(); // Temp
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();

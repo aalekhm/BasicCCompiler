@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\meta">
+      <UniqueIdentifier>{efd96c0a-d848-44ce-9e85-379222654c7f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\main.cpp">
@@ -34,6 +37,27 @@
     </ClInclude>
     <ClInclude Include="include\ConsoleColor.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\Variable.h">
+      <Filter>Header Files\meta</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\Apply.h">
+      <Filter>Header Files\meta</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\AutoLister.h">
+      <Filter>Header Files\meta</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\FunctionSignature.h">
+      <Filter>Header Files\meta</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\MetaFunction.h">
+      <Filter>Header Files\meta</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\MetaType.h">
+      <Filter>Header Files\meta</Filter>
+    </ClInclude>
+    <ClInclude Include="include\meta\MetaVariable.h">
+      <Filter>Header Files\meta</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

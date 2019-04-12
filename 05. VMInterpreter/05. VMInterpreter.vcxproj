@@ -120,6 +120,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\ConsoleColor.h" />
+    <ClInclude Include="include\meta\Apply.h" />
+    <ClInclude Include="include\meta\AutoLister.h" />
+    <ClInclude Include="include\meta\FunctionSignature.h" />
+    <ClInclude Include="include\meta\MetaFunction.h" />
+    <ClInclude Include="include\meta\MetaType.h" />
+    <ClInclude Include="include\meta\MetaVariable.h" />
+    <ClInclude Include="include\meta\Variable.h" />
     <ClInclude Include="include\RandomAccessFile.h" />
     <ClInclude Include="include\VirtualMachine.h" />
   </ItemGroup>

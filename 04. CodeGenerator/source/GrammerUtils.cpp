@@ -36,6 +36,8 @@ HANDLE									GrammerUtils::m_HColor;
 #define COLORIZE	0
 
 #define EMIT_1(__ICODE__, __OPERAND__)					emit(__ICODE__, (int32_t)__OPERAND__);
+#define EMIT_1F(__ICODE__, __OPERAND__)					emitF(__ICODE__, (float)__OPERAND__);
+
 #define EMIT_2(__ICODE__, __OPERAND1__, __OPERAND2__)	emit(__ICODE__, (int32_t)__OPERAND1__, (int32_t)__OPERAND2__);
 
 #define EMIT(__ICODE__)									emit((int32_t)__ICODE__);
@@ -43,6 +45,7 @@ HANDLE									GrammerUtils::m_HColor;
 
 #define EMIT_BYTE(__ICODE__)							emitByte((int8_t)__ICODE__);
 #define EMIT_INT(__ICODE__)								emitInt((int32_t)__ICODE__);
+#define EMIT_FLOAT(__ICODE__)							emitFloat((float)__ICODE__);
 
 #define EMIT_INT_ATPOS(__ICODE__, __IOFFSET__)			emitIntAtPos((int32_t)__ICODE__, __IOFFSET__);
 
@@ -115,6 +118,15 @@ CodeMap opCodeMap[] =
 	{ "MEMCPY",		OPCODE::MEMCPY,		1,  PRIMIIVETYPE::INT_32},
 	{ "MEMCMP",		OPCODE::MEMCMP,		1,  PRIMIIVETYPE::INT_32},
 	{ "MEMCHR",		OPCODE::MEMCHR,		1,  PRIMIIVETYPE::INT_32},
+	{ "SYSCALL",	OPCODE::SYSCALL,	2,  PRIMIIVETYPE::INT_32},
+	{ "PUSHF",		OPCODE::PUSHF,		2,  PRIMIIVETYPE::INT_32 },
+
+	{ "MULF",		OPCODE::MULF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "DIVF",		OPCODE::DIVF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "ADDF",		OPCODE::ADDF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "SUBF",		OPCODE::SUBF,		1,  PRIMIIVETYPE::INT_8 },
+
+	{ "PRTF",		OPCODE::PRTF,		1,  PRIMIIVETYPE::INT_8 },
 
 	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
 };
@@ -403,7 +415,8 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		printTabs();
 	}
 
-	switch (pNode->m_eASTNodeType)
+	ASTNodeType eASTNodeType = pNode->m_eASTNodeType;
+	switch (eASTNodeType)
 	{
 		case ASTNodeType::ASTNode_INTERFACEDEF:
 		{
@@ -530,13 +543,19 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		}
 		break;
 		case ASTNodeType::ASTNode_FUNCTIONCALL:
+		case ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL:
 		{
-			std::cout << GET_INFO_FOR_KEY(pNode, "text") << "(";
+			std::cout	<< ((eASTNodeType == ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL) ? "$_":"")
+						<< GET_INFO_FOR_KEY(pNode, "text") << "(";
 
 			std::vector<Tree*>* vStatements = &pNode->m_vStatements;
 			for (Tree* pChildNode : *vStatements)
 			{
-				if (pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+				if (NOT(	pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALLEND
+							||
+							pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND
+						)
+				)
 					std::cout << GET_INFO_FOR_KEY(pChildNode, "text") << ", ";
 			}
 			std::cout << ");" << std::endl;
@@ -631,13 +650,13 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		case ASTNodeType::ASTNode_PREDECR:
 		case ASTNodeType::ASTNode_PREINCR:
 		{
-			std::cout << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << GET_INFO_FOR_KEY(pNode, "text") << ";" << std::endl;
+			std::cout << ((eASTNodeType == ASTNodeType::ASTNode_PREDECR) ? "--" : "++") << GET_INFO_FOR_KEY(pNode, "text") << ";" << std::endl;
 		}
 		break;
 		case ASTNodeType::ASTNode_POSTDECR:
 		case ASTNodeType::ASTNode_POSTINCR:
 		{
-			std::cout << GET_INFO_FOR_KEY(pNode, "text") << ((pNode->m_eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";" << std::endl;
+			std::cout << GET_INFO_FOR_KEY(pNode, "text") << ((eASTNodeType == ASTNodeType::ASTNode_POSTDECR) ? "--" : "++") << ";" << std::endl;
 		}
 		break;
 		case ASTNodeType::ASTNode_ASSIGN:
@@ -929,7 +948,7 @@ void GrammerUtils::printAST(Tree* pNode, bool bPrintTabs/* = true*/)
 		}
 	}
 
-	switch (pNode->m_eASTNodeType)
+	switch (eASTNodeType)
 	{
 		case ASTNodeType::ASTNode_STRUCTDEF:
 		case ASTNodeType::ASTNode_FUNCTIONDEF:
@@ -1100,6 +1119,11 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 					populateStrings(pNode, sVector);
 				}
 				break;
+				case ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL:
+				{
+					addString(GET_INFO_FOR_KEY(pNode, "text"), sVector);
+				}
+				break;
 				case ASTNodeType::ASTNode_STRING:
 				case ASTNodeType::ASTNode_CHARACTER:
 				{
@@ -1212,6 +1236,11 @@ void GrammerUtils::populateCode(Tree* pNode)
 			case ASTNodeType::ASTNode_FUNCTIONCALLEND:
 			{
 				handleFunctionCall(pNode);
+			}
+			break;
+			case ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND:
+			{
+				handleSystemFunctionCall(pNode);
 			}
 			break;
 			case ASTNodeType::ASTNode_MEMBERACCESS:
@@ -1380,6 +1409,11 @@ void GrammerUtils::emitInt(int32_t iCode)
 	m_pBAOS->writeInt(iCode);
 }
 
+void GrammerUtils::emitFloat(float fCode)
+{
+	m_pBAOS->writeFloat(fCode);
+}
+
 void GrammerUtils::emitIntAtPos(int32_t iCode, uint32_t iOffset)
 {
 	m_pBAOS->writeIntAtPos(iCode, iOffset);
@@ -1400,6 +1434,21 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand1, int iOperand2)
 			EMIT_BYTE(iOperand1);
 			EMIT_BYTE(iOperand2);
 		}
+		break;
+	}
+}
+
+void GrammerUtils::emitF(OPCODE eOPCODE, float fOperand)
+{
+	switch (eOPCODE)
+	{
+		case OPCODE::PUSHF:
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+			std::cout << fOperand << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
+			EMIT_FLOAT(fOperand);
 		break;
 	}
 }
@@ -1436,6 +1485,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		}
 		break;
 		case OPCODE::CALL:
+		case OPCODE::SYSCALL:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
@@ -1450,6 +1500,10 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::MUL:
 		case OPCODE::DIV:
 		case OPCODE::MOD:
+		case OPCODE::ADDF:
+		case OPCODE::SUBF:
+		case OPCODE::MULF:
+		case OPCODE::DIVF:
 		case OPCODE::JMP_LT:
 		case OPCODE::JMP_LTEQ:
 		case OPCODE::JMP_GT:
@@ -2229,6 +2283,52 @@ LABEL1:
 	return pRETURN_FunctionInfo;
 }
 
+void GrammerUtils::handleSystemFunctionCall(Tree* pNode)
+{
+	// Get Callee Function Def details like argument Count & function signature.
+	Tree* pCALLEE_Node = pNode->m_pParentNode;
+	std::string sFuncCallee = GET_INFO_FOR_KEY(pCALLEE_Node, "text");
+
+	int iCALLEE_ArgCount = pCALLEE_Node->m_vStatements.size() - 1/*ASTNode_SYSTEMFUNCTIONCALLEND*/;
+
+	//////////////////////////////////////////////////////
+	// 1. Push Arguments onto the STACK in reverse order('R'ight to 'L'eft)
+	//		- If the Callee has arguments, they need to be pushed onto the stack.
+	if (iCALLEE_ArgCount > 0)
+	{
+		//////////////////////////////////////////////////////
+		// I. Push arguments onto the stack...
+		std::vector<Tree*>::reverse_iterator rItr = pCALLEE_Node->m_vStatements.rbegin();
+		for (; rItr != pCALLEE_Node->m_vStatements.rend(); ++rItr)
+		{
+			Tree* pArgNode = *rItr;
+			if (pArgNode->m_eASTNodeType != ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND)
+			{
+				populateCode(pArgNode);
+			}
+		}
+	}
+
+	//////////////////////////////////////////////////////
+	// 2. Make the actual 'System Function Call'
+	//		- In case of System Functions, call will be made by the VM.
+	//		- We need to pass on the String ID of the 'System function' we want to call.
+	//		- The arguments for the call are already available on the STACK.
+	int16_t iStrID = getStringPosition(sFuncCallee.c_str());
+	int32_t iOperand = 0;
+	{
+		//	iOperand = (STRING_ID) | (ARGUMENT_COUNT)
+		//					|				|_____________ No. of arguments.
+		//					|_____________________________ Name of the 'System Function'.
+
+		iOperand = (int32_t)iStrID;
+		iOperand <<= sizeof(int16_t) * 8;
+		iOperand |= (iCALLEE_ArgCount & 0x0000FFFF);
+
+		EMIT_1(OPCODE::SYSCALL, iOperand);
+	}
+}
+
 void GrammerUtils::handleFunctionCall(Tree* pNode)
 {
 	// Callee function name
@@ -2399,6 +2499,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 	std::string sRValuePostFixExpression = GET_INFO_FOR_KEY(pNode, "text");
 	StringTokenizer* st = StringTokenizer::create(sRValuePostFixExpression.c_str());
 	st->tokenize();
+	bool bIsFP = false;
 	while (st->hasMoreTokens())
 	{
 		Token prevTok = st->prevToken();
@@ -2411,10 +2512,32 @@ void GrammerUtils::handleExpression(Tree* pNode)
 		switch (eCurrTokenType)
 		{
 			case TokenType_::Type::TK_CHARACTER:
-				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
-				break;
+			{
+				if (bIsFP)
+				{
+					EMIT_1F(OPCODE::PUSHF, atof(tok.getText()));
+				}
+				else
+				{
+					EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
+				}
+			}
+			break;
 			case TokenType_::Type::TK_INTEGER:
-				EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
+			{
+				if (bIsFP)
+				{
+					EMIT_1F(OPCODE::PUSHF, atof(tok.getText()));
+				}
+				else
+				{
+					EMIT_1(OPCODE::PUSHI, atoi(tok.getText()));
+				}
+			}
+			break;
+			case TokenType_::Type::TK_FLOAT:
+				EMIT_1F(OPCODE::PUSHF, atof(tok.getText()));
+				bIsFP = true;
 				break;
 			case TokenType_::Type::TK_IDENTIFIER:
 				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(tok.getText()));
@@ -2423,19 +2546,19 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				EMIT_1(OPCODE::PUSHI, getStringPosition(tok.getText()));
 				break;
 			case TokenType_::Type::TK_MUL:
-				EMIT_1(OPCODE::MUL, 0);
+				EMIT_1(bIsFP ? OPCODE::MULF : OPCODE::MUL, 0);
 				break;
 			case TokenType_::Type::TK_DIV:
-				EMIT_1(OPCODE::DIV, 0);
+				EMIT_1(bIsFP ? OPCODE::DIVF : OPCODE::DIV, 0);
 				break;
 			case TokenType_::Type::TK_MOD:
 				EMIT_1(OPCODE::MOD, 0);
 				break;
 			case TokenType_::Type::TK_ADD:
-				EMIT_1(OPCODE::ADD, 0);
+				EMIT_1(bIsFP ? OPCODE::ADDF : OPCODE::ADD, 0);
 				break;
 			case TokenType_::Type::TK_SUB:
-				EMIT_1(OPCODE::SUB, 0);
+				EMIT_1(bIsFP ? OPCODE::SUBF : OPCODE::SUB, 0);
 				break;
 			case TokenType_::Type::TK_LT:
 				EMIT_1(OPCODE::JMP_LT, 0);
@@ -3318,6 +3441,8 @@ void GrammerUtils::handleFree(Tree* pNode)
 			sType == "int16_t"
 			||
 			sType == "int32_t"
+			||
+			sType == "float"
 		) {
 			EMIT_1(OPCODE::FREE, GET_VARIABLE_POSITION(sPointerName));
 		}
@@ -3567,12 +3692,16 @@ void GrammerUtils::handleStatements(Tree* pNode)
 		Tree* pChildNode = pNode->m_vStatements.at(iCount);
 
 		////////////////////////////////////////////////////////////////////////////
-		if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
+		if (pNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL || pNode->m_eASTNodeType == ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL)
 		{
 			/////////////////////////////////////////////////////////////////
 			// Bail out for the function arguments.
 			// They will be processed in 'ASTNode_FUNCTIONCALLEND'
-			if (pChildNode->m_eASTNodeType != ASTNodeType::ASTNode_FUNCTIONCALLEND)
+			if (NOT(	pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALLEND
+						||
+						pChildNode->m_eASTNodeType == ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND
+				)
+			)
 				continue;
 		}
 		////////////////////////////////////////////////////////////////////////////
@@ -3598,6 +3727,9 @@ void GrammerUtils::handleStatements(Tree* pNode)
 					case ASTNodeType::ASTNode_EXPRESSION:
 						EMIT_1(OPCODE::PRTI, 0);
 					break;
+					case ASTNodeType::ASTNode_FLOAT:
+						EMIT_1(OPCODE::PRTF, 0);
+					break;
 					case ASTNodeType::ASTNode_STRING:
 						EMIT_1(OPCODE::PRTS, 0);
 					break;
@@ -3621,6 +3753,9 @@ int32_t GrammerUtils::sizeOf(std::string sType)
 	else
 	if (sType == "int32_t")
 		return sizeof(int32_t);
+	else
+	if (sType == "float")
+		return sizeof(float);
 	else
 	{
 		std::map<std::string, StructInfo*>::const_iterator itrStruct = m_MapGlobalStructs.begin();
@@ -3649,6 +3784,9 @@ int32_t GrammerUtils::castValueFor(std::string sType)
 		return 0xFFFF;
 	else
 	if (sType == "int32_t")
+		return 0xFFFFFFFF;
+	else
+	if (sType == "float")
 		return 0xFFFFFFFF;
 
 	return 0;
@@ -3897,7 +4035,7 @@ void GrammerUtils::printAssembly(int8_t* iByteCode, std::vector<std::string>& vS
 					break;
 					case PRIMIIVETYPE::INT_32:
 					{
-						int32_t iInt = m_pBAIS->readInt();
+						uint32_t iInt = m_pBAIS->readInt();
 
 						std::cout << iInt;
 						if (bCanWrite)

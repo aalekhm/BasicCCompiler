@@ -596,6 +596,7 @@ bool TinyCReader::def() {
 											addType("int8_t");
 											addType("int16_t");
 											addType("int32_t");
+											addType("float");
 										
 while(true) {
 if(objectList()) {
@@ -1212,6 +1213,10 @@ return true;
 }
 
 bool TinyCReader::stmt() {
+if(systemFunctionCall()) {
+return true;
+}
+else
 if(functionCall()) {
 return true;
 }
@@ -1409,6 +1414,41 @@ return true;
 
 }
 
+bool TinyCReader::systemFunctionCall() {
+if(!GrammerUtils::match(TokenType_::Type::TK_SYSTEMFUNCTIONCALL, MANDATORY_))
+return false;
+
+															std::string sIdentifier = PREV_TOKEN_TEXT;
+														
+if(!GrammerUtils::match('(', MANDATORY_))
+return false;
+
+															Tree* pSystemFunctionCallNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL, sIdentifier.c_str());
+															Tree* pTemp = nullptr;
+															{
+																m_pASTCurrentNode->addChild(pSystemFunctionCallNode);
+																
+																pTemp = m_pASTCurrentNode;
+																m_pASTCurrentNode = pSystemFunctionCallNode;
+															}
+														
+if(!functionArgumentList()) {
+}
+else {
+}
+
+if(!GrammerUtils::match(')', MANDATORY_))
+return false;
+
+															Tree* pSystemFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND, sIdentifier.c_str());
+															m_pASTCurrentNode->addChild(pSystemFuncCallEndNode);
+															
+															m_pASTCurrentNode = pTemp;
+														
+return true;
+
+}
+
 bool TinyCReader::functionCall() {
 if(!GrammerUtils::match(TokenType_::Type::TK_FUNCTIONCALL, MANDATORY_))
 return false;
@@ -1494,28 +1534,6 @@ else {
 
 }
 
-return true;
-}
-else
-if(GrammerUtils::match(TokenType_::Type::TK_INTEGER, OPTIONAL_)) {
-
-																Tree* pIntegerNode = makeLeaf(ASTNodeType::ASTNode_INTEGER, PREV_TOKEN_TEXT);
-																{
-																	m_pASTCurrentNode->addChild(pIntegerNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("char_");
-																}
-															
-return true;
-}
-else
-if(GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
-
-																Tree* pCharacterNode = makeLeaf(ASTNodeType::ASTNode_CHARACTER, PREV_TOKEN_TEXT);
-																{
-																	m_pASTCurrentNode->addChild(pCharacterNode);
-																	m_pASTCurrentNode->m_sAdditionalInfo.append("int8_t_");
-																}
-															
 return true;
 }
 else
@@ -3581,6 +3599,14 @@ return true;
 }
 else
 if(GrammerUtils::match(TokenType_::Type::TK_INTEGER, OPTIONAL_)) {
+
+																sOperand = PREV_TOKEN_TEXT;
+																m_vPostFix.push_back(sOperand);
+															
+return true;
+}
+else
+if(GrammerUtils::match(TokenType_::Type::TK_FLOAT, OPTIONAL_)) {
 
 																sOperand = PREV_TOKEN_TEXT;
 																m_vPostFix.push_back(sOperand);
