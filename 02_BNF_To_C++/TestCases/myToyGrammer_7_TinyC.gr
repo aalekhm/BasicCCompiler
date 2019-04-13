@@ -1683,7 +1683,12 @@
 											std::string sOperand;
 										"</code>"
 										
-										( 	<functionCall>	"<code>"
+										( 	<systemFunctionCall>	
+															"<code>"
+																handleFunctionCallInExpr();
+															"</code>"
+											|
+											<functionCall>	"<code>"
 																handleFunctionCallInExpr();
 															"</code>"
 											|

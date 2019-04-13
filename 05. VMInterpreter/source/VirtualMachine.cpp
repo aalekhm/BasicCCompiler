@@ -548,13 +548,17 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		std::cout << green << (char)iTemp1;
 		break;
 	case OPCODE::PRTI:
-		iTemp1 = STACK[REGS.RSP++];
+	{
+		iTemp1 = *( (int32_t*)&STACK[REGS.RSP++] );
 		std::cout << green << iTemp1;
-		break;
+	}
+	break;
 	case OPCODE::PRTF:
-		fTemp1 = STACK[REGS.RSP++];
+	{
+		fTemp1 = *( (float*)&STACK[REGS.RSP++] );
 		std::cout << green << fTemp1;
-		break;
+	}
+	break;
 	case OPCODE::MALLOC:
 	{
 		iTemp1 = STACK[REGS.RSP++];
@@ -1145,16 +1149,23 @@ void glColor3f(float fRed, float fGreen, float fBlue)
 	std::cout << blue << "In glColor3f(" << fRed << ", " << fGreen << ", " << fBlue << ");" << std::endl;
 }
 
-int32_t retFunc(int32_t iValue)
+int32_t retSysFunc(int32_t iValue)
 {
-	std::cout << blue << "In iValue(" << iValue << ", retValue = " << (iValue * 3) << ");" << std::endl;
+	std::cout << blue << "In retSysFunc(" << iValue << ", retValue = " << (iValue * 3) << ");" << std::endl;
 	return iValue * 3;
+}
+
+float retFloatFunc(float fValue)
+{
+	std::cout << blue << "In retFloatFunc(" << fValue << ", retValue = " << (fValue * 3) << ");" << std::endl;
+	return fValue * 3;
 }
 
 META_REGISTER_FUN(glLoadIdentity);
 META_REGISTER_FUN(glClearColor);
 META_REGISTER_FUN(glColor3f);
-META_REGISTER_FUN(retFunc);
+META_REGISTER_FUN(retSysFunc);
+META_REGISTER_FUN(retFloatFunc);
 
 void VirtualMachine::scriptTest()
 {
@@ -1173,7 +1184,7 @@ void VirtualMachine::scriptTest()
 		int32_t iRetValue = 0;
 		Variable iRetVar(iRetValue);
 		Variable iArg(iRed);
-		GetFunctionByName("retFunc")->call(iRetVar, &iArg, 1);
+		GetFunctionByName("retSysFunc")->call(iRetVar, &iArg, 1);
 	}
 }
 
@@ -1192,7 +1203,7 @@ void VirtualMachine::executeScriptFunction(const char* sFuncName, int32_t iArgCo
 		}
 
 		// Function Arguments
-		Variable* pArgs = new Variable[iArgCount];// (Variable*)::malloc(iArgCount * sizeof(Variable));
+		Variable* pArgs = new Variable[iArgCount];
 		{
 			for (int32_t i = 0; i < pMetaFunction->getArgCount(); i++)
 			{
@@ -1210,7 +1221,7 @@ void VirtualMachine::executeScriptFunction(const char* sFuncName, int32_t iArgCo
 		size_t iRetVarSize = ret.m_MetaType->sizeOf();
 		if (iRetVarSize > 0)
 		{
-			memcpy_s(&STACK[--REGS.RSP], iRetVarSize, ret.m_Var, iRetVarSize);
+			memcpy_s(&REGS.RAX, iRetVarSize, ret.m_Var, iRetVarSize);
 		}
 
 		// Function Cleanup

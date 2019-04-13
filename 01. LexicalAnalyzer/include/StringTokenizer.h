@@ -23,6 +23,8 @@ class StringTokenizer
 		bool						hasMoreTokens();
 		Token						nextToken();
 		Token						prevToken();
+
+		bool						hasFloatingPoint() { return m_bHasFloatingPoint; }
 protected:
 	private:
 									StringTokenizer() = delete;
@@ -65,6 +67,7 @@ protected:
 		int							m_iDataLength;
 
 		bool						m_bIgnoreBNFNonTerminals;	// <Non-Terminal>
+		bool						m_bHasFloatingPoint;
 
 		std::vector<Token>			m_vTokens;
 		std::vector<Token>::const_iterator	m_TokensIterator;

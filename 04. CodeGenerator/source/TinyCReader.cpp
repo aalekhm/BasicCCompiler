@@ -3569,44 +3569,43 @@ bool TinyCReader::operands() {
 
 	std::string sOperand;
 
-	if (functionCall()) {
+	if (systemFunctionCall()) {
 
 		handleFunctionCallInExpr();
 
 		return true;
 	}
 	else
-		if (memCmp()) {
+		if (functionCall()) {
 
 			handleFunctionCallInExpr();
 
 			return true;
 		}
 		else
-			if (sizeOf()) {
+			if (memCmp()) {
 
 				handleFunctionCallInExpr();
 
 				return true;
 			}
 			else
-				if (structStaticOrObjectAccess()) {
+				if (sizeOf()) {
+
+					handleFunctionCallInExpr();
+
 					return true;
 				}
 				else
-					if (tk_identifier()) {
+					if (structStaticOrObjectAccess()) {
 						return true;
 					}
 					else
-						if (GrammerUtils::match(TokenType_::Type::TK_INTEGER, OPTIONAL_)) {
-
-							sOperand = PREV_TOKEN_TEXT;
-							m_vPostFix.push_back(sOperand);
-
+						if (tk_identifier()) {
 							return true;
 						}
 						else
-							if (GrammerUtils::match(TokenType_::Type::TK_FLOAT, OPTIONAL_)) {
+							if (GrammerUtils::match(TokenType_::Type::TK_INTEGER, OPTIONAL_)) {
 
 								sOperand = PREV_TOKEN_TEXT;
 								m_vPostFix.push_back(sOperand);
@@ -3614,18 +3613,26 @@ bool TinyCReader::operands() {
 								return true;
 							}
 							else
-								if (GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
+								if (GrammerUtils::match(TokenType_::Type::TK_FLOAT, OPTIONAL_)) {
 
 									sOperand = PREV_TOKEN_TEXT;
-									char pStr[255] = { 0 };
-									sprintf_s(pStr, "%d", sOperand.c_str()[0]);
-
-									m_vPostFix.push_back(pStr);
+									m_vPostFix.push_back(sOperand);
 
 									return true;
 								}
 								else
-									return false;
+									if (GrammerUtils::match(TokenType_::Type::TK_CHARACTER, OPTIONAL_)) {
+
+										sOperand = PREV_TOKEN_TEXT;
+										char pStr[255] = { 0 };
+										sprintf_s(pStr, "%d", sOperand.c_str()[0]);
+
+										m_vPostFix.push_back(pStr);
+
+										return true;
+									}
+									else
+										return false;
 
 	return true;
 

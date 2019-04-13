@@ -24,6 +24,7 @@ void StringTokenizer::init(const char* sData)
 	m_iCurrColumn = m_iSavedColumn = 0;
 
 	m_bIgnoreBNFNonTerminals = true;
+	m_bHasFloatingPoint = false;
 
 	m_vTokens.clear();
 	m_TokensIterator = m_vTokens.end();
@@ -92,6 +93,9 @@ void StringTokenizer::tokenize()
 		//	printf("tok = %s ==> %s\n", tok.getText(), TokenType::toString(tok.getType()).c_str());
 
 		m_vTokens.push_back(tok);
+
+		if (tok.getType() == TokenType_::Type::TK_FLOAT)
+			m_bHasFloatingPoint = true;
 
 		if (tok.getType() == TokenType_::Type::TK_EOI)
 			break;

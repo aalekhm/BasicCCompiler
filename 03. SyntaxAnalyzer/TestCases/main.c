@@ -1,6 +1,7 @@
 
 // https://rosettacode.org/wiki/Compiler/
 // http://dotnet.jku.at/applications/visualizer/
+// https://stackoverflow.com/questions/1669/learning-to-write-a-compiler
 // http://kenyatips.com/weird-programming-languages/
 // https://www.memorymanagement.org/mmref/alloc.html
 // https://www.tenouk.com/Bufferoverflowc/Bufferoverflow1c.html
@@ -67,19 +68,28 @@ void systemCallTest()
 	print("In systemCallTest");
 	putc(10);
 
+	float fSub = -1.9 - 10;
+	print("fSub = ", fSub);
+	putc(10);
+	
 	float fFloat = 11.1 * 2.3;
 	print("fFloat = ", fFloat);
-	putc(10);	
+	putc(10);
 	
 	// "$_" before a function denotes a 'System Function' call.
 	//		- A 'System Function' is a C++ function that can be called from the script.
 	$_glLoadIdentity();
 	$_glClearColor(1, 0, 0, 0);
-	$_glColor3f(-0.25 + 1, 21.9 * 7.3, fFloat);
 	
-	int32_t iRetValue = $_retFunc(11);
+	int32_t iRetValue = $_retSysFunc(11);
 	print("iRetValue = ", iRetValue);
 	putc(10);
+
+	float fRetValue = $_retFloatFunc(29.3);
+	print("fRetValue = ", fRetValue);
+	putc(10);
+	
+	$_glColor3f( (2 * 3) + (-0.25 + 1 - fRetValue), 21.9 * 7.3, fFloat - fSub);
 }
 
 interface IntfA
@@ -1188,8 +1198,8 @@ void main()
 	print("In main()");
 	putc(10);
 		
-	int32_t a = (1 * ((1 * (5 * 15)) / 10));
-	print("a = ", a);
+	float a = (-3.7 * ((7.9 * (5 * 15.9)) / 5.7));
+	print("a = ", a); // -407.682
 	putc(10);
 	
 	systemCallTest();

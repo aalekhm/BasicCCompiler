@@ -3569,6 +3569,13 @@ bool TinyCReader::operands() {
 
 											std::string sOperand;
 										
+if(systemFunctionCall()) {
+
+																handleFunctionCallInExpr();
+															
+return true;
+}
+else
 if(functionCall()) {
 
 																handleFunctionCallInExpr();

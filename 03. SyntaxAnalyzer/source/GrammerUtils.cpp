@@ -1148,6 +1148,15 @@ void GrammerUtils::populateStrings(Tree* pParentNode, std::vector<std::string>& 
 					}
 				}
 				break;
+				case ASTNodeType::ASTNode_TYPE:
+				{
+					Tree* pExpressionNode = pNode->m_pLeftNode;
+					if (pExpressionNode != nullptr)
+					{
+						populateStrings(pExpressionNode, sVector);
+					}
+				}
+				break;
 			}
 		}
 	}
@@ -1522,6 +1531,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::NEGATE:
 		case OPCODE::PRTC:
 		case OPCODE::PRTI:
+		case OPCODE::PRTF:
 		case OPCODE::PRTS:
 		case OPCODE::MALLOC:
 		case OPCODE::MEMSET:
@@ -2499,7 +2509,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 	std::string sRValuePostFixExpression = GET_INFO_FOR_KEY(pNode, "text");
 	StringTokenizer* st = StringTokenizer::create(sRValuePostFixExpression.c_str());
 	st->tokenize();
-	bool bIsFP = false;
+	bool bIsFP = st->hasFloatingPoint();
 	while (st->hasMoreTokens())
 	{
 		Token prevTok = st->prevToken();
@@ -2537,11 +2547,16 @@ void GrammerUtils::handleExpression(Tree* pNode)
 			break;
 			case TokenType_::Type::TK_FLOAT:
 				EMIT_1F(OPCODE::PUSHF, atof(tok.getText()));
-				bIsFP = true;
-				break;
+			break;
 			case TokenType_::Type::TK_IDENTIFIER:
+			{
+				std::string sType = GET_VARIABLE_NODETYPE(tok.getText());
+				if (sType == "float")
+					bIsFP = true;
+				
 				EMIT_1(OPCODE::FETCH, GET_VARIABLE_POSITION(tok.getText()));
-				break;
+			}
+			break;
 			case TokenType_::Type::TK_STRING:
 				EMIT_1(OPCODE::PUSHI, getStringPosition(tok.getText()));
 				break;
@@ -2614,6 +2629,9 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				// Send in the 'CAST' value of the pointer Type(int8_t = 0xFF, int16_6 = 0xFFFF, int32_t = 0xFFFFFFFF)
 				// which will be used @ runtime to make a 'CAST'.
 				std::string sType = GET_VARIABLE_NODETYPE(prevTok.getText());
+				if (sType == "float")
+					bIsFP = true;
+
 				uint32_t iCastValue = castValueFor(sType);
 				EMIT_1(OPCODE::PUSHI, sizeOf(sType));		// Push the size of the node for ArrayIndexing.
 				EMIT_1(OPCODE::LDA, iCastValue);
@@ -2650,6 +2668,11 @@ void GrammerUtils::handleExpression(Tree* pNode)
 					/////////////////////////////////////////////////////////////////
 					// 2. Fetch the value in the objects variable & push it onto the STACK.
 					std::string sVariableName = tok.getText();
+					Tree* pNode = pStructInfo->getMemberVariableASTNode(sVariableName.c_str());
+					std::string sType = GET_INFO_FOR_KEY(pNode, "type");
+					if (sType == "float")
+						bIsFP = true;
+
 					int32_t iPosition = getMemberPositionInStructHierarchy(sVariableName, pStructInfo);
 
 					EMIT_1(OPCODE::FETCH, iPosition);
@@ -2659,6 +2682,8 @@ void GrammerUtils::handleExpression(Tree* pNode)
 			break;
 		}
 	}
+
+	SET_INFO_FOR_KEY(pNode, "IS_FP_EXPRESSION", bIsFP ? "true" : "false");
 }
 
 void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
@@ -3723,9 +3748,22 @@ void GrammerUtils::handleStatements(Tree* pNode)
 				switch (pChildNode->m_eASTNodeType)
 				{
 					case ASTNodeType::ASTNode_INTEGER:
-					case ASTNodeType::ASTNode_IDENTIFIER:
-					case ASTNodeType::ASTNode_EXPRESSION:
 						EMIT_1(OPCODE::PRTI, 0);
+					break;
+					case ASTNodeType::ASTNode_EXPRESSION:
+					case ASTNodeType::ASTNode_IDENTIFIER:
+					{
+						std::string sIsFP = GET_INFO_FOR_KEY(pChildNode, "IS_FP_EXPRESSION");
+						if (sIsFP == "true")
+						{
+							EMIT_1(OPCODE::PRTF, 0);
+						}
+						else
+						{
+							EMIT_1(OPCODE::PRTI, 0);
+						}
+					}
+					break;
 					break;
 					case ASTNodeType::ASTNode_FLOAT:
 						EMIT_1(OPCODE::PRTF, 0);
