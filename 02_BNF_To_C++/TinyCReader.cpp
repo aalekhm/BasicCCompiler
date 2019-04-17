@@ -23,6 +23,7 @@
 
 #define SAVED_TOKEN 												GrammerUtils::m_pSavedToken
 #define SAVED_TOKEN_TEXT 											GrammerUtils::m_pSavedToken.getText()
+#define PREV_TOKEN 													GrammerUtils::m_pPrevToken
 #define PREV_TOKEN_TEXT 											GrammerUtils::m_pPrevToken.getText()
 
 #define GET_INFO_FOR_KEY(__node__, __key__)							__node__->getAdditionalInfoFor(__key__)
@@ -534,7 +535,7 @@ Tree* TinyCReader::getStructNodeByName(std::string sStructName)
 	assert(false);
 }
 
-void TinyCReader::handleFunctionCallInExpr()
+void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 {
 	// The idea here is to create a temporary variable of the type returned by the function
 	// & add it before the expression statement.
@@ -574,6 +575,10 @@ void TinyCReader::handleFunctionCallInExpr()
 
 			pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 			SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
+			if (NOT sFunctionType.empty())
+			{
+				SET_INFO_FOR_KEY(pPrimIntNode, "modifyType", sFunctionType.c_str());
+			}
 			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
 			SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
 			pBlockNode->addChild(pPrimIntNode);
@@ -623,6 +628,10 @@ return true;
 }
 else
 if(functionDef()) {
+return true;
+}
+else
+if(systemFunctionDef()) {
 return true;
 }
 else
@@ -1018,6 +1027,56 @@ return false;
 																	FunctionInfo::addStaticVariable(pStaticPtrNode);
 																}
 															
+if(!GrammerUtils::match(';', MANDATORY_))
+return false;
+return true;
+
+}
+
+bool TinyCReader::systemFunctionDef() {
+if(!GrammerUtils::match("SYSFUNC", MANDATORY_))
+return false;
+if(!GrammerUtils::match(TokenType_::Type::TK_IDENTIFIER, MANDATORY_))
+return false;
+
+																std::string sReturnType = PREV_TOKEN_TEXT;
+															
+if(!GrammerUtils::match(TokenType_::Type::TK_SYSTEMFUNCTIONCALL, MANDATORY_))
+return false;
+
+																std::string sFunctionName = PREV_TOKEN_TEXT;
+																
+																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
+																Tree* pReturnTypeNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType.c_str());
+																Tree* pArgListNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONARGLIST, "");
+																{
+																	pReturnTypeNode->m_pParentNode = pFunctionDefNode;
+																	pArgListNode->m_pParentNode = pFunctionDefNode;
+																	
+																	pFunctionDefNode->m_pLeftNode = pReturnTypeNode;
+																	pFunctionDefNode->m_pRightNode = pArgListNode;
+																}
+															
+if(!GrammerUtils::match('(', MANDATORY_))
+return false;
+
+																Tree* pTemp = nullptr;
+																{
+																	pTemp = m_pASTCurrentNode; // Save Root Node temporarily
+																	m_pASTCurrentNode = pArgListNode;
+																}
+															
+if(!functionArgumentDefList()) {
+}
+else {
+}
+
+
+																m_pASTCurrentNode = pTemp;
+																GrammerUtils::m_MapSystemFunctions[sFunctionName] = pFunctionDefNode;
+															
+if(!GrammerUtils::match(')', MANDATORY_))
+return false;
 if(!GrammerUtils::match(';', MANDATORY_))
 return false;
 return true;
@@ -3571,28 +3630,28 @@ bool TinyCReader::operands() {
 										
 if(systemFunctionCall()) {
 
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("sysFunc");
 															
 return true;
 }
 else
 if(functionCall()) {
 
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("scriptFunc");
 															
 return true;
 }
 else
 if(memCmp()) {
 
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("");
 															
 return true;
 }
 else
 if(sizeOf()) {
 
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("");
 															
 return true;
 }

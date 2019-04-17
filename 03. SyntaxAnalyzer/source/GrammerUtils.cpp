@@ -23,6 +23,7 @@ int8_t									GrammerUtils::m_iByteCode[MAX_BYTECODE_SIZE];
 std::map<std::string, FunctionInfo*>	GrammerUtils::m_MapGlobalFunctions;
 std::map<std::string, StructInfo*>		GrammerUtils::m_MapGlobalStructs;
 std::map<std::string, InterfaceInfo*>	GrammerUtils::m_MapGlobalInterfaces;
+std::map<std::string, Tree*>			GrammerUtils::m_MapSystemFunctions;
 FunctionInfo*							GrammerUtils::m_pCurrentFunction;
 StructInfo*								GrammerUtils::m_pCurrentStruct;
 InterfaceInfo*							GrammerUtils::m_pCurrentInterface;
@@ -65,60 +66,60 @@ HANDLE									GrammerUtils::m_HColor;
 
 CodeMap opCodeMap[] =
 {
-	{ "NOP",		OPCODE::NOP,		1,  PRIMIIVETYPE::INT_8},
-	{ "FETCH",		OPCODE::FETCH,		2,  PRIMIIVETYPE::INT_32},
-	{ "STORE",		OPCODE::STORE,		2,  PRIMIIVETYPE::INT_32},
-	{ "PUSH",		OPCODE::PUSH,		2,  PRIMIIVETYPE::INT_32},
-	{ "POP",		OPCODE::POP,		2,  PRIMIIVETYPE::INT_32},
-	{ "MUL",		OPCODE::MUL,		1,  PRIMIIVETYPE::INT_8},
-	{ "DIV",		OPCODE::DIV,		1,  PRIMIIVETYPE::INT_8},
-	{ "MOD",		OPCODE::MOD,		1,  PRIMIIVETYPE::INT_8},
-	{ "ADD",		OPCODE::ADD,		1,  PRIMIIVETYPE::INT_8},
-	{ "SUB",		OPCODE::SUB,		1,  PRIMIIVETYPE::INT_8},
-	{ "JMP_LT",		OPCODE::JMP_LT,		1,  PRIMIIVETYPE::INT_8},
-	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1,  PRIMIIVETYPE::INT_8},
-	{ "JMP_GT",		OPCODE::JMP_GT,		1,  PRIMIIVETYPE::INT_8},
-	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1,  PRIMIIVETYPE::INT_8},
-	{ "JMP_EQ",		OPCODE::JMP_EQ,		1,  PRIMIIVETYPE::INT_8},
-	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1,  PRIMIIVETYPE::INT_8},
-	{ "LOGICALOR",	OPCODE::LOGICALOR,	1,  PRIMIIVETYPE::INT_8},
-	{ "LOGICALAND",	OPCODE::LOGICALAND,	1,  PRIMIIVETYPE::INT_8},
-	{ "BITWISEOR",	OPCODE::BITWISEOR,	1,  PRIMIIVETYPE::INT_8},
-	{ "BITWISEAND",	OPCODE::BITWISEAND,	1,  PRIMIIVETYPE::INT_8},
-	{ "BITWISEXOR",	OPCODE::BITWISEXOR,	1,  PRIMIIVETYPE::INT_8},
-	{ "BITWISENOT",	OPCODE::BITWISENOT,	1,  PRIMIIVETYPE::INT_8},
-	{ "BITWISELEFTSHIFT",	OPCODE::BITWISELEFTSHIFT,	1,  PRIMIIVETYPE::INT_8},
-	{ "BITWISERIGHTSHIFT",	OPCODE::BITWISERIGHTSHIFT,	1,  PRIMIIVETYPE::INT_8},
-	{ "NOT",		OPCODE::_NOT,		1,  PRIMIIVETYPE::INT_8},
-	{ "JMP",		OPCODE::JMP,		2,  PRIMIIVETYPE::INT_32},
-	{ "JZ",			OPCODE::JZ,			2,  PRIMIIVETYPE::INT_32},
-	{ "JNZ",		OPCODE::JNZ,		2,  PRIMIIVETYPE::INT_32},
-	{ "PRTS",		OPCODE::PRTS,		1,  PRIMIIVETYPE::INT_8},
-	{ "PRTC",		OPCODE::PRTC,		1,  PRIMIIVETYPE::INT_8},
-	{ "PRTI",		OPCODE::PRTI,		1,  PRIMIIVETYPE::INT_8},
-	{ "CALL",		OPCODE::CALL,		2,  PRIMIIVETYPE::INT_32},
-	{ "RET",		OPCODE::RET,		1,  PRIMIIVETYPE::INT_8},
-	{ "SUB_REG",	OPCODE::SUB_REG,	3,  PRIMIIVETYPE::INT_8},
+	{ "NOP",		OPCODE::NOP,		1,  PRIMIIVETYPE::INT_8 },
+	{ "FETCH",		OPCODE::FETCH,		2,  PRIMIIVETYPE::INT_32 },
+	{ "STORE",		OPCODE::STORE,		2,  PRIMIIVETYPE::INT_32 },
+	{ "PUSH",		OPCODE::PUSH,		2,  PRIMIIVETYPE::INT_32 },
+	{ "POP",		OPCODE::POP,		2,  PRIMIIVETYPE::INT_32 },
+	{ "MUL",		OPCODE::MUL,		1,  PRIMIIVETYPE::INT_8 },
+	{ "DIV",		OPCODE::DIV,		1,  PRIMIIVETYPE::INT_8 },
+	{ "MOD",		OPCODE::MOD,		1,  PRIMIIVETYPE::INT_8 },
+	{ "ADD",		OPCODE::ADD,		1,  PRIMIIVETYPE::INT_8 },
+	{ "SUB",		OPCODE::SUB,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_LT",		OPCODE::JMP_LT,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_LTEQ",	OPCODE::JMP_LTEQ,	1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_GT",		OPCODE::JMP_GT,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_GTEQ",	OPCODE::JMP_GTEQ,	1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_EQ",		OPCODE::JMP_EQ,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP_NEQ",	OPCODE::JMP_NEQ,	1,  PRIMIIVETYPE::INT_8 },
+	{ "LOGICALOR",	OPCODE::LOGICALOR,	1,  PRIMIIVETYPE::INT_8 },
+	{ "LOGICALAND",	OPCODE::LOGICALAND,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISEOR",	OPCODE::BITWISEOR,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISEAND",	OPCODE::BITWISEAND,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISEXOR",	OPCODE::BITWISEXOR,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISENOT",	OPCODE::BITWISENOT,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISELEFTSHIFT",	OPCODE::BITWISELEFTSHIFT,	1,  PRIMIIVETYPE::INT_8 },
+	{ "BITWISERIGHTSHIFT",	OPCODE::BITWISERIGHTSHIFT,	1,  PRIMIIVETYPE::INT_8 },
+	{ "NOT",		OPCODE::_NOT,		1,  PRIMIIVETYPE::INT_8 },
+	{ "JMP",		OPCODE::JMP,		2,  PRIMIIVETYPE::INT_32 },
+	{ "JZ",			OPCODE::JZ,			2,  PRIMIIVETYPE::INT_32 },
+	{ "JNZ",		OPCODE::JNZ,		2,  PRIMIIVETYPE::INT_32 },
+	{ "PRTS",		OPCODE::PRTS,		1,  PRIMIIVETYPE::INT_8 },
+	{ "PRTC",		OPCODE::PRTC,		1,  PRIMIIVETYPE::INT_8 },
+	{ "PRTI",		OPCODE::PRTI,		1,  PRIMIIVETYPE::INT_8 },
+	{ "CALL",		OPCODE::CALL,		2,  PRIMIIVETYPE::INT_32 },
+	{ "RET",		OPCODE::RET,		1,  PRIMIIVETYPE::INT_8 },
+	{ "SUB_REG",	OPCODE::SUB_REG,	3,  PRIMIIVETYPE::INT_8 },
 
-	{ "PUSHI",		OPCODE::PUSHI,		2,  PRIMIIVETYPE::INT_32},
-	{ "PUSHR",		OPCODE::PUSHR,		2,  PRIMIIVETYPE::INT_8},
-	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8},
-	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8},
-	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8},
+	{ "PUSHI",		OPCODE::PUSHI,		2,  PRIMIIVETYPE::INT_32 },
+	{ "PUSHR",		OPCODE::PUSHR,		2,  PRIMIIVETYPE::INT_8 },
+	{ "POPI",		OPCODE::POPI,		2,  PRIMIIVETYPE::INT_8 },
+	{ "POPR",		OPCODE::POPR,		2,  PRIMIIVETYPE::INT_8 },
+	{ "NEGATE",		OPCODE::NEGATE,		1,  PRIMIIVETYPE::INT_8 },
 
-	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8},
-	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32},
+	{ "MALLOC",		OPCODE::MALLOC,		1,  PRIMIIVETYPE::INT_8 },
+	{ "FREE",		OPCODE::FREE,		2,  PRIMIIVETYPE::INT_32 },
 
-	{ "LDA",		OPCODE::LDA,		2,  PRIMIIVETYPE::INT_32},
-	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32},
-	{ "CLR",		OPCODE::CLR,		7,  PRIMIIVETYPE::INT_32},
-	{ "VTBL",		OPCODE::VTBL,		2,  PRIMIIVETYPE::INT_32},
-
-	{ "MEMSET",		OPCODE::MEMSET,		1,  PRIMIIVETYPE::INT_32},
-	{ "MEMCPY",		OPCODE::MEMCPY,		1,  PRIMIIVETYPE::INT_32},
-	{ "MEMCMP",		OPCODE::MEMCMP,		1,  PRIMIIVETYPE::INT_32},
-	{ "MEMCHR",		OPCODE::MEMCHR,		1,  PRIMIIVETYPE::INT_32},
-	{ "SYSCALL",	OPCODE::SYSCALL,	2,  PRIMIIVETYPE::INT_32},
+	{ "LDA",		OPCODE::LDA,		2,  PRIMIIVETYPE::INT_32 },
+	{ "STA",		OPCODE::STA,		2,  PRIMIIVETYPE::INT_32 },
+	{ "CLR",		OPCODE::CLR,		7,  PRIMIIVETYPE::INT_32 },
+	{ "VTBL",		OPCODE::VTBL,		2,  PRIMIIVETYPE::INT_32 },
+																 
+	{ "MEMSET",		OPCODE::MEMSET,		1,  PRIMIIVETYPE::INT_32 },
+	{ "MEMCPY",		OPCODE::MEMCPY,		1,  PRIMIIVETYPE::INT_32 },
+	{ "MEMCMP",		OPCODE::MEMCMP,		1,  PRIMIIVETYPE::INT_32 },
+	{ "MEMCHR",		OPCODE::MEMCHR,		1,  PRIMIIVETYPE::INT_32 },
+	{ "SYSCALL",	OPCODE::SYSCALL,	2,  PRIMIIVETYPE::INT_32 },
 	{ "PUSHF",		OPCODE::PUSHF,		2,  PRIMIIVETYPE::INT_32 },
 
 	{ "MULF",		OPCODE::MULF,		1,  PRIMIIVETYPE::INT_8 },
@@ -127,8 +128,9 @@ CodeMap opCodeMap[] =
 	{ "SUBF",		OPCODE::SUBF,		1,  PRIMIIVETYPE::INT_8 },
 
 	{ "PRTF",		OPCODE::PRTF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "CAST",		OPCODE::CAST,		3,  PRIMIIVETYPE::INT_8 },
 
-	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8},
+	{ "HLT",		OPCODE::HLT,		1,  PRIMIIVETYPE::INT_8 },
 };
 
 RegisterMap registerMap[]
@@ -1433,6 +1435,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand1, int iOperand2)
 	switch (eOPCODE)
 	{
 		case OPCODE::SUB_REG:
+		case OPCODE::CAST:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode;
@@ -1483,11 +1486,20 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		break;
 		case OPCODE::PUSHR:
 		case OPCODE::POPR:
-		case OPCODE::VTBL:
 		{
 #if (VERBOSE == 1)
 			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
 			std::cout << registerMap[iOperand].sRegister << std::endl;
+#endif
+			EMIT_BYTE(eOPCODE);
+			EMIT_BYTE(iOperand);
+		}
+		break;
+		case OPCODE::VTBL:
+		{
+#if (VERBOSE == 1)
+			std::cout << CURRENT_OFFSET << ". " << opCodeMap[(int)eOPCODE].sOpCode << " ";
+			std::cout << iOperand << std::endl;
 #endif
 			EMIT_BYTE(eOPCODE);
 			EMIT_BYTE(iOperand);
@@ -2683,7 +2695,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 		}
 	}
 
-	SET_INFO_FOR_KEY(pNode, "IS_FP_EXPRESSION", bIsFP ? "true" : "false");
+	SET_INFO_FOR_KEY(pNode, "EXPRESSION_RVALUE_TYPE", bIsFP ? "float" : "int32_t");
 }
 
 void GrammerUtils::handlePostFixExpression(Tree* pPostFixNode)
@@ -2766,6 +2778,32 @@ void GrammerUtils::handleString(Tree* pNode)
 
 void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 {
+	PRIMIIVETYPE eLVal_PRIMIIVETYPE = PRIMIIVETYPE::INT_32, eRVal_PRIMIIVETYPE = PRIMIIVETYPE::INT_32;
+
+	std::string sFuncType = GET_INFO_FOR_KEY(pNode, "modifyType");
+	if (NOT sFuncType.empty())
+	{
+		std::string sFuncName = GET_INFO_FOR_KEY(pNode, "givenName");
+		Tree* pRetNode = nullptr;
+		if (sFuncType == "sysFunc")
+		{
+			Tree* pSystemFuncNode = GrammerUtils::getSystemFunctionByName(sFuncName);
+			pRetNode = pSystemFuncNode->m_pLeftNode;
+		}
+		else
+		if (sFuncType == "scriptFunc")
+		{
+			FunctionInfo* pFunctionInfo = pFunctionInfo = GrammerUtils::getGlobalFunctionByName(sFuncName);
+			pRetNode = pFunctionInfo->m_pFunctionReturnType;
+		}
+
+		if (pRetNode != nullptr)
+		{
+			std::string sType = GET_INFO_FOR_KEY(pRetNode, "text");
+			SET_INFO_FOR_KEY(pNode, "type", sType.c_str());
+		}
+	}
+
 	Tree* pExpressionNode = pNode->m_pLeftNode;		// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
 	if (pExpressionNode != nullptr)
@@ -2775,18 +2813,54 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 			for (Tree* pChild : pExpressionNode->m_vStatements)
 			{
 				populateCode(pChild);
+
+				// If its a Function Call, get its 'return' type & set the RValue to it.
+				{
+					std::string sFuncName = GET_INFO_FOR_KEY(pChild, "text");
+					Tree* pRetNode = nullptr;
+					if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_FUNCTIONCALL)
+					{
+						FunctionInfo* pFunctionInfo = getGlobalFunctionByName(sFuncName.c_str());
+						if (pFunctionInfo != nullptr)
+						{
+							pRetNode = pFunctionInfo->m_pFunctionReturnType;
+							std::string sType = GET_INFO_FOR_KEY(pRetNode, "text");
+							eRVal_PRIMIIVETYPE = getTypeByString(sType);
+						}
+					}
+					else
+					if (pChild->m_eASTNodeType == ASTNodeType::ASTNode_SYSTEMFUNCTIONCALL)
+					{
+						Tree* pSystemFuncNode = getSystemFunctionByName(sFuncName);
+						if (pSystemFuncNode != nullptr)
+						{
+							pRetNode = pSystemFuncNode->m_pLeftNode;
+							std::string sType = GET_INFO_FOR_KEY(pRetNode, "text");
+							eRVal_PRIMIIVETYPE = getTypeByString(sType);
+						}
+					}
+
+				}
 			}
 
 			EMIT_1(OPCODE::PUSHR, EREGISTERS::RAX);
 		}
 		else
+		{
 			populateCode(pExpressionNode);
+
+			std::string sType = GET_INFO_FOR_KEY(pExpressionNode, "EXPRESSION_RVALUE_TYPE");
+			eRVal_PRIMIIVETYPE = getTypeByString(sType);
+		}
 
 		////////////////////////////////////////////////////////
 		// Before assigning any value to a variable, its type is checked
 		// & the final value on the STACK is then 'ANDED(&)' with this variable's 'type'(check 'castValueFor()' for more info)
 		// and then pushed onto the STACK which is later stored in the variable.
-		cast(castValueFor( GET_INFO_FOR_KEY(pNode, "type") ));
+		{
+			eLVal_PRIMIIVETYPE = getTypeByString( GET_INFO_FOR_KEY(pNode, "type") );
+			EMIT_2(OPCODE::CAST, eLVal_PRIMIIVETYPE, eRVal_PRIMIIVETYPE);
+		}
 		EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION( GET_INFO_FOR_KEY(pNode, "text") ));
 	}
 }
@@ -2929,6 +3003,8 @@ void GrammerUtils::handleAssign(Tree* pNode)
 	Tree* pIdentifierNode = pNode->m_pRightNode;	// Remember we have added expression node(rvalue) to any parent's Left.
 													// In case of ASSIGN, right node will be the lvalue.
 	std::string sVariableName = GET_INFO_FOR_KEY(pNode, "text");
+	PRIMIIVETYPE eLVal_PRIMIIVETYPE = PRIMIIVETYPE::INT_32, eRVal_PRIMIIVETYPE = PRIMIIVETYPE::INT_32;
+
 	//////////////////////////////////////////////////////////////
 	// Compute PreFixExpr
 	// STA_VM_1. RValue to be stored, picked up from the STACK.
@@ -2937,6 +3013,8 @@ void GrammerUtils::handleAssign(Tree* pNode)
 	}
 
 	populateCode(pExpressionNode);
+	std::string sType = GET_INFO_FOR_KEY(pExpressionNode, "EXPRESSION_RVALUE_TYPE");
+	eRVal_PRIMIIVETYPE = getTypeByString(sType);
 
 	//////////////////////////////////////////////////////////////
 	// Cast only int8_t, int16_t, int32_t, @DEREF assignments to their respective 'TYPES'.
@@ -2945,6 +3023,7 @@ void GrammerUtils::handleAssign(Tree* pNode)
 	//		pPtr0 = pPtr1;	// DO NOT cast this assignment.
 							// as its an object address.
 	
+
 	ASTNodeType	eIdentifierNodeASTNodeType = pIdentifierNode->m_eASTNodeType;
 	{
 		switch (eIdentifierNodeASTNodeType)
@@ -2953,8 +3032,12 @@ void GrammerUtils::handleAssign(Tree* pNode)
 			{
 				std::string sType = GET_VARIABLE_NODETYPE( sVariableName );
 
-				if (NOT IS_VARIABLE_POINTER_TYPE(  sVariableName  ))
-					cast(castValueFor(sType));
+				if (NOT IS_VARIABLE_POINTER_TYPE(sVariableName))
+				{
+					eLVal_PRIMIIVETYPE = getTypeByString(sType);
+					EMIT_2(OPCODE::CAST, eLVal_PRIMIIVETYPE, eRVal_PRIMIIVETYPE);
+				}
+
 				EMIT_1(OPCODE::STORE, GET_VARIABLE_POSITION(  sVariableName  ));
 			}
 			break;
@@ -2971,7 +3054,8 @@ void GrammerUtils::handleAssign(Tree* pNode)
 				if (pDerefExpressionLeaf != nullptr)
 				{
 					std::string sType = GET_VARIABLE_NODETYPE(  sVariableName  );
-					cast(castValueFor(sType));					// Perform relevant 'CAST'
+					eLVal_PRIMIIVETYPE = getTypeByString(sType);// Perform relevant 'CAST'
+					EMIT_2(OPCODE::CAST, eLVal_PRIMIIVETYPE, eRVal_PRIMIIVETYPE);
 
 					/////////////////////////////////////////////////////////////////
 					// STA_VM_2.ArrayIndex.
@@ -3018,7 +3102,9 @@ void GrammerUtils::handleAssign(Tree* pNode)
 					/////////////////////////////////////////////////////////////////
 					// 2. Perform relevant cast before storing the value in objects variable.
 					std::string sType = getMemberTypeInStructHierarchy(sVariableName, pStructInfo);
-					cast(castValueFor(sType));												// Perform relevant 'CAST'
+					eLVal_PRIMIIVETYPE = getTypeByString(sType);
+					EMIT_2(OPCODE::CAST, eLVal_PRIMIIVETYPE, eRVal_PRIMIIVETYPE);
+
 
 					/////////////////////////////////////////////////////////////////
 					// 3. Storing the value in object variable.
@@ -3753,8 +3839,8 @@ void GrammerUtils::handleStatements(Tree* pNode)
 					case ASTNodeType::ASTNode_EXPRESSION:
 					case ASTNodeType::ASTNode_IDENTIFIER:
 					{
-						std::string sIsFP = GET_INFO_FOR_KEY(pChildNode, "IS_FP_EXPRESSION");
-						if (sIsFP == "true")
+						std::string sType = GET_INFO_FOR_KEY(pChildNode, "EXPRESSION_RVALUE_TYPE");
+						if (sType == "float")
 						{
 							EMIT_1(OPCODE::PRTF, 0);
 						}
@@ -3832,7 +3918,7 @@ int32_t GrammerUtils::castValueFor(std::string sType)
 
 void GrammerUtils::storeValueAtPosForVariable(int32_t iPos, const char* sType, Tree* pNode)
 {
-	cast(castValueFor(sType));					// Perform relevant 'CAST'
+	cast(sType);								// Perform relevant 'CAST'
 
 	EMIT_1(OPCODE::PUSHI, iPos);				// Push a ArrayIndex of iPos onto the STACK i.e
 												// @pVar = iRValue; ==> @pVar[iPos] = iRValue;
@@ -3877,6 +3963,72 @@ void GrammerUtils::storeVTablePointerInObjectOnHeap(int16_t iShortPosition, Stru
 			int8_t iSize = pStructInfo->sizeOfMe() >> 2;		// sizeOfMe() return size in bytes.
 			storeVTablePointerInObjectOnHeap(iShortPosition + iSize, pStructInfo->m_ParentStructInfo);
 		}
+	}
+}
+
+PRIMIIVETYPE GrammerUtils::getTypeByString(std::string sType)
+{
+	if (sType == "int8_t")
+	{
+		return PRIMIIVETYPE::INT_8;
+	}
+	else
+	if (sType == "int16_t")
+	{
+		return PRIMIIVETYPE::INT_16;
+	}
+	else
+	if (sType == "int32_t")
+	{
+		return PRIMIIVETYPE::INT_32;
+	}
+	else
+	if (sType == "int64_t")
+	{
+		return PRIMIIVETYPE::INT_64;
+	}
+	else
+	if (sType == "float")
+	{
+		return PRIMIIVETYPE::FLOAT;
+	}
+	else
+	{
+		assert(false);
+	}
+}
+ 
+void GrammerUtils::cast(std::string sType)
+{
+	/////////////////////////////////////////////////////////////////
+	// Cast the expresseion with relevant Type Value
+	if (sType == "int8_t")
+	{
+		EMIT_1(OPCODE::CAST, PRIMIIVETYPE::INT_8, PRIMIIVETYPE::INT_32);
+	}
+	else
+	if (sType == "int16_t")
+	{
+		EMIT_1(OPCODE::CAST, PRIMIIVETYPE::INT_16, PRIMIIVETYPE::INT_32);
+	}
+	else
+	if (sType == "int32_t")
+	{
+		EMIT_1(OPCODE::CAST, PRIMIIVETYPE::INT_32, PRIMIIVETYPE::INT_32);
+	}
+	else
+	if (sType == "int64_t")
+	{
+		EMIT_1(OPCODE::CAST, PRIMIIVETYPE::INT_64, PRIMIIVETYPE::INT_32);
+	}
+	else
+	if (sType == "float")
+	{
+		EMIT_1(OPCODE::CAST, PRIMIIVETYPE::FLOAT, PRIMIIVETYPE::INT_32);
+	}
+	else
+	{
+		assert(false);
 	}
 }
 
@@ -3932,6 +4084,42 @@ FunctionInfo* GrammerUtils::getFunctionByNameInStruct(std::string sFunctionName,
 	return bReturnFunctionInfo;
 }
 
+FunctionInfo* GrammerUtils::getGlobalFunctionByName(std::string sFuncName)
+{
+	FunctionInfo* bReturnFunctionInfo = nullptr;
+
+	std::map<std::string, FunctionInfo*>::const_iterator itrFunc = m_MapGlobalFunctions.find(sFuncName.c_str());
+	assert(itrFunc != m_MapGlobalFunctions.end());
+	if (itrFunc == m_MapGlobalFunctions.end())
+		return nullptr;
+
+	return itrFunc->second;
+}
+
+Tree* GrammerUtils::getSystemFunctionByName(std::string sSystemFuncName)
+{
+	FunctionInfo* bReturnFunctionInfo = nullptr;
+
+	std::map<std::string, Tree*>::const_iterator itrFunc = m_MapSystemFunctions.find(sSystemFuncName.c_str());
+	assert(itrFunc != m_MapSystemFunctions.end());
+	if (itrFunc == m_MapSystemFunctions.end())
+		return nullptr;
+
+	return itrFunc->second;
+}
+
+std::string GrammerUtils::getSystemFunctionReturnType(std::string sSystemFuncName)
+{
+	std::string sType = "";
+	Tree* pNode = getSystemFunctionByName(sSystemFuncName);
+	assert(pNode != nullptr);
+	if (pNode != nullptr)
+	{
+		sType = GET_INFO_FOR_KEY(pNode, "type");
+	}
+
+	return sType;
+}
 
 bool GrammerUtils::isStructObedient(StructInfo* pStructInfo)
 {

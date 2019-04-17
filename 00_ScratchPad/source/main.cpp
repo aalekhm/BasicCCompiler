@@ -656,5 +656,12 @@ int main(int argc, char* argv[])
 
 	callCPPFunc("func1");
 
+	float f = 3.142f;
+	int32_t i = 1234;
+	char str[16];
+	sprintf_s(str, 16, "%d", (int32_t)f);
+	int32_t ii = (int32_t)f;
+
+
 	exit(EXIT_SUCCESS);
 }

@@ -63,6 +63,17 @@
 // ToDo:
 //		- [DONE] 'float' as primitive type along with 'int8_t', 'int16_t' & 'int32_t'.
 
+SYSFUNC void 	$_glLoadIdentity();
+SYSFUNC void 	$_glClearColor(int32_t iRed, int32_t iGreen, int32_t iBlue, int32_t iAlpha);
+SYSFUNC void 	$_glColor3f(float fRed, float fGreen, float fBlue);
+SYSFUNC int32_t $_retSysFunc(int32_t iValue);
+SYSFUNC float 	$_retFloatFunc(float fValue);
+
+float retFunFloat()
+{
+	return 91.9;
+}
+
 void systemCallTest()
 {
 	print("In systemCallTest");
@@ -76,6 +87,10 @@ void systemCallTest()
 	print("fFloat = ", fFloat);
 	putc(10);
 	
+	int32_t iFloatToInt = retFunFloat();
+	print("iFloatToInt = ", iFloatToInt);
+	putc(10);
+	
 	// "$_" before a function denotes a 'System Function' call.
 	//		- A 'System Function' is a C++ function that can be called from the script.
 	$_glLoadIdentity();
@@ -85,11 +100,19 @@ void systemCallTest()
 	print("iRetValue = ", iRetValue);
 	putc(10);
 
-	float fRetValue = $_retFloatFunc(29.3);
-	print("fRetValue = ", fRetValue);
+	float fSysRetSysFunc = $_retSysFunc(11);
+	print("fSysRetSysFunc = ", fSysRetSysFunc);
+	putc(10);
+
+	float fSysRetFloatFunc = $_retFloatFunc(29.3);
+	print("fSysRetFloatFunc = ", fSysRetFloatFunc);
 	putc(10);
 	
-	$_glColor3f( (2 * 3) + (-0.25 + 1 - fRetValue), 21.9 * 7.3, fFloat - fSub);
+	int32_t iSysRetFloatFunc = 2 * $_retFloatFunc(29.3);
+	print("iSysRetFloatFunc = ", iSysRetFloatFunc);
+	putc(10);
+
+	$_glColor3f( (2 * 3) + (-0.25 + 1 - fSysRetFloatFunc), 21.9 * 7.3, fFloat - fSub);
 }
 
 interface IntfA

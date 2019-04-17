@@ -14,6 +14,8 @@
 											<staticDeclaration>
 											|
 											<functionDef>
+											|
+											<systemFunctionDef>
 										) ;
 										
 <interfaceDeclaration>			::=		"interface"
@@ -239,7 +241,43 @@
 																}
 															"</code>"
 										';';
-
+										
+<systemFunctionDef>				::=		"SYSFUNC"
+										TK_IDENTIFIER		"<code>"
+																std::string sReturnType = PREV_TOKEN_TEXT;
+															"</code>"
+										TK_SYSTEMFUNCTIONCALL
+															"<code>"
+																std::string sFunctionName = PREV_TOKEN_TEXT;
+																
+																Tree* pFunctionDefNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONDEF, sFunctionName.c_str());
+																Tree* pReturnTypeNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONRETURNTYPE, sReturnType.c_str());
+																Tree* pArgListNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONARGLIST, "");
+																{
+																	pReturnTypeNode->m_pParentNode = pFunctionDefNode;
+																	pArgListNode->m_pParentNode = pFunctionDefNode;
+																	
+																	pFunctionDefNode->m_pLeftNode = pReturnTypeNode;
+																	pFunctionDefNode->m_pRightNode = pArgListNode;
+																}
+															"</code>"
+										'('					"<code>"
+																Tree* pTemp = nullptr;
+																{
+																	pTemp = m_pASTCurrentNode; // Save Root Node temporarily
+																	m_pASTCurrentNode = pArgListNode;
+																}
+															"</code>"
+										[ <functionArgumentDefList>	]	
+															"<code>"
+																m_pASTCurrentNode = pTemp;
+																GrammerUtils::m_MapSystemFunctions[sFunctionName] = pFunctionDefNode;
+															"</code>"
+										')'
+										';'
+										;
+										
+										
 <functionDef>					::=							"<code>"
 																std::string sPrevText = PREV_TOKEN_TEXT;
 															"</code>"
@@ -1683,21 +1721,21 @@
 											std::string sOperand;
 										"</code>"
 										
-										( 	<systemFunctionCall>	
+										( 	<systemFunctionCall>
 															"<code>"
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("sysFunc");
 															"</code>"
 											|
 											<functionCall>	"<code>"
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("scriptFunc");
 															"</code>"
 											|
 											<memCmp>		"<code>"
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("");
 															"</code>"
 											|
 											<sizeOf>		"<code>"
-																handleFunctionCallInExpr();
+																handleFunctionCallInExpr("");
 															"</code>"
 											|
 											<structStaticOrObjectAccess>

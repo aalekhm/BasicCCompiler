@@ -302,6 +302,7 @@ enum class OPCODE
 	ADDF,
 	SUBF,
 	PRTF,
+	CAST,
 	HLT,
 };
 
@@ -310,7 +311,8 @@ enum class PRIMIIVETYPE
 	INT_8,
 	INT_16,
 	INT_32,
-	INT_64
+	INT_64,
+	FLOAT,
 };
 
 struct CodeMap

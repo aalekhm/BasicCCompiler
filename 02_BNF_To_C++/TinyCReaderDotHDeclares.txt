@@ -30,7 +30,7 @@
 		std::string 				getCurrentScopeString();
 		
 		Tree*						getStructNodeByName(std::string sStructName);
-		void						handleFunctionCallInExpr();
+		void						handleFunctionCallInExpr(std::string sFunctionType);
 	protected:
 		
 	private:

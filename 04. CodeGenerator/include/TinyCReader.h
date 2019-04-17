@@ -18,6 +18,7 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("virtual");
 			GrammerUtils::m_vKeywords.push_back("static");
 			GrammerUtils::m_vKeywords.push_back("static");
+			GrammerUtils::m_vKeywords.push_back("SYSFUNC");
 			GrammerUtils::m_vKeywords.push_back("return");
 			GrammerUtils::m_vKeywords.push_back("if");
 			GrammerUtils::m_vKeywords.push_back("else");
@@ -60,6 +61,7 @@ class TinyCReader {
 		bool primitiveType();
 		bool structType();
 		bool staticPtr();
+		bool systemFunctionDef();
 		bool functionDef();
 		bool functionArgumentDefList();
 		bool functionArgumentDefListMore();
@@ -191,7 +193,7 @@ class TinyCReader {
 		std::string 				getCurrentScopeString();
 		
 		Tree*						getStructNodeByName(std::string sStructName);
-		void						handleFunctionCallInExpr();
+		void						handleFunctionCallInExpr(std::string sFunctionType);
 	protected:
 		
 	private:

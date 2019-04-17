@@ -23,6 +23,7 @@
 
 #define SAVED_TOKEN 												GrammerUtils::m_pSavedToken
 #define SAVED_TOKEN_TEXT 											GrammerUtils::m_pSavedToken.getText()
+#define PREV_TOKEN 													GrammerUtils::m_pPrevToken
 #define PREV_TOKEN_TEXT 											GrammerUtils::m_pPrevToken.getText()
 
 #define GET_INFO_FOR_KEY(__node__, __key__)							__node__->getAdditionalInfoFor(__key__)
@@ -534,7 +535,7 @@ Tree* TinyCReader::getStructNodeByName(std::string sStructName)
 	assert(false);
 }
 
-void TinyCReader::handleFunctionCallInExpr()
+void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 {
 	// The idea here is to create a temporary variable of the type returned by the function
 	// & add it before the expression statement.
@@ -574,6 +575,10 @@ void TinyCReader::handleFunctionCallInExpr()
 
 			pPrimIntNode->m_sAdditionalInfo.append(sFullyQualifiedTempVariableName);
 			SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
+			if (NOT sFunctionType.empty())
+			{
+				SET_INFO_FOR_KEY(pPrimIntNode, "modifyType", sFunctionType.c_str());
+			}
 			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
 			SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
 			pBlockNode->addChild(pPrimIntNode);

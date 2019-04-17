@@ -60,6 +60,7 @@ enum class OPCODE
 	ADDF,
 	SUBF,
 	PRTF,
+	CAST,
 	HLT
 };
 
@@ -192,8 +193,9 @@ class VirtualMachine
 		void						dealloc(int32_t pAddress);
 		void						merge();
 
-		int32_t						getValueIn(int32_t iVariable);
+		void*						getAddressOf(int32_t iVariable);
 
+		void						fetch(OPCODE eOpCode);
 		void						store(OPCODE eOpCode);
 		void						pushr(OPCODE eOpCode);
 		void						popr(OPCODE eOpCode);
@@ -207,6 +209,7 @@ class VirtualMachine
 		void						memCpy(OPCODE eOpCode);
 		void						memCmp(OPCODE eOpCode);
 		void						memChr(OPCODE eOpCode);
+		void						cast(OPCODE eOpCode);
 
 		int32_t						getConsumedMemory();
 		int32_t						getAvailableMemory();

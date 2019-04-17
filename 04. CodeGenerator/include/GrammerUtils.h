@@ -120,7 +120,9 @@ class GrammerUtils
 
 		static int32_t								sizeOf(std::string sType);
 		static int32_t								castValueFor(std::string sType);
+		static void									cast(std::string sType);
 		static void									cast(int32_t iCastValue);
+		static PRIMIIVETYPE							getTypeByString(std::string sType);
 		static void									storeValueAtPosForVariable(int32_t iPos, const char* sType, Tree* pNode);
 
 		static void									emit(OPCODE eOPCODE, int iOperand);
@@ -166,7 +168,13 @@ class GrammerUtils
 		static bool									isAUserDefinedFunction(const char* cStr);
 		static bool									isAUserDefinedVariable(const char* cStr);
 
+		static FunctionInfo*						getGlobalFunctionByName(std::string sFuncName);
+		static Tree*								getSystemFunctionByName(std::string sSystemFuncName);
+		static std::string							getSystemFunctionReturnType(std::string sSystemFuncName);
+
 		static FunctionInfo*						m_pCurrentFunction;
 		static StructInfo*							m_pCurrentStruct;
 		static InterfaceInfo*						m_pCurrentInterface;
+
+		static std::map<std::string, Tree*>			m_MapSystemFunctions;
 };
