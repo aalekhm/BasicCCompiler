@@ -981,12 +981,12 @@ void VirtualMachine::cast(OPCODE eOpCode)
 			if (iRVal_Type == (int8_t)PRIMIIVETYPE::FLOAT)
 			{
 				int8_t iInt8 = (int8_t)*(float*)pAddr;
-				memcpy_s(&STACK[REGS.RSP], sizeof(int8_t), &iInt8, sizeof(int8_t));
+				STACK[REGS.RSP] = iInt8;
 			}
 			else
 			{
 				int8_t iInt8 = (int8_t)*(int32_t*)pAddr;
-				memcpy_s(&STACK[REGS.RSP], sizeof(int8_t), &iInt8, sizeof(int8_t));
+				STACK[REGS.RSP] = iInt8;
 			}
 		}
 		break;
@@ -995,12 +995,12 @@ void VirtualMachine::cast(OPCODE eOpCode)
 			if (iRVal_Type == (int8_t)PRIMIIVETYPE::FLOAT)
 			{
 				int16_t iInt16 = (int16_t)*(float*)pAddr;
-				memcpy_s(&STACK[REGS.RSP], sizeof(int16_t), &iInt16, sizeof(int16_t));
+				STACK[REGS.RSP] = iInt16;
 			}
 			else
 			{
 				int16_t iInt16 = (int16_t)*(int32_t*)pAddr;
-				memcpy_s(&STACK[REGS.RSP], sizeof(int16_t), &iInt16, sizeof(int16_t));
+				STACK[REGS.RSP] = iInt16;
 			}
 		}
 		break;
@@ -1009,12 +1009,12 @@ void VirtualMachine::cast(OPCODE eOpCode)
 			if (iRVal_Type == (int8_t)PRIMIIVETYPE::FLOAT)
 			{
 				int32_t iInt32 = (int32_t)*(float*)pAddr;
-				memcpy_s(&STACK[REGS.RSP], sizeof(int32_t), &iInt32, sizeof(int32_t));
+				STACK[REGS.RSP] = iInt32;
 			}
 			else
 			{
 				int32_t iInt32 = (int32_t)*(int32_t*)pAddr;
-				memcpy_s(&STACK[REGS.RSP], sizeof(int32_t), &iInt32, sizeof(int32_t));
+				STACK[REGS.RSP] = iInt32;
 			}
 		}
 		break;
@@ -1299,11 +1299,18 @@ float retFloatFunc(float fValue)
 	return fValue * 3;
 }
 
+float glColor3fMul(float fRed, float fGreen, float fBlue)
+{
+	std::cout << blue << "In glColor3fMul(" << fRed << ", " << fGreen << ", " << fBlue << "); = " << (fRed * fGreen * fBlue) << std::endl;
+	return fRed * fGreen * fBlue;
+}
+
 META_REGISTER_FUN(glLoadIdentity);
 META_REGISTER_FUN(glClearColor);
 META_REGISTER_FUN(glColor3f);
 META_REGISTER_FUN(retSysFunc);
 META_REGISTER_FUN(retFloatFunc);
+META_REGISTER_FUN(glColor3fMul);
 
 void VirtualMachine::scriptTest()
 {

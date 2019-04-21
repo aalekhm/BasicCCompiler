@@ -147,6 +147,7 @@ class GrammerUtils
 		static FunctionInfo*						getFunctionByNameInStruct(std::string sFunctionName, StructInfo* pStructInfo);
 
 		static bool									isStructObedient(StructInfo* pStructInfo);
+		static bool									isFloatingPointExpression(std::string sExpr);
 
 		static std::vector<std::string>				m_vStrings;
 

@@ -514,11 +514,17 @@
 																
 																pTemp = m_pASTCurrentNode;
 																m_pASTCurrentNode = pSystemFunctionCallNode;
+																
+																m_vPostFix.push_back("_START_");
+																m_vOperatorStack.push("_START_");
 															}
 														"</code>"
 										[ <functionArgumentList> ]
 										')'
 														"<code>"
+															// Clear Up Expression engine.
+															clearTopOfExpressionStack();
+														
 															Tree* pSystemFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND, sIdentifier.c_str());
 															m_pASTCurrentNode->addChild(pSystemFuncCallEndNode);
 															
@@ -537,11 +543,17 @@
 																
 																pTemp = m_pASTCurrentNode;
 																m_pASTCurrentNode = pFunctionCallNode;
+																
+																m_vPostFix.push_back("_START_");
+																m_vOperatorStack.push("_START_");
 															}
 														"</code>"
 										[ <functionArgumentList> ]
 										')'
 														"<code>"
+															// Clear Up Expression engine.
+															clearTopOfExpressionStack();
+															
 															Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sIdentifier.c_str());
 															m_pASTCurrentNode->addChild(pFuncCallEndNode);
 															

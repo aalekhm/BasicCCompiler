@@ -2516,12 +2516,91 @@ void GrammerUtils::handlePreFixExpression(Tree* pPreFixNode)
 	}
 }
 
+bool GrammerUtils::isFloatingPointExpression(std::string sExpr)
+{
+	StringTokenizer* st = StringTokenizer::create(sExpr.c_str());
+	st->tokenize();
+	bool bIsFP = false;
+
+	while (st->hasMoreTokens())
+	{
+		Token prevTok = st->prevToken();
+		Token tok = st->nextToken();
+
+		TokenType_::Type eCurrTokenType = tok.getType();
+		if (eCurrTokenType == TokenType_::Type::TK_WHITESPACE || eCurrTokenType == TokenType_::Type::TK_EOI || eCurrTokenType == TokenType_::Type::TK_COMMA)
+			continue;
+
+		switch (eCurrTokenType)
+		{
+			case TokenType_::Type::TK_IDENTIFIER:
+			{
+				std::string sType = GET_VARIABLE_NODETYPE(tok.getText());
+				if (sType == "float")
+				{
+					bIsFP = true;
+					break;
+				}
+			}
+			break;
+			case TokenType_::Type::TK_DEREF:
+			{
+				std::string sType = GET_VARIABLE_NODETYPE(prevTok.getText());
+				if (sType == "float")
+				{
+					bIsFP = true;
+					break;
+				}
+			}
+			break;
+			case TokenType_::Type::TK_MEMBERACCESS:
+			{
+				std::string sObjectName = tok.getText();	// sObjectName
+				Token tok = st->nextToken();				// "-"
+				tok = st->nextToken();						// ">"
+				tok = st->nextToken();						// variableName
+
+				std::string sStructType = "";
+				if (sObjectName == "this")
+					sStructType = m_pCurrentStruct->m_sStructName;
+				else
+					sStructType = GET_VARIABLE_NODETYPE(sObjectName);
+				StructInfo* pStructInfo = m_MapGlobalStructs[sStructType];
+				assert(pStructInfo != nullptr);
+				if (pStructInfo != nullptr)
+				{
+					std::string sVariableName = tok.getText();
+					Tree* pNode = pStructInfo->getMemberVariableASTNode(sVariableName.c_str());
+					std::string sType = GET_INFO_FOR_KEY(pNode, "type");
+					if (sType == "float")
+					{
+						bIsFP = true;
+						break;
+					}
+				}
+			}
+			break;
+		}
+	}
+
+	return bIsFP;
+}
+
 void GrammerUtils::handleExpression(Tree* pNode)
 {
 	std::string sRValuePostFixExpression = GET_INFO_FOR_KEY(pNode, "text");
 	StringTokenizer* st = StringTokenizer::create(sRValuePostFixExpression.c_str());
 	st->tokenize();
 	bool bIsFP = st->hasFloatingPoint();
+
+	if (NOT bIsFP)
+	{
+		bIsFP = isFloatingPointExpression(sRValuePostFixExpression);
+
+		st->setData(sRValuePostFixExpression.c_str(), true);
+		st->tokenize();
+	}
+
 	while (st->hasMoreTokens())
 	{
 		Token prevTok = st->prevToken();
@@ -2839,7 +2918,6 @@ void GrammerUtils::handlePrimitiveInt(Tree* pNode)
 							eRVal_PRIMIIVETYPE = getTypeByString(sType);
 						}
 					}
-
 				}
 			}
 

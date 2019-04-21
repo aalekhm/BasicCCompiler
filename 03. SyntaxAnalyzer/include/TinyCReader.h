@@ -194,6 +194,7 @@ class TinyCReader {
 		
 		Tree*						getStructNodeByName(std::string sStructName);
 		void						handleFunctionCallInExpr(std::string sFunctionType);
+		void 						clearTopOfExpressionStack();
 	protected:
 		
 	private:

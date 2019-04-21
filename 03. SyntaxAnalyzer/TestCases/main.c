@@ -68,6 +68,7 @@ SYSFUNC void 	$_glClearColor(int32_t iRed, int32_t iGreen, int32_t iBlue, int32_
 SYSFUNC void 	$_glColor3f(float fRed, float fGreen, float fBlue);
 SYSFUNC int32_t $_retSysFunc(int32_t iValue);
 SYSFUNC float 	$_retFloatFunc(float fValue);
+SYSFUNC float 	$_glColor3fMul(float fRed, float fGreen, float fBlue);
 
 float retFunFloat()
 {
@@ -108,8 +109,12 @@ void systemCallTest()
 	print("fSysRetFloatFunc = ", fSysRetFloatFunc);
 	putc(10);
 	
-	int32_t iSysRetFloatFunc = 2 * $_retFloatFunc(29.3);
-	print("iSysRetFloatFunc = ", iSysRetFloatFunc);
+	int32_t i32SysRetFloatFunc = 12 * $_retFloatFunc(29.3) + $_glColor3fMul(1.9, 3.7, 9.3);
+	print("i32SysRetFloatFunc = ", i32SysRetFloatFunc);
+	putc(10);
+
+	int8_t i8SysRetFloatFunc = 12 * $_retFloatFunc(29.3) + $_glColor3fMul(1.9, 3.7, 9.3);
+	print("i8SysRetFloatFunc = ", i8SysRetFloatFunc);
 	putc(10);
 
 	$_glColor3f( (2 * 3) + (-0.25 + 1 - fSysRetFloatFunc), 21.9 * 7.3, fFloat - fSub);
@@ -755,8 +760,8 @@ int32_t retNewFunc()
 	}
 	
 	// RValue Nested ArrayIndexing
-	int32_t iVar = pNew + pPtr_0[2 * 3 - 4 + pPtr_0[1] - 256];	// 1977 + 255
-	print("iVar = ", iVar, "...");
+	int32_t iVar = pNew[0] + pPtr_0[2 * 3 - 4 + pPtr_0[1] - 256];	// 1977 + 255
+	print("iVar = ", iVar, "... pNew[0] = ", pNew[0], ", pPtr_0[1] = ", pPtr_0[1]);
 	putc(10);
 	////////////////////////////////////////////////
 	

@@ -199,26 +199,49 @@ Tree* TinyCReader::createPostFixExpr(Tree* pLeaf /* = nullptr*/)
 {
 	if (!m_vOperatorStack.empty())
 	{
-		while (!m_vOperatorStack.empty())
+		std::string sTop = m_vOperatorStack.top();
+		while (NOT(m_vOperatorStack.empty() || sTop == "_START_"))
 		{
-			std::string sTop = m_vOperatorStack.top();
 			m_vPostFix.push_back(sTop);
-
 			m_vOperatorStack.pop();
+
+			if (NOT m_vOperatorStack.empty())
+				sTop = m_vOperatorStack.top();
 		}
+
+		if (sTop == "_START_")
+			m_vOperatorStack.pop();
 	}
 
 	std::string sPostFixExpr = "";
 
-	int iSize = m_vPostFix.size();
-	for (int i = 1; i <= iSize; i++)
+	int iSize = m_vPostFix.size(), i = 0, iStartPos = 0;
+	while (i < iSize)
 	{
-		sPostFixExpr += m_vPostFix[i - 1];
-		if (i != iSize)
+		if (m_vPostFix[i] == "_START_")
+		{
+			iStartPos = i + 1;
+		}
+		i++;
+	}
+
+	for (int i = iStartPos; i < iSize; i++)
+	{
+		sPostFixExpr += m_vPostFix[i];
+		if (i < iSize - 1)
 			sPostFixExpr += ", ";
 	}
 
-	m_vPostFix.clear();
+	if (iStartPos >= 1)
+	{
+		iStartPos--;
+		while (iStartPos != m_vPostFix.size())
+		{
+			m_vPostFix.erase(m_vPostFix.begin() + iStartPos);
+		}
+	}
+	else
+		m_vPostFix.clear();
 
 	if (pLeaf == nullptr)
 		pLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, sPostFixExpr.c_str());
@@ -227,6 +250,7 @@ Tree* TinyCReader::createPostFixExpr(Tree* pLeaf /* = nullptr*/)
 
 	return pLeaf;
 }
+
 
 Tree* TinyCReader::makeLeaf(ASTNodeType eASTNodeType, const char* sText)
 {
@@ -593,6 +617,22 @@ void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 
 		m_vPostFix.push_back(sFullyQualifiedTempVariableName);
 	}
+}
+
+void TinyCReader::clearTopOfExpressionStack()
+{
+	int32_t iPostFixSize = m_vPostFix.size();
+	if (iPostFixSize > 0)
+	{
+		if (iPostFixSize == 1 && m_vPostFix[0] == "_START_")
+			m_vPostFix.clear();
+		else
+			if (m_vPostFix[iPostFixSize - 1] == "_START_")
+				m_vPostFix.erase(m_vPostFix.begin() + iPostFixSize - 1);
+	}
+
+	if (m_vOperatorStack.size() > 0 && m_vOperatorStack.top() == "_START_")
+		m_vOperatorStack.pop();
 }
 
 
@@ -1489,6 +1529,9 @@ bool TinyCReader::systemFunctionCall() {
 
 		pTemp = m_pASTCurrentNode;
 		m_pASTCurrentNode = pSystemFunctionCallNode;
+
+		m_vPostFix.push_back("_START_");
+		m_vOperatorStack.push("_START_");
 	}
 
 	if (!functionArgumentList()) {
@@ -1498,6 +1541,9 @@ bool TinyCReader::systemFunctionCall() {
 
 	if (!GrammerUtils::match(')', MANDATORY_))
 		return false;
+
+	// Clear Up Expression engine.
+	clearTopOfExpressionStack();
 
 	Tree* pSystemFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_SYSTEMFUNCTIONCALLEND, sIdentifier.c_str());
 	m_pASTCurrentNode->addChild(pSystemFuncCallEndNode);
@@ -1524,6 +1570,9 @@ bool TinyCReader::functionCall() {
 
 		pTemp = m_pASTCurrentNode;
 		m_pASTCurrentNode = pFunctionCallNode;
+
+		m_vPostFix.push_back("_START_");
+		m_vOperatorStack.push("_START_");
 	}
 
 	if (!functionArgumentList()) {
@@ -1533,6 +1582,9 @@ bool TinyCReader::functionCall() {
 
 	if (!GrammerUtils::match(')', MANDATORY_))
 		return false;
+
+	// Clear Up Expression engine.
+	clearTopOfExpressionStack();
 
 	Tree* pFuncCallEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONCALLEND, sIdentifier.c_str());
 	m_pASTCurrentNode->addChild(pFuncCallEndNode);
