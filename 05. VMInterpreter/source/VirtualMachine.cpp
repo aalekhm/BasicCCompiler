@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <iostream>
 #include "ConsoleColor.h"
-#include "meta/MetaFunction.h"
 
 #define VERBOSE	1
 
@@ -113,16 +112,25 @@ struct CodeMap
 };
 
 VirtualMachine::VirtualMachine()
+: m_sBuff(nullptr)
+, m_iLength(0)
+, CODE(nullptr)
+, STACK(nullptr)
+, DATA(nullptr)
+, GLOBALS(nullptr)
+, HEAP(nullptr)
+, m_bRunning(false)
 { }
 
 VirtualMachine::~VirtualMachine()
 { }
 
-VirtualMachine*	VirtualMachine::create()
+VirtualMachine*	VirtualMachine::create(std::function<void(const char*, int16_t)>* fSysFuncCallback)
 {
 	if (m_pVMInstance == nullptr)
 	{
 		m_pVMInstance = new VirtualMachine();
+		m_pVMInstance->setSysFuncCallback(fSysFuncCallback);
 	}
 
 	return m_pVMInstance;
@@ -136,22 +144,33 @@ void VirtualMachine::run(const char* sMachineCodeFile)
 		bool bCanRead = pRaf->openForRead(sMachineCodeFile);
 		if (bCanRead)
 		{
-			unsigned long iLength = pRaf->length();
-			char* sBuff = new char[iLength + 1];
-			memset(sBuff, 0, iLength);
+			m_iLength = pRaf->length();
+			m_sBuff = new char[m_iLength + 1];
+			memset(m_sBuff, 0, m_iLength);
 
-			unsigned long iBytesRead = pRaf->read(sBuff);
+			unsigned long iBytesRead = pRaf->read(m_sBuff);
 			if (iBytesRead > 0)
 			{
-				reset();
-				load(sBuff, iLength);
-				execute(sBuff);
-			}
+				pRaf->close();
 
-			delete[] sBuff;
-			sBuff = nullptr;
+				restart();
+			}
 		}
-		pRaf->close();
+	}
+}
+
+void VirtualMachine::restart()
+{
+	reset();
+	load(m_sBuff, m_iLength);
+	execute(m_sBuff);
+}
+
+void VirtualMachine::stop()
+{
+	if (m_sBuff != nullptr)
+	{
+		delete[] m_sBuff;
 	}
 }
 
@@ -167,6 +186,9 @@ void VirtualMachine::reset()
 	REGS.CS = CS_START_OFFSET;
 	REGS.SS = SS_START_OFFSET;
 	REGS.DS = DS_START_OFFSET;
+
+	m_vAllocatedList.clear();
+	m_vUnAllocatedList.clear();
 
 	m_vUnAllocatedList.push_back(HeapNode(0, MAX_HEAP_SIZE));
 
@@ -233,8 +255,6 @@ void VirtualMachine::load(const char* iByteCode, int iBuffLength)
 	int iEndOffset = 0;
 	iEndOffset = loadBSS(iByteCode, 0, iBuffLength);
 	iEndOffset = loadCode(iByteCode, iEndOffset, iBuffLength);
-
-	scriptTest();
 }
 
 void VirtualMachine::execute(const char* iByteCode)
@@ -594,25 +614,25 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			int32_t* pDS = (int32_t*)&RAM[DS_START_OFFSET];
 
 			int32_t iStringOffset = *(pDS + iTemp1);
-			std::cout << green << &RAM[iStringOffset];
+			std::cout << green << &RAM[iStringOffset] << white;
 		}
 		break;
 		case OPCODE::PRTC:
 		{
 			iTemp1 = STACK[REGS.RSP++];
-			std::cout << green << (char)iTemp1;
+			std::cout << green << (char)iTemp1 << white;
 		}
 		break;
 		case OPCODE::PRTI:
 		{
 			iTemp1 = *( (int32_t*)&STACK[REGS.RSP++] );
-			std::cout << green << iTemp1;
+			std::cout << green << iTemp1 << white;
 		}
 		break;
 		case OPCODE::PRTF:
 		{
 			fTemp1 = *( (float*)&STACK[REGS.RSP++] );
-			std::cout << green << fTemp1;
+			std::cout << green << fTemp1 << white;
 		}
 		break;
 		case OPCODE::MALLOC:
@@ -623,7 +643,7 @@ void VirtualMachine::eval(OPCODE eOpCode)
 			assert(iAddress >= 0);
 			STACK[--REGS.RSP] = iAddress;
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << red << getConsumedMemory() << "/" << MAX_HEAP_SIZE << std::endl;
+			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Malloc(" << iTemp1 << ") @ " << iAddress << " ------ CONSUMED: " << red << getConsumedMemory() << "/" << MAX_HEAP_SIZE << white << std::endl;
 #endif
 		}
 		break;
@@ -843,7 +863,7 @@ void VirtualMachine::sta(OPCODE eOpCode)
 		memcpy(pAddress_8, iRValueAddr, iVarType);
 
 		#if (VERBOSE == 1)
-				std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP] " << blue << iAddress << "[" << iArrayIndex << "] = " << *iRValueAddr << std::endl;
+				std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP] " << blue << iAddress << "[" << iArrayIndex << "] = " << *iRValueAddr << white << std::endl;
 		#endif
 	}
 }
@@ -915,9 +935,20 @@ void VirtualMachine::sysCall(OPCODE eOpCode)
 	int32_t iStringOffset = *(pDS + iStringID);
 
 	const char* sSysFuncName = (const char*)&RAM[iStringOffset];
-	executeScriptFunction(sSysFuncName, iArgCount);
+	if (m_fSysFuncCallback != nullptr)
+	{
+		(*m_fSysFuncCallback)(sSysFuncName, iArgCount);
+	}
 
 	REGS.RSP += iArgCount;
+}
+
+void VirtualMachine::setSysFuncCallback(std::function<void(const char*, int16_t)>* fSysFuncCallback)
+{
+	if (fSysFuncCallback != nullptr)
+	{
+		m_fSysFuncCallback = fSysFuncCallback;
+	}
 }
 
 void VirtualMachine::memSet(OPCODE eOpCode)
@@ -1087,7 +1118,7 @@ void VirtualMachine::dealloc(int32_t pAddress)
 		if (pAddress == pAllocHeapNode.m_pAddress)
 		{
 #if (VERBOSE == 1)
-			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << " ----- AVAILABLE: " << green << getAvailableMemory() << "/" << MAX_HEAP_SIZE << std::endl;
+			std::cout << "\t\t\t\t\t\t" << yellow << "[HEAP]" << blue << " Reclaiming Memory @ " << pAddress << " of Size = " << pAllocHeapNode.m_iSize << " ----- AVAILABLE: " << green << getAvailableMemory() << "/" << MAX_HEAP_SIZE << white << std::endl;
 #endif
 			/////////////////////////////////////////////////////////////////
 			// 3. Merge it with any preceding HeapNode.
@@ -1265,119 +1296,14 @@ int32_t VirtualMachine::getAvailableMemory()
 	return iAvailableMemory;
 }
 
-void* VirtualMachine::getStackPointerFromTOS(int32_t iOffset)
+const void* VirtualMachine::getStackPointerFromTOS(int32_t iOffset) const
 {
 	assert(abs(REGS.RSP + iOffset) < MAX_STACK_SIZE);
 	return &STACK[REGS.RSP + iOffset];
 }
 
-// Dummy System Functions.
-void glLoadIdentity()
+REGISTERS* VirtualMachine::getVMRegisters()
 {
-	std::cout << blue << "In glLoadIdentity();" << std::endl;
+	return &REGS;
 }
 
-void glClearColor(int32_t iRed, int32_t iGreen, int32_t iBlue, int32_t iAlpha)
-{
-	std::cout << blue << "In glClearColor(" << iRed << ", " << iGreen << ", " << iBlue << ", " << iAlpha << ");" << std::endl;
-}
-
-void glColor3f(float fRed, float fGreen, float fBlue)
-{
-	std::cout << blue << "In glColor3f(" << fRed << ", " << fGreen << ", " << fBlue << ");" << std::endl;
-}
-
-int32_t retSysFunc(int32_t iValue)
-{
-	std::cout << blue << "In retSysFunc(" << iValue << ", retValue = " << (iValue * 3) << ");" << std::endl;
-	return iValue * 3;
-}
-
-float retFloatFunc(float fValue)
-{
-	std::cout << blue << "In retFloatFunc(" << fValue << ", retValue = " << (fValue * 3) << ");" << std::endl;
-	return fValue * 3;
-}
-
-float glColor3fMul(float fRed, float fGreen, float fBlue)
-{
-	std::cout << blue << "In glColor3fMul(" << fRed << ", " << fGreen << ", " << fBlue << "); = " << (fRed * fGreen * fBlue) << std::endl;
-	return fRed * fGreen * fBlue;
-}
-
-META_REGISTER_FUN(glLoadIdentity);
-META_REGISTER_FUN(glClearColor);
-META_REGISTER_FUN(glColor3f);
-META_REGISTER_FUN(retSysFunc);
-META_REGISTER_FUN(retFloatFunc);
-META_REGISTER_FUN(glColor3fMul);
-
-void VirtualMachine::scriptTest()
-{
-	// Script Test
-	{
-		GetFunctionByName("glLoadIdentity")->call(nullptr, nullptr, 0);
-
-		int32_t iRed = 128, iGreen = 64, iBlue = 32, iAlpha = 255;
-		Variable iArgs[] = { iRed, iGreen, iBlue, iAlpha };
-		GetFunctionByName("glClearColor")->call(nullptr, iArgs, 4);
-
-		float fRed = 128.1f, fGreen = 64.2f, fBlue = 32.3f;
-		Variable fArgs[] = { fRed, fGreen, fBlue };
-		GetFunctionByName("glColor3f")->call(nullptr, fArgs, 4);
-
-		int32_t iRetValue = 0;
-		Variable iRetVar(iRetValue);
-		Variable iArg(iRed);
-		GetFunctionByName("retSysFunc")->call(iRetVar, &iArg, 1);
-	}
-}
-
-void VirtualMachine::executeScriptFunction(const char* sFuncName, int32_t iArgCount)
-{
-	MetaFunction* pMetaFunction = GetFunctionByName(sFuncName);
-	assert(pMetaFunction != nullptr);
-	if (pMetaFunction != nullptr)
-	{
-		// Return Value
-		Variable ret;
-		{
-			ret.m_MetaType = pMetaFunction->getRetType();
-			if (ret.m_MetaType->sizeOf() > 0)
-				ret.m_Var = ret.m_MetaType->newAlloc();
-		}
-
-		// Function Arguments
-		Variable* pArgs = new Variable[iArgCount];
-		{
-			for (int32_t i = 0; i < pMetaFunction->getArgCount(); i++)
-			{
-				const MetaType* pArgMetaType = pMetaFunction->getArgType(i);
-				pArgs[i].m_MetaType = pArgMetaType;
-				pArgs[i].m_Var = pArgs[i].m_MetaType->newAlloc();
-				pArgs[i].m_MetaType->setValueFrom(pArgs[i].m_Var, getStackPointerFromTOS(i));
-			}
-		}
-
-		// Function Call
-		pMetaFunction->call(ret, pArgs, iArgCount);
-
-		// Check Return type & push it on the 'STACK'.
-		size_t iRetVarSize = ret.m_MetaType->sizeOf();
-		if (iRetVarSize > 0)
-		{
-			memcpy_s(&REGS.RAX, iRetVarSize, ret.m_Var, iRetVarSize);
-		}
-
-		// Function Cleanup
-		{
-			for (int32_t i = 0; i < pMetaFunction->getArgCount(); i++)
-			{
-				pArgs[i].m_MetaType->deleteAlloc(pArgs[i].m_Var);
-			}
-			delete[] pArgs;
-			if (ret.m_MetaType->sizeOf() > 0)
-				ret.m_MetaType->deleteAlloc(ret.m_Var);
-		}
-	}
-}

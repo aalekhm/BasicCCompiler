@@ -24,7 +24,7 @@ struct Void_MetaType : public MetaType
 	virtual const char* name() const { return "void"; }
 	virtual size_t		sizeOf() const { return 0; }
 
-	virtual double		toNumber(void* pAddress) const { return 0; }
+	virtual double		toNumber(void* pAddress) const { return (double)0; }
 	virtual const char*	toString(void* pAddress) const { return ""; }
 	virtual void		cast(void* pTo, void* pFrom, const MetaType& metaType) const { };
 
@@ -42,7 +42,7 @@ struct Int8_MetaType : public MetaType
 	virtual const char* name() const { return "int8_t"; }
 	virtual size_t		sizeOf() const { return sizeof(int8_t); }
 
-	virtual double		toNumber(void* pAddress) const { return *(int8_t*)pAddress; }
+	virtual double		toNumber(void* pAddress) const { return (double)*(int8_t*)pAddress; }
 	virtual const char*	toString(void* pAddress) const 
 	{ 
 		static char sBuf[64];
@@ -69,7 +69,7 @@ struct Int16_MetaType : public MetaType
 	virtual const char* name() const { return "int16_t"; }
 	virtual size_t		sizeOf() const { return sizeof(int16_t); }
 
-	virtual double		toNumber(void* pAddress) const { return *(int16_t*)pAddress; }
+	virtual double		toNumber(void* pAddress) const { return (double)*(int16_t*)pAddress; }
 	virtual const char*	toString(void* pAddress) const
 	{
 		static char sBuf[64];
@@ -96,7 +96,7 @@ struct Int32_MetaType : public MetaType
 	virtual const char* name() const { return "int32_t"; }
 	virtual size_t		sizeOf() const { return sizeof(int32_t); }
 
-	virtual double		toNumber(void* pAddress) const { return *(int32_t*)pAddress; }
+	virtual double		toNumber(void* pAddress) const { return (double)*(int32_t*)pAddress; }
 	virtual const char*	toString(void* pAddress) const
 	{
 		static char sBuf[64];
@@ -123,7 +123,7 @@ struct Int64_MetaType : public MetaType
 	virtual const char* name() const { return "int64_t"; }
 	virtual size_t		sizeOf() const { return sizeof(int64_t); }
 
-	virtual double		toNumber(void* pAddress) const { return *(int64_t*)pAddress; }
+	virtual double		toNumber(void* pAddress) const { return (double)*(int64_t*)pAddress; }
 	virtual const char*	toString(void* pAddress) const
 	{
 		static char sBuf[64];
@@ -177,7 +177,7 @@ struct Float_MetaType : public MetaType
 	virtual const char* name() const { return "float"; }
 	virtual size_t		sizeOf() const { return sizeof(float); }
 
-	virtual double		toNumber(void* pAddress) const { return *(float*)pAddress; }
+	virtual double		toNumber(void* pAddress) const { return (double)*(float*)pAddress; }
 	virtual const char*	toString(void* pAddress) const
 	{
 		static char sBuf[64];

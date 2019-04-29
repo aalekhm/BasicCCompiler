@@ -19,6 +19,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "06_C++_Reflection_ThatGameC
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "07_LuaMetaSystem_ThatGameCompany_x86", "07_LuaMetaSystem_ThatGameCompany_x86\07_LuaMetaSystem_ThatGameCompany_x86.vcxproj", "{B1D6FF4E-3889-443F-917F-12A242FF8194}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "08_BareBonesOpenGLWindowLib", "08_BareBonesOpenGLWindowLib\08_BareBonesOpenGLWindowLib.vcxproj", "{06CE9A50-95F2-47AB-98CA-08702CCA3293}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "09_ScriptInterpreterTest", "09_ScriptInterpreterTest\09_ScriptInterpreterTest.vcxproj", "{EE672998-C876-4743-8265-666314EE39AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -91,6 +95,22 @@ Global
 		{B1D6FF4E-3889-443F-917F-12A242FF8194}.Release|x64.Build.0 = Release|x64
 		{B1D6FF4E-3889-443F-917F-12A242FF8194}.Release|x86.ActiveCfg = Release|Win32
 		{B1D6FF4E-3889-443F-917F-12A242FF8194}.Release|x86.Build.0 = Release|Win32
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Debug|x64.ActiveCfg = Debug|x64
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Debug|x64.Build.0 = Debug|x64
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Debug|x86.ActiveCfg = Debug|Win32
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Debug|x86.Build.0 = Debug|Win32
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Release|x64.ActiveCfg = Release|x64
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Release|x64.Build.0 = Release|x64
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Release|x86.ActiveCfg = Release|Win32
+		{06CE9A50-95F2-47AB-98CA-08702CCA3293}.Release|x86.Build.0 = Release|Win32
+		{EE672998-C876-4743-8265-666314EE39AE}.Debug|x64.ActiveCfg = Debug|x64
+		{EE672998-C876-4743-8265-666314EE39AE}.Debug|x64.Build.0 = Debug|x64
+		{EE672998-C876-4743-8265-666314EE39AE}.Debug|x86.ActiveCfg = Debug|Win32
+		{EE672998-C876-4743-8265-666314EE39AE}.Debug|x86.Build.0 = Debug|Win32
+		{EE672998-C876-4743-8265-666314EE39AE}.Release|x64.ActiveCfg = Release|x64
+		{EE672998-C876-4743-8265-666314EE39AE}.Release|x64.Build.0 = Release|x64
+		{EE672998-C876-4743-8265-666314EE39AE}.Release|x86.ActiveCfg = Release|Win32
+		{EE672998-C876-4743-8265-666314EE39AE}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

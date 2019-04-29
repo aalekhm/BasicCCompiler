@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <functional>
 
 enum class OPCODE
 {
@@ -175,11 +176,16 @@ struct HeapNode
 class VirtualMachine
 {
 	public:
-		static VirtualMachine*		create();
-
-		static VirtualMachine*		m_pVMInstance;
+		static VirtualMachine*		create(std::function<void(const char*, int16_t)>* fSysFuncCallback);
 		void						run(const char* sMachineCodeFile);
+		void						restart();
+		void						stop();
+
+		const void*					getStackPointerFromTOS(int32_t iOffset) const;
+		REGISTERS*					getVMRegisters();
 	protected:
+		void						setSysFuncCallback(std::function<void(const char*, int16_t)>* fSysFuncCallback);
+
 		void						reset();
 		int							loadBSS(const char* iByteCode, int startOffset, int iBuffLength);
 		int							loadCode(const char* iByteCode, int startOffset, int iBuffLength);
@@ -213,16 +219,14 @@ class VirtualMachine
 
 		int32_t						getConsumedMemory();
 		int32_t						getAvailableMemory();
-
-		void*						getStackPointerFromTOS(int32_t iOffset);
-
-		// Scripting
-		void						executeScriptFunction(const char* sFuncName, int32_t iArgCount);
-		void						scriptTest(); // Temp
 	private:
 									VirtualMachine();
 		virtual						~VirtualMachine();
+		static VirtualMachine*		m_pVMInstance;
+		char*						m_sBuff;
+		unsigned long				m_iLength;
 
+		std::function<void(const char*, int16_t)>* m_fSysFuncCallback;
 		REGISTERS					REGS;
 
 		int8_t*						CODE;
