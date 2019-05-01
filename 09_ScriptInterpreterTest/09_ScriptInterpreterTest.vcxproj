@@ -85,6 +85,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>../$(IntDir)</AdditionalLibraryDirectories>
@@ -119,15 +120,29 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\ConsoleColor.h" />
     <ClInclude Include="include\Dream3DTest.h" />
     <ClInclude Include="include\Engine\Base.h" />
     <ClInclude Include="include\Engine\EngineManager.h" />
     <ClInclude Include="include\Engine\KeyboardManager.h" />
     <ClInclude Include="include\Engine\MouseManager.h" />
     <ClInclude Include="include\Engine\Timer.h" />
+    <ClInclude Include="include\gl.h" />
+    <ClInclude Include="include\meta\Apply.h" />
+    <ClInclude Include="include\meta\AutoLister.h" />
+    <ClInclude Include="include\meta\FunctionSignature.h" />
+    <ClInclude Include="include\meta\MetaFunction.h" />
+    <ClInclude Include="include\meta\MetaType.h" />
+    <ClInclude Include="include\meta\MetaVariable.h" />
+    <ClInclude Include="include\meta\Variable.h" />
+    <ClInclude Include="include\RandomAccessFile.h" />
+    <ClInclude Include="include\VirtualMachine.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dream3DTest.cpp" />
+    <ClCompile Include="src\gl.cpp" />
+    <ClCompile Include="src\RandomAccessFile.cpp" />
+    <ClCompile Include="src\VirtualMachine.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

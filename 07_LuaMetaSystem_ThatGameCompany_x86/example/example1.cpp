@@ -53,66 +53,6 @@ int main(int argc, char* argv[]){
 		if (luaL_dofile(L, "example/example_loop.lua"))
 			error(L, "cannot run configuration file: %s", lua_tostring(L, -1));
 
-		/*
-		MetaFunction* mf = nullptr;
-		Variable* ret = nullptr;
-		Variable* args;
-		void* pVoid = nullptr;
-		Variable* pVoidVariable = new Variable(pVoid);
-
-		int iArgCount = 0;
-
-		//glMatrixMode(GL_MODELVIEW);
-		mf = GetFunctionByName("glMatrixMode");
-		{
-			int32 iVal = GL_MODELVIEW;
-
-			iArgCount = 1;
-			ret = pVoidVariable;
-			Variable args[] = { iVal };
-			mf->apply(*ret, args, iArgCount);
-		}
-		
-		//glLoadIdentity();
-		mf = GetFunctionByName("glLoadIdentity");
-		{
-			iArgCount = 0;
-			ret = pVoidVariable;
-			Variable args[] = { *pVoidVariable };
-			mf->apply(*ret, args, iArgCount);
-		}
-
-		//glClearColor(1, 0, 0, 0);
-		mf = GetFunctionByName("glClearColor");
-		{
-			iArgCount = 4;
-			ret = pVoidVariable;
-			Variable args[] = { 1 , 0, 0, 0 };
-			mf->apply(*ret, args, iArgCount);
-		}
-
-		//glClear(GL_COLOR_BUFFER_BIT + GL_DEPTH_BUFFER_BIT);
-		mf = GetFunctionByName("glClear");
-		{
-			iArgCount = 1;
-			ret = pVoidVariable;
-			Variable args[] = { GL_COLOR_BUFFER_BIT + GL_DEPTH_BUFFER_BIT };
-			mf->apply(*ret, args, iArgCount);
-		}
-
-		//mf = GetFunctionByName("funcStr");
-		//{
-		//	const char* sStr = "HellowWorld";
-		//
-		//	iArgCount = 1;
-		//	ret = pVoidVariable;
-		//	Variable args[] = { sStr };
-		//	mf->apply(*ret, args, iArgCount);
-		//}
-
-		delete pVoidVariable;
-		*/
-
 		wnd.swapBuffers();
 
 		float64 currentTime = wnd.elapsedTime();

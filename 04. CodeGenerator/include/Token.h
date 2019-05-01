@@ -301,6 +301,7 @@ enum class OPCODE
 	DIVF,
 	ADDF,
 	SUBF,
+	MODF,
 	PRTF,
 	CAST,
 	HLT,

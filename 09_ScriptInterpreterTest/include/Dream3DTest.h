@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Engine/EngineManager.h"
+#include "VirtualMachine.h"
 
-class Dream3DTest : EngineManager
+class Dream3DTest : public EngineManager
 {
 	public:
 								Dream3DTest();
@@ -21,5 +22,7 @@ class Dream3DTest : EngineManager
 		virtual void			onMouseWheelEx(WPARAM wParam, LPARAM lParam);
 	protected:
 	private:
+		VirtualMachine*			m_pVM;
+		void					onScriptCallback(const char* sSysFuncName, int16_t iArgCount);
 };
 

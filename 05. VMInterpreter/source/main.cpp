@@ -77,10 +77,9 @@ int main(int argc, char* argv[])
 	}
 
 	std::function<void(const char* sSysFuncName, int16_t iArgCount)> fSysFuncCallback = onScriptCallback;
-
 	pVM = VirtualMachine::create(&fSysFuncCallback);
-	pVM->run(argv[1]);
-	pVM->restart();
+	pVM->loadFile(argv[1]);
+	pVM->start();
 
 	exit(EXIT_SUCCESS);
 }

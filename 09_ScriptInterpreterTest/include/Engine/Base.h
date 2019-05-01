@@ -14,7 +14,7 @@
 #include <vector>
 #include <map>
 
-#include <gl\glew.h>
+#include "gl.h"
 
 // Common
 #ifndef NULL

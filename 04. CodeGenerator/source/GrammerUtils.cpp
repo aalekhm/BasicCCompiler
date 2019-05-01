@@ -126,6 +126,7 @@ CodeMap opCodeMap[] =
 	{ "DIVF",		OPCODE::DIVF,		1,  PRIMIIVETYPE::INT_8 },
 	{ "ADDF",		OPCODE::ADDF,		1,  PRIMIIVETYPE::INT_8 },
 	{ "SUBF",		OPCODE::SUBF,		1,  PRIMIIVETYPE::INT_8 },
+	{ "MODF",		OPCODE::MODF,		1,  PRIMIIVETYPE::INT_8 },
 
 	{ "PRTF",		OPCODE::PRTF,		1,  PRIMIIVETYPE::INT_8 },
 	{ "CAST",		OPCODE::CAST,		3,  PRIMIIVETYPE::INT_8 },
@@ -1525,6 +1526,7 @@ void GrammerUtils::emit(OPCODE eOPCODE, int iOperand)
 		case OPCODE::SUBF:
 		case OPCODE::MULF:
 		case OPCODE::DIVF:
+		case OPCODE::MODF:
 		case OPCODE::JMP_LT:
 		case OPCODE::JMP_LTEQ:
 		case OPCODE::JMP_GT:
@@ -2658,7 +2660,7 @@ void GrammerUtils::handleExpression(Tree* pNode)
 				EMIT_1(bIsFP ? OPCODE::DIVF : OPCODE::DIV, 0);
 				break;
 			case TokenType_::Type::TK_MOD:
-				EMIT_1(OPCODE::MOD, 0);
+				EMIT_1(bIsFP ? OPCODE::MODF : OPCODE::MOD, 0);
 				break;
 			case TokenType_::Type::TK_ADD:
 				EMIT_1(bIsFP ? OPCODE::ADDF : OPCODE::ADD, 0);
