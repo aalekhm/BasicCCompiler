@@ -55,15 +55,18 @@
 																Tree* pTemp = nullptr;
 																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
 																m_pASTCurrentNode = pInterfaceDefNode;
-																
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
+
 																Tree* pInterfaceStartNode = makeLeaf(ASTNodeType::ASTNode_INTERFACESTART, "");
 																m_pASTCurrentNode->addChild(pInterfaceStartNode);
+																
 															"</code>"
 											{ <interfaceObjectList> [';'] }
 												
 										'}'					"<code>"
 																__END_INTERFACE__
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 																
 																Tree* pInterfaceEndNode = makeLeaf(ASTNodeType::ASTNode_INTERFACEEND, "");
 																m_pASTCurrentNode->addChild(pInterfaceEndNode);
@@ -161,6 +164,7 @@
 																Tree* pTemp = nullptr;
 																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
 																m_pASTCurrentNode = pStructDefNode;
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 																
 																Tree* pStructStartNode = makeLeaf(ASTNodeType::ASTNode_STRUCTSTART, "");
 																m_pASTCurrentNode->addChild(pStructStartNode);
@@ -169,6 +173,7 @@
 										'}'					"<code>"
 																__END_STRUCT__
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 																
 																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
 																m_pASTCurrentNode->addChild(pStructEndNode);
@@ -222,7 +227,7 @@
 										"</code>"
 										;
 
-<staticPtr>						::=		<primitiveType>		"<code>"
+<staticPtr>						::=		<variableType>		"<code>"
 																std::string sPointerType = PREV_TOKEN_TEXT;
 															"</code>"
 										'*'
@@ -327,6 +332,7 @@
 										'{'					"<code>"
 																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
 																m_pASTCurrentNode = pFunctionDefNode;
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 																
 																Tree* pFuncStartNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONSTART, "");
 																m_pASTCurrentNode->addChild(pFuncStartNode);
@@ -335,6 +341,7 @@
 										'}'					"<code>"
 																__END_FUNCTION__
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 																
 																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
 																m_pASTCurrentNode->addChild(pFuncEndNode);
@@ -606,12 +613,14 @@
 										<expr>			"<code>"
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															m_pASTCurrentNode = pIfNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														"</code>"
 										')'
-										['{']
+										'{'
 										<stmt_list>
-										['}'] 			"<code>"
+										'}'				"<code>"
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 														"</code>"
 										[ <elseStatement> ]		
 														"<code>"
@@ -630,12 +639,14 @@
 																pElseNode->m_pParentNode = pIfNode->m_pParentNode;
 																
 																m_pASTCurrentNode = pElseNode;
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 															}
 														"</code>"
-										['{']
+										'{'
 										<stmt_list>
-										['}'] 			"<code>"
+										'}'				"<code>"
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 															
 															pIfNode->m_pRightNode = pElseNode;
 															{
@@ -666,12 +677,14 @@
 										<expr>			"<code>"
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															m_pASTCurrentNode = pWhileNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														"</code>"
 										')'
 										['{']
 										<stmt_list> 
 										['}'] 			"<code>"
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 															
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pWhileNode);
@@ -736,6 +749,7 @@
 														{
 															pTemp = m_pASTCurrentNode;
 															m_pASTCurrentNode = pSwitchCaseNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														}
 													"</code>"
 										':'
@@ -750,6 +764,8 @@
 										';' ]
 													"<code>"
 														__END_CURRENT_BLOCK__
+														__RESET_BLOCK_NODE__
+														
 														m_pASTCurrentNode = pTemp;
 													"</code>"
 										;
@@ -764,6 +780,7 @@
 														{
 															pTemp = m_pASTCurrentNode;
 															m_pASTCurrentNode = pSwitchDefaultNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														}
 													"</code>"
 										':'
@@ -772,6 +789,8 @@
 										[ '}' ]
 													"<code>"
 														__END_CURRENT_BLOCK__
+														__RESET_BLOCK_NODE__
+														
 														m_pASTCurrentNode = pTemp;
 													"</code>"
 										"break"
@@ -831,11 +850,13 @@
 										[ <oneOrMoreLoopExprs> ]
 										')'				"<code>"
 															m_pASTCurrentNode = pWhileNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														"</code>"
 										[ '{' ]
 										<stmt_list>
 										[ '}' ]			"<code>"
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 															
 															for(Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
 															{
@@ -1110,10 +1131,12 @@
 
 <bracesstmtlist>				::= 	'{' 				"<code>"
 																__START_BLOCK_STRING__("{")
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 															"</code>"
 										<stmt_list> 
 										'}'					"<code>"
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 															"</code>"
 										;
 
@@ -1606,12 +1629,44 @@
 																m_pASTCurrentNode = pRValueExpressionLeftLeaf;
 															}
 														"</code>"
-										<expr>			"<code>"
+										(	"new"		"<code>"
+															// Since this will be a 'struct' constructor call, change its type to 'ASTNode_TYPESTRUCT'
+															// & make all necessary changes that suit 'ASTNode_TYPESTRUCT'
+															
+															pAssignmentNode->m_eASTNodeType = ASTNodeType::ASTNode_TYPESTRUCT;
+															pAssignmentNode->m_pLeftNode = nullptr; delete pRValueExpressionLeftLeaf; 	// No need for these, hence remove & delete.
+															pAssignmentNode->m_pRightNode = nullptr; delete pIdentifierLeaf;			// No need for these, hence remove & delete.
+															
+															pAssignmentNode->m_sAdditionalInfo.append(sVariableName);
+															pAssignmentNode->m_bIsPointerType = true;
+															SET_INFO_FOR_KEY(pAssignmentNode, "givenName", sVariableName);
+															SET_INFO_FOR_KEY(pAssignmentNode, "scope", getCurrentScopeString());
+
+															m_pASTCurrentNode = pAssignmentNode;
+														"</code>"
+											<functionCall>
+														"<code>"
+															// Since the last node would have been a 'ASTNode_FUNCTIONCALL', grab it 
+															// & make changes to 'ASTNode_TYPESTRUCT' node.
+															
+															Tree* pFunctionCallNode = m_pASTCurrentNode->m_vStatements[0];
+															{
+																std::string sStructType = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
+																SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sStructType);
+																SET_INFO_FOR_KEY(pAssignmentNode, "type", sStructType);
+															}
+
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pAssignmentNode);
+														"</code>"
+											|
+											<expr>		"<code>"
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pAssignmentNode);
 														"</code>"
+										)
 										;
 										
 <freePtrStatement>				::=		"free"
@@ -1914,7 +1969,6 @@
 																
 																Tree* pExpressionNode = m_pASTCurrentNode->m_pParentNode;		// In this case ASTNode_MEMBERACCESS's parent.
 																Tree* pAssignNode = pExpressionNode->m_pParentNode;
-																Tree* pBlockNode = pAssignNode->m_pParentNode;
 																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
 																{
 																	pFunctionCallNode->removeFromParent();
@@ -1933,7 +1987,7 @@
 																		SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
 																		SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
 																		SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
-																		pBlockNode->addChild(pPrimIntNode);
+																		m_pASTCurrentBlockNode->addChild(pPrimIntNode);
 																	}
 																	
 																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");

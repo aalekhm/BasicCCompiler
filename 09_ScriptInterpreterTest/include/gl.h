@@ -1577,6 +1577,7 @@ extern void(GL_FUNCPTR * _ptr_glBegin)(GLenum);
 extern void(GL_FUNCPTR * _ptr_glEnd)(void);
 extern void(GL_FUNCPTR * _ptr_glColor3f)(GLfloat, GLfloat, GLfloat);
 extern void(GL_FUNCPTR * _ptr_glVertex2f)(GLfloat, GLfloat);
+extern void(GL_FUNCPTR * _ptr_glVertex2i)(GLint, GLint);
 
 inline void GL_FUNCPTR glMatrixMode (GLenum mode){
     _ptr_glMatrixMode(mode);
@@ -1602,6 +1603,9 @@ inline void GL_FUNCPTR glColor3f (GLfloat red, GLfloat green, GLfloat blue){
 }
 inline void GL_FUNCPTR glVertex2f (GLfloat x, GLfloat y){
 	_ptr_glVertex2f(x, y);
+}
+inline void GL_FUNCPTR glVertex2i(GLint x, GLint y) {
+	_ptr_glVertex2i(x, y);
 }
 
 //OpenGL1.2
@@ -3098,6 +3102,7 @@ static int Load_GL_Version_1_0(bool _coreProfile){
 		LOAD_FUNCTION_NAME(_ptr_glEnd, void(GL_FUNCPTR *)(void), "glEnd");
 		LOAD_FUNCTION_NAME(_ptr_glColor3f, void(GL_FUNCPTR *)(GLfloat, GLfloat, GLfloat), "glColor3f");
 		LOAD_FUNCTION_NAME(_ptr_glVertex2f, void(GL_FUNCPTR *)(GLfloat, GLfloat), "glVertex2f");
+		LOAD_FUNCTION_NAME(_ptr_glVertex2i, void(GL_FUNCPTR *)(GLint, GLint), "glVertex2i");
 	}
 	else{
         _ptr_glMatrixMode = VoidCoreProfileError < GLenum > ;
@@ -3107,6 +3112,7 @@ static int Load_GL_Version_1_0(bool _coreProfile){
 		_ptr_glEnd = VoidCoreProfileError < >;
 		_ptr_glColor3f = VoidCoreProfileError < GLfloat, GLfloat, GLfloat >;
 		_ptr_glVertex2f = VoidCoreProfileError < GLfloat, GLfloat >;
+		_ptr_glVertex2i = VoidCoreProfileError < GLint, GLint >;
 	}
 	LOAD_FUNCTION_NAME(_ptr_glCullFace, void(GL_FUNCPTR*)(GLenum mode), "glCullFace");
 	LOAD_FUNCTION_NAME(_ptr_glFrontFace, void(GL_FUNCPTR*)(GLenum mode), "glFrontFace");

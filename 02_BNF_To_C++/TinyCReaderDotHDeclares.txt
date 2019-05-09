@@ -42,6 +42,8 @@
 		
 		Tree*						m_pASTRootNode;
 		Tree*						m_pASTCurrentNode;
+		Tree*						m_pASTCurrentBlockNode;
+		Tree*						m_pASTPrevBlockNode;
 		
 		std::vector<std::string>	m_sBlockStringList;
 		bool						m_bInterfaceInProcess;

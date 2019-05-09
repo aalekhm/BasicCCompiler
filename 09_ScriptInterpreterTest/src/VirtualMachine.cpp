@@ -5,7 +5,8 @@
 #include <iostream>
 #include "ConsoleColor.h"
 
-#define VERBOSE	1
+#define VERBOSE		1
+#define LOGTOFILE	0
 
 VirtualMachine*	VirtualMachine::m_pVMInstance = nullptr;
 
@@ -121,6 +122,9 @@ VirtualMachine::VirtualMachine()
 , GLOBALS(nullptr)
 , HEAP(nullptr)
 , m_bRunning(false)
+#if (LOGTOFILE == 1)
+, m_pLogger(nullptr)
+#endif
 { }
 
 VirtualMachine::~VirtualMachine()
@@ -171,6 +175,12 @@ void VirtualMachine::stop()
 	{
 		delete[] m_sBuff;
 	}
+#if (LOGTOFILE == 1)
+	if (m_pLogger != nullptr)
+	{
+		m_pLogger->close();
+	}
+#endif
 }
 
 void VirtualMachine::reset()
@@ -188,7 +198,7 @@ void VirtualMachine::reset()
 	m_vAllocatedList.clear();
 	m_vUnAllocatedList.clear();
 
-	m_vUnAllocatedList.push_back(HeapNode(0, MAX_HEAP_SIZE));
+	m_vUnAllocatedList.push_back(HeapNode(1, MAX_HEAP_SIZE));
 
 	m_bRunning = false;
 }
@@ -222,6 +232,8 @@ int VirtualMachine::loadBSS(const char* iByteCode, int startOffset, int iBuffLen
 		int32_t iStaticVariableCount = (*(int32_t*)&iByteCode[iOffset]);
 
 		GLOBALS = (int32_t*)&RAM[iStringStartOffset];
+		memset(GLOBALS, 0, sizeof(int32_t) * iStaticVariableCount);
+
 		iOffset += sizeof(int32_t);
 		iStringStartOffset += sizeof(int32_t) * iStaticVariableCount;
 	}
@@ -246,6 +258,10 @@ int VirtualMachine::loadCode(const char* iByteCode, int startOffset, int iBuffLe
 
 void VirtualMachine::load(const char* iByteCode, int iBuffLength)
 {
+#if (LOGTOFILE == 1)
+	m_pLogger = new RandomAccessFile();
+	m_pLogger->openForWrite("log.txt");
+#endif
 	memset(&RAM, 0, sizeof(char) * MAX_RAM_SIZE);
 	CODE = (int8_t*)&RAM[CS_START_OFFSET];
 	STACK = (int32_t*)&RAM[SS_START_OFFSET];
@@ -624,6 +640,9 @@ void VirtualMachine::eval(OPCODE eOpCode)
 
 			int32_t iStringOffset = *(pDS + iTemp1);
 			std::cout << green << &RAM[iStringOffset] << white;
+#if (LOGTOFILE == 1)
+			m_pLogger->writeLine((const char*)&RAM[iStringOffset]);
+#endif
 		}
 		break;
 		case OPCODE::PRTC:
@@ -636,12 +655,26 @@ void VirtualMachine::eval(OPCODE eOpCode)
 		{
 			iTemp1 = *( (int32_t*)&STACK[REGS.RSP++] );
 			std::cout << green << iTemp1 << white;
+
+#if (LOGTOFILE == 1)
+			char sBuf[8];
+			memset(sBuf, 0, 8);
+			sprintf_s(sBuf, 8, "%d", iTemp1);
+			m_pLogger->writeLine(sBuf);
+#endif
 		}
 		break;
 		case OPCODE::PRTF:
 		{
 			fTemp1 = *( (float*)&STACK[REGS.RSP++] );
 			std::cout << green << fTemp1 << white;
+
+#if (LOGTOFILE == 1)
+			char sBuf[255];
+			memset(sBuf, 0, 255);
+			sprintf_s(sBuf, 255, "%f", fTemp1);
+			m_pLogger->writeLine(sBuf);
+#endif
 		}
 		break;
 		case OPCODE::MALLOC:

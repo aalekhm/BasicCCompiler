@@ -4,7 +4,16 @@
 #define __START_BLOCK_STRING__(_BLOCKNAME_) \
 	updateBlockString(_BLOCKNAME_); \
 	startBlockMarker(); \
-	
+
+#define __CURRENT_BLOCK_NODE__(__node__) \
+	if(m_pASTCurrentBlockNode != nullptr) \
+			m_pASTPrevBlockNode = m_pASTCurrentBlockNode; \
+	m_pASTCurrentBlockNode = __node__; \
+
+#define __RESET_BLOCK_NODE__ \
+	m_pASTCurrentBlockNode = m_pASTPrevBlockNode; \
+	m_pASTPrevBlockNode = nullptr; \
+
 #define __END_CURRENT_BLOCK__ \
 	removeLastFromBlockString(); \
 	endBlockMarker(); \
@@ -31,8 +40,13 @@
 #define APPEND_INFO_FOR_KEY(__node__, __key__, __appendValue__)		__node__->appendAdditionalInfo(__key__, __appendValue__)
 	
 TinyCReader::TinyCReader()
-: m_bStructInProcess(false)
-, m_bFunctionInProcess(false)
+	: m_bStructInProcess(false)
+	, m_bFunctionInProcess(false)
+	, m_bInterfaceInProcess(false)
+	, m_pASTRootNode(nullptr)
+	, m_pASTCurrentNode(nullptr)
+	, m_pASTCurrentBlockNode(nullptr)
+	, m_pASTPrevBlockNode(nullptr)
 {
 	GrammerUtils::init();
 }
@@ -574,7 +588,6 @@ void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 	
 	Tree* pExpressionNode = m_pASTCurrentNode;
 	Tree* pAssignNode = pExpressionNode->m_pParentNode;
-	Tree* pBlockNode = pAssignNode->m_pParentNode;
 	Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
 	{
 		pFunctionCallNode->removeFromParent();
@@ -605,7 +618,7 @@ void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 			}
 			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
 			SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
-			pBlockNode->addChild(pPrimIntNode);
+			m_pASTCurrentBlockNode->addChild(pPrimIntNode);
 		}
 		
 		Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");
@@ -737,9 +750,11 @@ return false;
 																Tree* pTemp = nullptr;
 																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
 																m_pASTCurrentNode = pInterfaceDefNode;
-																
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
+
 																Tree* pInterfaceStartNode = makeLeaf(ASTNodeType::ASTNode_INTERFACESTART, "");
 																m_pASTCurrentNode->addChild(pInterfaceStartNode);
+																
 															
 while(true) {
 if(interfaceObjectList()) {
@@ -761,6 +776,7 @@ return false;
 
 																__END_INTERFACE__
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 																
 																Tree* pInterfaceEndNode = makeLeaf(ASTNodeType::ASTNode_INTERFACEEND, "");
 																m_pASTCurrentNode->addChild(pInterfaceEndNode);
@@ -909,6 +925,7 @@ return false;
 																Tree* pTemp = nullptr;
 																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
 																m_pASTCurrentNode = pStructDefNode;
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 																
 																Tree* pStructStartNode = makeLeaf(ASTNodeType::ASTNode_STRUCTSTART, "");
 																m_pASTCurrentNode->addChild(pStructStartNode);
@@ -933,6 +950,7 @@ return false;
 
 																__END_STRUCT__
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 																
 																Tree* pStructEndNode = makeLeaf(ASTNodeType::ASTNode_STRUCTEND, "");
 																m_pASTCurrentNode->addChild(pStructEndNode);
@@ -1044,7 +1062,7 @@ return true;
 }
 
 bool TinyCReader::staticPtr() {
-if(!primitiveType())
+if(!variableType())
 return false;
 
 																std::string sPointerType = PREV_TOKEN_TEXT;
@@ -1186,6 +1204,7 @@ return false;
 
 																pTemp = m_pASTCurrentNode; // Save Root Node temporarily
 																m_pASTCurrentNode = pFunctionDefNode;
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 																
 																Tree* pFuncStartNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONSTART, "");
 																m_pASTCurrentNode->addChild(pFuncStartNode);
@@ -1197,6 +1216,7 @@ return false;
 
 																__END_FUNCTION__
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 																
 																Tree* pFuncEndNode = makeLeaf(ASTNodeType::ASTNode_FUNCTIONEND, "");
 																m_pASTCurrentNode->addChild(pFuncEndNode);
@@ -1689,29 +1709,19 @@ return false;
 
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															m_pASTCurrentNode = pIfNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														
 if(!GrammerUtils::match(')', MANDATORY_))
 return false;
-if(!GrammerUtils::match('{', OPTIONAL_)) {
-
-}
-
-else {
-
-}
-
+if(!GrammerUtils::match('{', MANDATORY_))
+return false;
 if(!stmt_list())
 return false;
-if(!GrammerUtils::match('}', OPTIONAL_)) {
-
-}
-
-else {
-
-}
-
+if(!GrammerUtils::match('}', MANDATORY_))
+return false;
 
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 														
 if(!elseStatement()) {
 }
@@ -1739,28 +1749,18 @@ return false;
 																pElseNode->m_pParentNode = pIfNode->m_pParentNode;
 																
 																m_pASTCurrentNode = pElseNode;
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 															}
 														
-if(!GrammerUtils::match('{', OPTIONAL_)) {
-
-}
-
-else {
-
-}
-
+if(!GrammerUtils::match('{', MANDATORY_))
+return false;
 if(!stmt_list())
 return false;
-if(!GrammerUtils::match('}', OPTIONAL_)) {
-
-}
-
-else {
-
-}
-
+if(!GrammerUtils::match('}', MANDATORY_))
+return false;
 
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 															
 															pIfNode->m_pRightNode = pElseNode;
 															{
@@ -1799,6 +1799,7 @@ return false;
 
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															m_pASTCurrentNode = pWhileNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														
 if(!GrammerUtils::match(')', MANDATORY_))
 return false;
@@ -1822,6 +1823,7 @@ else {
 
 
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 															
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pWhileNode);
@@ -1936,6 +1938,7 @@ return false;
 														{
 															pTemp = m_pASTCurrentNode;
 															m_pASTCurrentNode = pSwitchCaseNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														}
 													
 if(!GrammerUtils::match(':', MANDATORY_))
@@ -1974,6 +1977,8 @@ return false;
 
 
 														__END_CURRENT_BLOCK__
+														__RESET_BLOCK_NODE__
+														
 														m_pASTCurrentNode = pTemp;
 													
 return true;
@@ -1992,6 +1997,7 @@ return false;
 														{
 															pTemp = m_pASTCurrentNode;
 															m_pASTCurrentNode = pSwitchDefaultNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														}
 													
 if(!GrammerUtils::match(':', MANDATORY_))
@@ -2016,6 +2022,8 @@ else {
 
 
 														__END_CURRENT_BLOCK__
+														__RESET_BLOCK_NODE__
+														
 														m_pASTCurrentNode = pTemp;
 													
 if(!GrammerUtils::match("break", MANDATORY_))
@@ -2100,6 +2108,7 @@ if(!GrammerUtils::match(')', MANDATORY_))
 return false;
 
 															m_pASTCurrentNode = pWhileNode;
+															__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 														
 if(!GrammerUtils::match('{', OPTIONAL_)) {
 
@@ -2121,6 +2130,7 @@ else {
 
 
 															__END_CURRENT_BLOCK__
+															__RESET_BLOCK_NODE__
 															
 															for(Tree* pLoopExpr : pFor_LoopExpressionsLeaf->m_vStatements)
 															{
@@ -2596,6 +2606,7 @@ if(!GrammerUtils::match('{', MANDATORY_))
 return false;
 
 																__START_BLOCK_STRING__("{")
+																__CURRENT_BLOCK_NODE__(m_pASTCurrentNode)
 															
 if(!stmt_list())
 return false;
@@ -2603,6 +2614,7 @@ if(!GrammerUtils::match('}', MANDATORY_))
 return false;
 
 																__END_CURRENT_BLOCK__
+																__RESET_BLOCK_NODE__
 															
 return true;
 
@@ -3302,14 +3314,53 @@ return false;
 																m_pASTCurrentNode = pRValueExpressionLeftLeaf;
 															}
 														
-if(!expr())
+if(GrammerUtils::match("new", OPTIONAL_)) {
+
+															// Since this will be a 'struct' constructor call, change its type to 'ASTNode_TYPESTRUCT'
+															// & make all necessary changes that suit 'ASTNode_TYPESTRUCT'
+															
+															pAssignmentNode->m_eASTNodeType = ASTNodeType::ASTNode_TYPESTRUCT;
+															pAssignmentNode->m_pLeftNode = nullptr; delete pRValueExpressionLeftLeaf; 	// No need for these, hence remove & delete.
+															pAssignmentNode->m_pRightNode = nullptr; delete pIdentifierLeaf;			// No need for these, hence remove & delete.
+															
+															pAssignmentNode->m_sAdditionalInfo.append(sVariableName);
+															pAssignmentNode->m_bIsPointerType = true;
+															SET_INFO_FOR_KEY(pAssignmentNode, "givenName", sVariableName);
+															SET_INFO_FOR_KEY(pAssignmentNode, "scope", getCurrentScopeString());
+
+															m_pASTCurrentNode = pAssignmentNode;
+														
+if(!functionCall())
 return false;
+
+															// Since the last node would have been a 'ASTNode_FUNCTIONCALL', grab it 
+															// & make changes to 'ASTNode_TYPESTRUCT' node.
+															
+															Tree* pFunctionCallNode = m_pASTCurrentNode->m_vStatements[0];
+															{
+																std::string sStructType = GET_INFO_FOR_KEY(pFunctionCallNode, "text");
+																SET_INFO_FOR_KEY(pFunctionCallNode, "memberFunctionOf", sStructType);
+																SET_INFO_FOR_KEY(pAssignmentNode, "type", sStructType);
+															}
+
+															m_pASTCurrentNode = pTemp;
+															m_pASTCurrentNode->addChild(pAssignmentNode);
+														
+return true;
+}
+else
+if(expr()) {
 
 															m_pASTCurrentNode = createPostFixExpr(m_pASTCurrentNode);
 															
 															m_pASTCurrentNode = pTemp;
 															m_pASTCurrentNode->addChild(pAssignmentNode);
 														
+return true;
+}
+else
+return false;
+
 return true;
 
 }
@@ -3954,7 +4005,6 @@ return false;
 																
 																Tree* pExpressionNode = m_pASTCurrentNode->m_pParentNode;		// In this case ASTNode_MEMBERACCESS's parent.
 																Tree* pAssignNode = pExpressionNode->m_pParentNode;
-																Tree* pBlockNode = pAssignNode->m_pParentNode;
 																Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
 																{
 																	pFunctionCallNode->removeFromParent();
@@ -3973,7 +4023,7 @@ return false;
 																		SET_INFO_FOR_KEY(pPrimIntNode, "givenName", sFuncName);
 																		SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
 																		SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
-																		pBlockNode->addChild(pPrimIntNode);
+																		m_pASTCurrentBlockNode->addChild(pPrimIntNode);
 																	}
 																	
 																	Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");

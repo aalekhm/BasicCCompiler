@@ -38,6 +38,7 @@ class TinyCReader {
 			GrammerUtils::m_vKeywords.push_back("sizeOf");
 			GrammerUtils::m_vKeywords.push_back("new");
 			GrammerUtils::m_vKeywords.push_back("malloc");
+			GrammerUtils::m_vKeywords.push_back("new");
 			GrammerUtils::m_vKeywords.push_back("free");
 			GrammerUtils::m_vKeywords.push_back("&&");
 			GrammerUtils::m_vKeywords.push_back("||");
@@ -205,6 +206,8 @@ class TinyCReader {
 		
 		Tree*						m_pASTRootNode;
 		Tree*						m_pASTCurrentNode;
+		Tree*						m_pASTCurrentBlockNode;
+		Tree*						m_pASTPrevBlockNode;
 		
 		std::vector<std::string>	m_sBlockStringList;
 		bool						m_bInterfaceInProcess;

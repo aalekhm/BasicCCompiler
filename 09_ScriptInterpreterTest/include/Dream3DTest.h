@@ -20,7 +20,10 @@ class Dream3DTest : public EngineManager
 		virtual void			onMouseMoveEx(int mCode, int x, int y);
 		virtual void			onMouseUpEx(int mCode, int x, int y);
 		virtual void			onMouseWheelEx(WPARAM wParam, LPARAM lParam);
-	protected:
+
+		int32_t					m_iMouseX;
+		int32_t					m_iMouseY;
+protected:
 	private:
 		VirtualMachine*			m_pVM;
 		void					onScriptCallback(const char* sSysFuncName, int16_t iArgCount);

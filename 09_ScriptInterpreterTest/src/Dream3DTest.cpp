@@ -5,10 +5,16 @@
 #include <cstdlib>
 
 void	createGLRotationMatrix(float _x, float _y, float _angle);
-float	osClock();
+float	osClock_ElapsedTimeinSeconds();
+float	osClock_DeltaTimeInMs();
 void	randomSeed(uint32_t iSeed);
 float	random();
 float	sine(float fAngleInRadians);
+int32_t	getScreenWidth();
+int32_t	getScreenHeight();
+int32_t getMouseX();
+int32_t getMouseY();
+int32_t	isKeyPressed(int32_t iKeyCode);
 
 META_REGISTER_FUN(glMatrixMode);
 META_REGISTER_FUN(glLoadIdentity);
@@ -17,11 +23,18 @@ META_REGISTER_FUN(glClear);
 META_REGISTER_FUN(glBegin);
 META_REGISTER_FUN(glColor3f);
 META_REGISTER_FUN(glVertex2f);
+META_REGISTER_FUN(glVertex2i);
 META_REGISTER_FUN(glEnd);
-META_REGISTER_FUN(osClock);
+META_REGISTER_FUN(osClock_ElapsedTimeinSeconds);
+META_REGISTER_FUN(osClock_DeltaTimeInMs);
 META_REGISTER_FUN(randomSeed);
 META_REGISTER_FUN(random);
 META_REGISTER_FUN(sine);
+META_REGISTER_FUN(getScreenWidth);
+META_REGISTER_FUN(getScreenHeight);
+META_REGISTER_FUN(getMouseX);
+META_REGISTER_FUN(getMouseY);
+META_REGISTER_FUN(isKeyPressed);
 META_REGISTER_FUN_(createGLRotationMatrix, "glRotationzf");
 
 static std::function<void(const char* sSysFuncName, int16_t iArgCount)> fSysFuncCallback = nullptr;
@@ -72,17 +85,20 @@ void Dream3DTest::keyReleasedEx(unsigned int iVirtualKeycode, unsigned short ch)
 	 
 void Dream3DTest::onMouseDownEx(int mCode, int x, int y)
 {
-
+	m_iMouseX = x;
+	m_iMouseY = y;
 }
 
 void Dream3DTest::onMouseMoveEx(int mCode, int x, int y)
 {
-
+	m_iMouseX = x;
+	m_iMouseY = y;
 }
 
 void Dream3DTest::onMouseUpEx(int mCode, int x, int y)
 {
-
+	m_iMouseX = x;
+	m_iMouseY = y;
 }
 
 void Dream3DTest::onMouseWheelEx(WPARAM wParam, LPARAM lParam)
@@ -153,9 +169,14 @@ void createGLRotationMatrix(float _x, float _y, float _angle)
 	glLoadMatrixf(m);
 }
 
-float osClock()
+float osClock_ElapsedTimeinSeconds()
 {
 	return (float)engine.getTimer()->getElapsedTimeInSec();
+}
+
+float osClock_DeltaTimeInMs()
+{
+	return (float)engine.getTimer()->getDeltaTimeMs();
 }
 
 void randomSeed(uint32_t iSeed)
@@ -171,4 +192,29 @@ float random()
 float sine(float fAngleInRadians)
 {
 	return std::sin(fAngleInRadians);
+}
+
+int32_t getScreenWidth()
+{
+	return engine.getWidth();
+}
+
+int32_t	getScreenHeight()
+{
+	return engine.getHeight();
+}
+
+int32_t getMouseX()
+{
+	return engine.m_iMouseX;
+}
+
+int32_t getMouseY()
+{
+	return engine.m_iMouseY;
+}
+
+int32_t	isKeyPressed(int32_t iKeyCode)
+{
+	return engine.isKeyPressed(iKeyCode);
 }

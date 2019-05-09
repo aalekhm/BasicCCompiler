@@ -4,7 +4,16 @@
 #define __START_BLOCK_STRING__(_BLOCKNAME_) \
 	updateBlockString(_BLOCKNAME_); \
 	startBlockMarker(); \
-	
+
+#define __CURRENT_BLOCK_NODE__(__node__) \
+	if(m_pASTCurrentBlockNode != nullptr) \
+			m_pASTPrevBlockNode = m_pASTCurrentBlockNode; \
+	m_pASTCurrentBlockNode = __node__; \
+
+#define __RESET_BLOCK_NODE__ \
+	m_pASTCurrentBlockNode = m_pASTPrevBlockNode; \
+	m_pASTPrevBlockNode = nullptr; \
+
 #define __END_CURRENT_BLOCK__ \
 	removeLastFromBlockString(); \
 	endBlockMarker(); \
@@ -31,8 +40,13 @@
 #define APPEND_INFO_FOR_KEY(__node__, __key__, __appendValue__)		__node__->appendAdditionalInfo(__key__, __appendValue__)
 	
 TinyCReader::TinyCReader()
-: m_bStructInProcess(false)
-, m_bFunctionInProcess(false)
+	: m_bStructInProcess(false)
+	, m_bFunctionInProcess(false)
+	, m_bInterfaceInProcess(false)
+	, m_pASTRootNode(nullptr)
+	, m_pASTCurrentNode(nullptr)
+	, m_pASTCurrentBlockNode(nullptr)
+	, m_pASTPrevBlockNode(nullptr)
 {
 	GrammerUtils::init();
 }
@@ -574,7 +588,6 @@ void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 	
 	Tree* pExpressionNode = m_pASTCurrentNode;
 	Tree* pAssignNode = pExpressionNode->m_pParentNode;
-	Tree* pBlockNode = pAssignNode->m_pParentNode;
 	Tree* pFunctionCallNode = pExpressionNode->getLastStatement();
 	{
 		pFunctionCallNode->removeFromParent();
@@ -605,7 +618,7 @@ void TinyCReader::handleFunctionCallInExpr(std::string sFunctionType)
 			}
 			SET_INFO_FOR_KEY(pPrimIntNode, "type", "int32_t");
 			SET_INFO_FOR_KEY(pPrimIntNode, "scope", getCurrentScopeString());
-			pBlockNode->addChild(pPrimIntNode);
+			m_pASTCurrentBlockNode->addChild(pPrimIntNode);
 		}
 		
 		Tree* pExpressionLeftLeaf = makeLeaf(ASTNodeType::ASTNode_EXPRESSION, "");

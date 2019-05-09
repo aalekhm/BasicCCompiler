@@ -78,6 +78,7 @@ void(GL_FUNCPTR * _ptr_glBegin)(GLenum) = nullptr;
 void(GL_FUNCPTR * _ptr_glEnd)(void) = nullptr;
 void(GL_FUNCPTR * _ptr_glColor3f)(GLfloat, GLfloat, GLfloat) = nullptr;
 void(GL_FUNCPTR * _ptr_glVertex2f)(GLfloat, GLfloat) = nullptr;
+void(GL_FUNCPTR * _ptr_glVertex2i)(GLint, GLint) = nullptr;
 
 //OpenGL1.2
 //core 

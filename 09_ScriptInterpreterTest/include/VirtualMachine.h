@@ -3,6 +3,8 @@
 #include <vector>
 #include <functional>
 
+#define LOGTOFILE	0
+
 enum class OPCODE
 {
 	NOP = 0,
@@ -176,6 +178,9 @@ struct HeapNode
 
 class VirtualMachine
 {
+#if (LOGTOFILE == 1)
+	friend class RandomAccessFile;
+#endif
 	public:
 		static VirtualMachine*		create(std::function<void(const char*, int16_t)>* fSysFuncCallback);
 		void						loadFile(const char* sMachineCodeFile);
@@ -242,4 +247,7 @@ class VirtualMachine
 
 		std::vector<HeapNode>		m_vAllocatedList;
 		std::vector<HeapNode>		m_vUnAllocatedList;
+#if (LOGTOFILE == 1)
+		RandomAccessFile*			m_pLogger;
+#endif
 };

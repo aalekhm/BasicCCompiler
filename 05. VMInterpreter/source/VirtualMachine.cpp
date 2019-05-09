@@ -188,7 +188,7 @@ void VirtualMachine::reset()
 	m_vAllocatedList.clear();
 	m_vUnAllocatedList.clear();
 
-	m_vUnAllocatedList.push_back(HeapNode(0, MAX_HEAP_SIZE));
+	m_vUnAllocatedList.push_back(HeapNode(1, MAX_HEAP_SIZE));
 
 	m_bRunning = false;
 }
@@ -222,6 +222,8 @@ int VirtualMachine::loadBSS(const char* iByteCode, int startOffset, int iBuffLen
 		int32_t iStaticVariableCount = (*(int32_t*)&iByteCode[iOffset]);
 
 		GLOBALS = (int32_t*)&RAM[iStringStartOffset];
+		memset(GLOBALS, 0, sizeof(int32_t) * iStaticVariableCount);
+
 		iOffset += sizeof(int32_t);
 		iStringStartOffset += sizeof(int32_t) * iStaticVariableCount;
 	}

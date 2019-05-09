@@ -25,6 +25,7 @@ class EngineManager {
 		void					shutdown();
 		void					exit();
 		State					getState();
+		void					setWindowText(const char* sTitle);
 
 		void					setViewport(int w, int h);
 		void					initTimer();

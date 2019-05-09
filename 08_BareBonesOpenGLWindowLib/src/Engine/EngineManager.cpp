@@ -43,6 +43,14 @@ HWND EngineManager::getWindowHandle() {
 	return m_pHWnd;
 }
 
+void EngineManager::setWindowText(const char* sTitle)
+{
+	if (sTitle != nullptr && strlen(sTitle) > 0)
+	{
+		SetWindowText(m_pHWnd, sTitle);
+	}
+}
+
 void EngineManager::shutdown() {
 	if(m_iState != UNINITIALIZED) {
 
@@ -162,22 +170,14 @@ unsigned int EngineManager::getHeight() {
 void EngineManager::updateFPS() {
 	++m_iFrameCount;
 
-	//double dCurrTimeMillis = m_pTimer->getElapsedTimeInMilliSec();
-	//unsigned int iLimitFPS = 30;
-	//unsigned int iLimitFPSTimeMillis = 1000/iLimitFPS;
-	//if(gLastElapsedTimeMillis <= 0) {
-	//	gLastElapsedTimeMillis = dCurrTimeMillis;
-	//}
-	//double dFrameTime = dCurrTimeMillis - gLastElapsedTimeMillis;
-	//if(dFrameTime >= 0 && dFrameTime < iLimitFPSTimeMillis ) {
-	//	SleepEx((unsigned long)(iLimitFPSTimeMillis - dFrameTime), true);
-	//}
-	//gLastElapsedTimeMillis = dCurrTimeMillis;
-
 	if( (m_pTimer->getFrameElapsedTime() - m_dLastElapsedFPSTimeMs) >= 1000.0f) {
 		m_iFrameRate = m_iFrameCount;
 		m_iFrameCount = 0;
 		m_dLastElapsedFPSTimeMs = m_pTimer->getElapsedTimeInMilliSec();
+
+		char sText[255];
+		sprintf_s(sText, 255, "FPS: %d", m_iFrameRate);
+		setWindowText(sText);
 	}
 }
 
