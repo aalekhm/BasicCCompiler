@@ -4,6 +4,10 @@
 #include "Engine/EngineManager.h"
 #include <cstdlib>
 
+#if defined _M_IX86
+#error "This code should not be compiled on x86. Use x64 instead"
+#endif
+
 void	createGLRotationMatrix(float _x, float _y, float _angle);
 float	osClock_ElapsedTimeinSeconds();
 float	osClock_DeltaTimeInMs();

@@ -2,7 +2,7 @@
 #include <string>
 #include <assert.h>
 
-namespace TokenType_
+namespace TokenType
 {
 	enum class Type
 	{
@@ -148,7 +148,7 @@ namespace TokenType_
 		return "";
 	}
 
-	inline TokenType_::Type fromString(std::string sTokenType)
+	inline TokenType::Type fromString(std::string sTokenType)
 	{
 			 if(sTokenType == "TK_MUL")					return Type::TK_MUL;
 		else if(sTokenType == "TK_MULEQ")				return Type::TK_MULEQ;
@@ -221,18 +221,18 @@ namespace TokenType_
 
 struct Token
 {
-	Token(TokenType_::Type eTokenType, std::string sText, int iLine, int iColumn)
+	Token(TokenType::Type eTokenType, std::string sText, int iLine, int iColumn)
 		: m_eTokenType(eTokenType)
 		, m_sText(sText)
 		, m_iLine(iLine)
 		, m_iColumn(iColumn)
 	{}
 
-	TokenType_::Type	m_eTokenType;
+	TokenType::Type	m_eTokenType;
 	std::string			m_sText;
 	int					m_iLine;
 	int					m_iColumn;
 
-	TokenType_::Type	getType() { return m_eTokenType; }
+	TokenType::Type	getType() { return m_eTokenType; }
 	const char*			getText() { return m_sText.c_str(); }
 };

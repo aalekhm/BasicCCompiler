@@ -551,6 +551,7 @@ float foo2(int i, float f) { std::cout << "In foo2(" << i << ", " << f << ")" <<
 
 void callCPPFunc(std::string sFuncName)
 {
+#if defined _M_IX86
 	void* pFuncPtr = map_FunctionMap[sFuncName];
 	assert(pFuncPtr != nullptr);
 	if (pFuncPtr != nullptr)
@@ -568,6 +569,7 @@ void callCPPFunc(std::string sFuncName)
 			pop eax
 		}
 	}
+#endif
 }
 
 int main(int argc, char* argv[])

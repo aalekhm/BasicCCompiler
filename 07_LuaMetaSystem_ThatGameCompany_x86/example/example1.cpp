@@ -6,6 +6,11 @@
 #include "extern/window.cpp"
 #include "extern/gl.cpp"
 
+#if defined _M_X64
+#error "This code should not be compiled on x86. Use x64 instead"
+#endif
+
+
 #include "meta/luaRegister.h"
 #include "example/luaGL.h"
 
@@ -34,7 +39,8 @@ void funcStr(const char* sStr)
 	std::cout << sStr << std::endl;
 }
 
-int main(int argc, char* argv[]){
+int main(int argc, char* argv[])
+{
 	//Init lua state and bind variables and function defined at global scope
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
@@ -66,5 +72,6 @@ int main(int argc, char* argv[]){
 
 	} while (wnd.processAllMessages() && wnd.getKey('c') != InputHandler::ButtonState::PRESSED);
 	lua_close(L);
+
 	return 0;
 }
